@@ -1,0 +1,99 @@
+name: Build Desktop App (Tauri)
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-tauri:
+    name: Build Tauri on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            pyinstaller_args: "--clean python-server.spec"
+            binary_src: "backend/dist/python-server.exe"
+            binary_dest: "frontend/src-tauri/binaries/python-server-x86_64-pc-windows-msvc.exe"
+          - os: ubuntu-22.04
+            pyinstaller_args: "--clean python-server.spec"
+            binary_src: "backend/dist/python-server"
+            binary_dest: "frontend/src-tauri/binaries/python-server-x86_64-unknown-linux-gnu"
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # ── Dependencies ──
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux Dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libgdk-pixbuf2.0-dev
+
+      # ── Build Backend (PyInstaller) ──
+      - name: Install Python Dependencies
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build Python Sidecar (PyInstaller)
+        working-directory: ./backend
+        run: pyinstaller ${{ matrix.pyinstaller_args }}
+
+      - name: Move Sidecar Binary for Tauri
+        shell: bash
+        run: |
+          mkdir -p frontend/src-tauri/binaries
+          cp ${{ matrix.binary_src }} ${{ matrix.binary_dest }}
+
+      # ── Build Frontend & Tauri App ──
+      - name: Install Node Dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Build Tauri App
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: "./frontend"
+          args: ${{ matrix.os == 'ubuntu-22.04' && '--bundles deb,appimage' || '' }}
+
+      # ── Upload Artifacts ──
+      - name: Upload Windows MSI/EXE
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cops-desktop-windows
+          path: |
+            frontend/src-tauri/target/release/bundle/msi/*.msi
+            frontend/src-tauri/target/release/bundle/nsis/*.exe
+          retention-days: 7
+
+      - name: Upload Linux DEB/AppImage
+        if: matrix.os == 'ubuntu-22.04'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cops-desktop-linux
+          path: |
+            frontend/src-tauri/target/release/bundle/deb/*.deb
+            frontend/src-tauri/target/release/bundle/appimage/*.AppImage
+          retention-days: 7
