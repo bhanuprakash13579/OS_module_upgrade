@@ -1,0 +1,2508 @@
+',1) order by dc_code
+2.   Articles in excess of permissible limits, which are property declared may be detained for payment of duty and / or other reasons as specified above.  Such goods will be released to the owner or his authorised representative on production of this receipt within 1 (one) month from date after which they will be disposed of under the provision of Customs Act, 1962, without any further reference to the owner of the goods and no claim over the goods whatsoever will be entertained a later date.
+',5) where
+ABSTRACT REPORT ON ADJUDICATIONS BY D.C. / A.D.C.(AIRPORT) FROM 
+ABSTRACT REPORT ON BAGGAGE DUTY COLLECTED FROM 
+ABSTRACT REPORT ON DEPUTY / ASST. COMMISSIONERWISE DUTY COLLECTED  FROM 
+ABSTRACT REPORT ON OFFENCE CASES REGISTERED FROM 
+ABSTRACT REPORT ON ONLINE DOCUMENTS (BRs, OS, DRs, FMs, Warehouse Receipts) GENERATED THROUGH COPS SOFTWARE FROM 
+ABSTRACT REPORT ON WAREHOUSE RECEIPTS FROM 
+*\AC:\Users\Admin.user-HP\Desktop\05092021\COPSBR.vbp
+Adjudication Details Not Entered For This O.S.No.  Please Update the Adjudication Details Before Selecting the Entry Of Duty Payment Details ! 
+ADJUDICATION DETAILS OF Addl. / Joint Commissioner (ALL CASES) DURING 
+ADJUDICATION DETAILS OF Addl. / Joint Commissioner DURING 
+ADJUDICATION DETAILS OF Addl. / Joint Commissioner FOR THE CASES BOOKED DURING 
+ADJUDICATION DETAILS OF Addl. / Joint Commissioner FOR THE CASES BOOKED PRIOR TO 
+Adjudication Details Updated ! 
+Adjudication Details UPDATED IN D.R. DATA ! 
+Adjudication Not Over for the entered OS No. & Year.  Please Adjudicate before Printing of Adjn. Order 
+Adjudication Particulars Not Updated in D/R Data ! 
+admin
+admin	
+Admin
+ADMIN
+Airport name Not Found in Airport Master.  Contact System Administrator ! 
+ align=left>
+ align=left><font face=Arial size=1>
+  align=left><font face=Arial size=1><b>
+ align=left><font face=Arial size=1><b>
+ align=left><strong><font face=Arial>
+ align=left><strong><font face=Arial>&nbsp;</font></strong></td>
+ align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+ align=left><strong><font face=Arial size=1>
+ align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+ align=left><strong><font face=Arial size=1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b><u>B.R.No.&nbsp;
+  align=right><font face=Arial size=1><b>
+ align=right><font face=Arial size=1><b>
+ align=right><strong><font face=Arial size=1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+All Data Refreshed From Server ! 
+All the Warehoused Goods in the Entered W/H No. & Year have been released. No Quantity Left in Warehouse For Release ! 
+ Already Restored From Backup ! 
+ and adjudication_date between 
+' and adjudication_date between 
+ and adjudication_date is not null group by adj_offr_name 
+ and adjudication_date is null and isnull(total_items_value)=false and total_items_value<>0 order by os_date,os_no
+ and bank_shift='Day' and entry_deleted='D' group by br_type+'-'+cstr(br_no) 
+ and bank_shift='Day' and entry_deleted='D' order by br_type,br_no 
+ and bank_shift='Day' order by br_type,br_no 
+ and bank_shift='Day' order by unique_no 
+ and bank_shift='Night' and entry_deleted='D'  group by br_type+'-'+cstr(br_no)
+ and bank_shift='Night' and entry_deleted='D' order by br_type,br_no 
+ and bank_shift='Night' order by br_type,br_no 
+ and bank_shift='Night' order by unique_no 
+  and batch_shift<>'na' and br_amount<>0 and (entry_deleted is null or entry_deleted<>'Y') 
+ and batch_shift<>'na' and (challan_no is null or len(trim(challan_no))=0) and (entry_deleted is null or entry_deleted<>'Y') 
+ and batch_shift<>'na' and (challan_no is null or len(trim(challan_no))=0) and (entry_deleted is null or entry_deleted<>'Y') group by bank_date 
+  and batch_shift<>'na' and (entry_deleted is null or entry_deleted<>'Y') group by bank_date 
+ and batch_shift<>'na' and (entry_deleted is null or entry_deleted<>'Y') group by bank_date 
+  and batch_shift<>'na' and pp_amount<>0 and (entry_deleted is null or entry_deleted<>'Y')
+  and batch_shift<>'na' and ref_amount<>0 and (entry_deleted is null or entry_deleted<>'Y')
+  and batch_shift<>'na' and rf_amount<>0 and (entry_deleted is null or entry_deleted<>'Y') 
+  and batch_shift<>'na' and (wh_amount+other_amount)<>0 and (entry_deleted is null or entry_deleted<>'Y') 
+' and booked_by like 'AIU%' order by os_date,os_no  
+ and br_amount<>0 and batch_shift<>'na' and (entry_deleted is null or entry_deleted<>'Y') group by challan_no 
+ and (br_items.items_desc like '
+ and br_no not in (select br_no from type_changed_brs where (used_br_type='Bagg' or used_br_type='OS' or used_br_type='OOS') and br_date>=#04/21/2016#) order by br_no 
+ and br_no not in (select br_no from type_changed_brs where used_br_type='Gold') order by br_no 
+ and br_no not in (select br_no from type_changed_brs where used_br_type='SDO') order by br_no 
+  and br_no not in (select br_no from type_changed_brs where used_br_type='Silv') order by br_no 
+ and (br_type='Bagg' or br_type='OS' or br_type='OOS') order by br_no 
+ and (br_type='Bagg' or br_type='SDO' or br_type='OS' or br_type='TR') and total_duty_amount<>0 and (entry_deleted is null or entry_deleted<>'Y') 
+ and br_type='Fuel' and (entry_deleted is null or entry_deleted<>'Y') 
+ and (br_type='Gold') order by br_no 
+ and (br_type='OS' or br_type='OOS') and (entry_deleted is null or entry_deleted<>'Y')  
+' and (br_type='OS' or br_type='OOS')  and (entry_deleted is null or entry_deleted<>'Y') 
+ and br_type<>'SDO' group by flight_no 
+ and (br_type='SDO') order by br_no 
+ and (br_type='Silv') order by br_no 
+ and (closure_ind is null or closure_ind<>'Y') and (entry_deleted is null or entry_deleted<>'Y') 
+# and (closure_ind is null or closure_ind<>'Y') and os_no in (select os_no from mahazar_items where 
+ and (closure_ind is null or closure_ind<>'Y') group by detained_by
+ and (closure_ind is null or closure_ind<>'Y') group by detained_by 
+ and (closure_ind is null or closure_ind<>'Y') group by seal_no
+ and (closure_ind is null or len(trim(closure_ind))=0 or closure_ind<>'Y') order by mhb_no 
+ and (closure_ind='Y') and (entry_deleted is null or entry_deleted<>'Y') order by dr_date,dr_no 
+ and (confiscated_value+redeemed_value+re_export_value)<=500000 and booked_by like 'AIU%' 
+ and (cops_items.items_desc like '
+ and cops_master.location_code=cops_items.location_code and adjudication_date between 
+ and cops_master.os_date between 
+ and dr_no<>0 and (dr_type='Bagg') order by wh_date,wh_no 
+ and dr_no<>0 and (dr_type='Bagg' or dr_type='AIU') order by wh_date,wh_no 
+ and dr_no<>0 order by dr_date,dr_no 
+# and dr_no in (select dr_no from dr_items where 
+ and dr_type<>'Bagg' and (entry_deleted is null or entry_deleted<>'Y') 
+ and dr_type='Bagg' and (entry_deleted is null or entry_deleted<>'Y') 
+ and (dr_type='Bagg' or dr_type='Other') and (entry_deleted is null or entry_deleted<>'Y') 
+' and dr_type<>'MHB'  and (entry_deleted is null or entry_deleted<>'Y') 
+' and dr_type<>'MHB' and (entry_deleted is null or entry_deleted<>'Y') 
+')) and dr_type<>'MHB' and (entry_deleted is null or entry_deleted<>'Y') and location_code='
+' and dr_type<>'MHB' and (entry_deleted is null or entry_deleted<>'Y')  group by detained_pkg_no 
+' and dr_type<>'MHB' and (entry_deleted is null or entry_deleted<>'Y') group by detained_pkg_no 
+' and dr_type<>'MHB' and (entry_deleted is null or entry_deleted<>'Y') group by detained_pkg_type 
+' and dr_type<>'MHB' and (entry_deleted is null or entry_deleted<>'Y')  order by items_sno 
+' and dr_type<>'MHB' and (entry_deleted is null or entry_deleted<>'Y') order by items_sno 
+' and dr_type<>'MHB' order by items_sno
+ and entry_deleted='D' 
+  and  (entry_deleted is null or entry_deleted<>'Y') 
+  and (entry_deleted is null or entry_deleted<>'Y') 
+ and (entry_deleted is null or entry_deleted<>'Y')
+ and (entry_deleted is null or entry_deleted<>'Y') 
+ and (entry_deleted is null or entry_deleted='Y') 
+'  and (entry_deleted is null or entry_deleted<>'Y') 
+'  and (entry_deleted is null or entry_deleted<>'Y')  
+' and (entry_deleted is null or entry_deleted<>'Y')
+' and (entry_deleted is null or entry_deleted<>'Y') 
+' and (entry_deleted is null or entry_deleted<>'Y')  
+' and (entry_deleted is null or entry_deleted<>'Y')   
+')  and (entry_deleted is null or entry_deleted<>'Y') 
+') and (entry_deleted is null or entry_deleted<>'Y') 
+ and (entry_deleted is null or entry_deleted<>'Y') and 
+  and  (entry_deleted is null or entry_deleted<>'Y') and br_type<>'na' 
+' and (entry_deleted is null or entry_deleted<>'Y') and dr_type<>'MHB' 
+ and (entry_deleted is null or entry_deleted<>'Y') and len(trim(challan_no))<>0 
+ and (entry_deleted is null or entry_deleted<>'Y') and location_code='
+#  and (entry_deleted is null or entry_deleted<>'Y')  and location_code='
+# and (entry_deleted is null or entry_deleted<>'Y')  and location_code='
+# and (entry_deleted is null or entry_deleted<>'Y') and location_code='
+') and (entry_deleted is null or entry_deleted<>'Y') and location_code='
+ and (entry_deleted is null or entry_deleted<>'Y') group by bank_date 
+# and (entry_deleted is null or entry_deleted<>'Y') group by (cstr(bank_date)+'-'+bank_shift) 
+ and (entry_deleted is null or entry_deleted<>'Y') group by detained_pkg_no 
+' and (entry_deleted is null or entry_deleted<>'Y') order by br_date desc 
+' and (entry_deleted is null or entry_deleted<>'Y') order by cint(detained_pkg_no),items_sno  
+ and (entry_deleted is null or entry_deleted<>'Y') order by dr_date,dr_no 
+' and (entry_deleted is null or entry_deleted<>'Y') order by items_sno 
+ and (entry_deleted is null or entry_deleted<>'Y') order by mhb_no 
+ and (entry_deleted='Y')  
+ and entry_deleted='Y'
+ and entry_deleted='Y' 
+ and (entry_deleted='Y') and  bank_date>=#04/21/2016# 
+') and entry_deleted='Y' and location_code='
+' and ((ISNULL(active_ind)=TRUE or len(trim(active_ind))=0))order by category_code 
+ and (IsNull(receipt_by_who) = True Or Len(Trim(receipt_by_who)) = 0) and (entry_deleted is null or entry_deleted<>'Y') 
+ and items_category='Under OS' group by items_duty_type order by sum(items_value) desc
+' and items_category='Under OS' group by items_duty_type order by sum(items_value) desc
+ and (items_desc like '%CURREN%') 
+ and (items_desc like '%GOLD%' or items_desc like '%BANGLE%' OR items_desc like '%JEWEL%') 
+ and (items_duty_type like 'Liquor%' or items_duty_type='cigarate') 
+ and (items_duty_type<>'pri_gold' AND items_duty_type<>'jwl_gold') order by cops_master.os_date,cops_master.os_no 
+ and it is greater than the current batch date.  Data Error.  Contact System Administrator and Check / Correct the Batch Date of the said B/R No. in the Database ! 
+ and len(trim(challan_no))<>0 and (entry_deleted is null or entry_deleted<>'Y')  and location_code='
+# and len(trim(challan_no))<>0 and (entry_deleted is null or entry_deleted<>'Y')  and location_code='
+# and len(trim(challan_no))<>0 and (entry_deleted is null or entry_deleted<>'Y') and location_code='
+ and mid(items_duty_type,1,2)='02' and (entry_deleted is null or entry_deleted<>'Y') group by br_no
+  and (mid(items_duty_type,1,2)='02' or mid(items_duty_type,1,2)='03') order by items_duty_type,items_sno 
+  and (mid(items_duty_type,1,2)='02' or mid(items_duty_type,1,2)='03' or mid(items_duty_type,1,2)='04' or mid(items_duty_type,1,2)='05') order by items_duty_type,items_sno 
+ and (mid(items_duty_type,1,2)='02' or mid(items_duty_type,1,2)='03' or mid(items_duty_type,1,2)='04' or mid(items_duty_type,1,2)='05' or mid(items_duty_type,1,2)='06') and (entry_deleted is null or entry_deleted<>'Y') group by br_no
+ and mid(items_duty_type,1,2)='03' and (entry_deleted is null or entry_deleted<>'Y') group by br_no
+ and mid(items_duty_type,1,2)='04' and (entry_deleted is null or entry_deleted<>'Y') group by br_no
+  and (mid(items_duty_type,1,2)='04' or mid(items_duty_type,1,2)='05' or mid(items_duty_type,1,2)='06') order by items_duty_type,items_sno 
+ and mid(items_duty_type,1,2)='05' and (entry_deleted is null or entry_deleted<>'Y') group by br_no
+ and mid(items_duty_type,1,2)='06' and (entry_deleted is null or entry_deleted<>'Y') group by br_no
+  and mid(items_duty_type,1,2)='06' order by items_duty_type,items_sno 
+ and mid(items_duty_type,1,2)='07' and (entry_deleted is null or entry_deleted<>'Y') group by br_no
+  and (mid(items_duty_type,1,2)='07') order by items_duty_type,items_sno 
+  and mid(items_duty_type,1,2)='07' order by items_duty_type,items_sno 
+ and (mid(items_duty_type,1,2)='07' or mid(items_duty_type,1,2)='08') and (entry_deleted is null or entry_deleted<>'Y') group by br_no 
+ and mid(items_duty_type,1,2)='08' and (entry_deleted is null or entry_deleted<>'Y') group by br_no
+  and (mid(items_duty_type,1,2)='08') order by items_duty_type,items_sno 
+  and mid(items_duty_type,1,2)='08' order by items_duty_type,items_sno 
+  and (mid(items_duty_type,1,2)='09' or mid(items_duty_type,1,2)='10' or mid(items_duty_type,1,2)='11') order by items_sno 
+  and (mid(items_duty_type,1,2)='09' or mid(items_duty_type,1,2)='10' or mid(items_duty_type,1,2)='11' or mid(items_duty_type,1,2)='12' or mid(items_duty_type,1,2)='06') and items_fa<>0 order by items_sno 
+  and mid(items_duty_type,1,2)='17' and items_fa<>0 order by items_sno 
+ and nationality like 'NOT*' order by os_date,os_no 
+ and os_date between 
+ and os_no in (select os_no from cops_master where (right(trim(os_no),1)='0' or right(trim(os_no),1)='1' or right(trim(os_no),1)='2' or right(trim(os_no),1)='3' or right(trim(os_no),1)='4' or right(trim(os_no),1)='5' or right(trim(os_no),1)='6' or right(trim(os_no),1)='7' or right(trim(os_no),1)='8' or right(trim(os_no),1)='9') and location_code='
+ and os_no like '
+ and os_no like '%
+') and os_no like '
+ and os_no not in (select os_no from cops_master where (right(trim(os_no),1)='0' or right(trim(os_no),1)='1' or right(trim(os_no),1)='2' or right(trim(os_no),1)='3' or right(trim(os_no),1)='4' or right(trim(os_no),1)='5' or right(trim(os_no),1)='6' or right(trim(os_no),1)='7' or right(trim(os_no),1)='8' or right(trim(os_no),1)='9') and location_code='
+) and os_year in (select os_year from cops_master where 
+ and pax_name like '%
+ and pax_nationality like 'NOT*' order by os_date,os_no 
+ and receipt_by_who='Y' order by dr_date,dr_no 
+ and (right(trim(os_no),1)='A' or right(trim(os_no),1)='1' or right(trim(os_no),1)='2' or right(trim(os_no),1)='3' or right(trim(os_no),1)='4' or right(trim(os_no),1)='5' or right(trim(os_no),1)='6' or right(trim(os_no),1)='7' or right(trim(os_no),1)='8' or right(trim(os_no),1)='9' or right(trim(os_no),1)='0') 
+ and (total_items_value=0 or isnull(total_items_value)=true) order by os_date,os_no
+ and total_items_value>500000 and booked_by like 'Batch%' 
+ and warehoused_qty<>balance_qty order by wh_date,wh_no,items_sno 
+Appeal Details Updated ! 
+Appeal Filed Details Updated ! 
+Appeal Order No.________________________Dated_________  
+ Are Pending for Valuation.  Please Update the Values and Then Prepare B/R for the Items in this D/R ! 
+ Are Pending for Valuation.  Please Update the Values and Then Prepare B/R for the Items in this O/S ! 
+Are You Sure to Delete the Above B/R Details ? 
+Are You Sure to Delete the Above D/R Details ? 
+Are You Sure to Delete the Above Fuel Duty Receipt Details ? 
+Are You Sure to Delete the Above O/S Details ? 
+Are You Sure to Delete the Item Details at Sl.No. 
+Are You Sure to Generate the B/R Printout for the Above B/R No. ? 
+ %. Are You Sure to Generate the B/R Printout for the Entered B/R No. With BCD Rate For Baggage Goods as 
+ %. Are You Sure to Generate the B/R Printout for the Entered B/R No. With BCD Rate For Cigaratee as 
+ %. Are You Sure to Generate the B/R Printout for the Entered B/R No. With BCD Rate For Cigaratte as 
+ %. Are You Sure to Generate the B/R Printout for the Entered B/R No. With BCD Rate For Gold Jewellery as 
+ %. Are You Sure to Generate the B/R Printout for the Entered B/R No. With BCD Rate For Gold Primary as 
+ %. Are You Sure to Generate the B/R Printout for the Entered B/R No. With BCD Rate For Jewellery Gold as 
+ %. Are You Sure to Generate the B/R Printout for the Entered B/R No. With BCD Rate For Jewellery Silver as 
+ %. Are You Sure to Generate the B/R Printout for the Entered B/R No. With BCD Rate For Primary Gold as 
+ %. Are You Sure to Generate the B/R Printout for the Entered B/R No. With BCD Rate For Primary Silver as 
+Are You Sure to Generate the D/R Printout for the Above D/R No. ? 
+Are You Sure to Generate the F/M Printout for the Above System No. ? 
+Are You Sure to Generate the O.S. Printout for the Above O/S No. ? 
+Are You Sure to Modify the Above Mentioned Timings for Day Batch ? 
+Are You Sure to Prepare B.R. From the Above Entered O.S. No. ? 
+Are You Sure to Prepare B.R. From the Above mentioned D/R No. ? 
+Are You Sure to Prepare B.R. From the Above mentioned O/S No. ? 
+Are You Sure to Prepare D.R. From the Above Entered O.S. No. ? 
+Are You Sure to Release the Goods From the Above W/H No. ? 
+.  Are You Sure to Update the Entered B.R.No. ? 
+Are You Sure to Update Warehouse Database From the Above Entered O.S. No. ? 
+Arrival Flight Details Not Found in Database.  Please Create them from Master Creation Option of Main Menu ! 
+arrived_from
+ & Arrived From  
+ Arrived From 
+Arrived From &nbsp;&nbsp;(*)
+ & Arrived From Port Other Than Bhutan, Myanmar & Nepal 
+ Arrived From Port other Than Myanmar, Nepal, Bhutan & China 
+</b>1. Perishables will be disposed off within seven days from the date of
+ between from_date and to_date and mid(duty_category,1,2)='
+ between from_date and to_date and mid(duty_category,1,2)='16'  
+<body LEFTMARGIN=10 RIGHTMARGIN=20>
+B.R. Amount Cannot be Zero.  Please Select the Items For Which Duty has to be calculated.  Otherwise Quit this Option ! 
+B.R. DATA COULD NOT BE RESTORED FROM BACKUP.  CONTACT SYSTEM ADMINISTRATOR ! 
+B/R Data Imported into Server Database ! 
+B.R. Data Restored From Backup To Client Machine !
+B/R DELETED
+B/R Details Deleted ! 
+B/R Details Updated in D/R Database ! 
+B/R ENTRIES OF THE SELECTED DATE AND BATCH
+BR_FROM_DR
+BR_FROM_OS
+ (br_items.entry_deleted is null or br_items.entry_deleted<>'Y') and 
+ br_items.items_duty_type,br_items.items_sno from br_items,br_master where BR_items.br_date>=cdate('
+br_master,br_items where br_master.location_code='
+ (br_master.entry_deleted is null or br_master.entry_deleted<>'Y') and 
+B.R. No. Cannot be More than 8 digits.  Contact System Administrator ! 
+B.R. / OFFENCE DETAILS OF PASSENGERS HAVING '
+B.R / O.S. / D.R. Data Transferred From Local Machine to Server !
+B.R./ O.S. / D.R. / M.H.B. / Mahazar Data From Server Loaded in Local Machine Memory ! 
+br_series_from
+BR_Series_From
+ B/Rs. FOR THE PERIOD FROM 
+Case Type Cannot be Null.  Please Select the Type from the drop down list ! 
+Category not found in the Item Category master.  Contact System Administrator ! 
+Category of the Item Not Available.  Cannot Prepare B/R from the D/R Details. Use Online B/R Option to prepare B/R and Inform System Administrator About the Problem ! 
+Category of the Item Not Available.  Cannot Prepare B/R from the O/S Details. Use Online B/R Option to prepare B/R and Inform System Administrator About the Problem ! 
+<center><table border=0 cellpadding=0 cellspacing=0 colspan=9 width=100% id=AutoNumber2>
+<center><table border=0 cellpadding=0 cellspacing=0 width=100% id=AutoNumber2>
+<center><table border=0 cellpadding=0 cellspacing=0 width=94% id=AutoNumber2>
+<center><table border=0 cellpadding=0 cellspacing=0 width=96% id=AutoNumber2>
+<center><table border=0 cellpadding=0 cellspacing=3 width=96% id=AutoNumber2>
+<center><table border=0 cellpadding=0 cellspacing=5 width=94% id=AutoNumber2>
+<center><table border=0 cellpadding=0 cellspacing=5 width=96% id=AutoNumber2>
+<center><table border=0 cellpadding=1 cellspacing=1 style=border-collapse: collapse bordercolor=#111111 width=96% id=AutoNumber2>
+<center><table border=1 cellpadding=0 cellspacing=0 width=100% id=AutoNumber2>
+<center><table border=1 cellpadding=0 cellspacing=0 width=96% id=AutoNumber2>
+<center><table border=1 cellpadding=1 cellspacing=1 style=border-collapse: collapse bordercolor=#111111 width=1240 id=AutoNumber2>
+<center><table border=1 cellpadding=1 cellspacing=1 style=border-collapse: collapse bordercolor=#111111 width=96% id=AutoNumber2>
+Challan Details Not Updated For Fuel Duty Receipts.  Please Update Challan Details For FDR No(s). 
+Challan No(s). Not Updated For B.R.No(s). 
+Challan No(s). Not Updated For Fuel Duty Receipt No(s). 
+Check the Font Size.  If it is NOT IN NORMAL size, take B.R. Printout from Main Menu.  Otherwise Printouts will not be proper ! 
+Check the Font Size.  If it is NOT IN NORMAL size, take D.R. Printout from Main Menu.  Otherwise Printouts will not be proper ! 
+ cint(right(trim(category_desc),2))=10 
+ cint(right(trim(category_desc),2))=11 
+ (cint(right(trim(category_desc),2))>=14 and cint(right(trim(category_desc),2))<=25) 
+ cint(right(trim(category_desc),2))<=2 or cint(right(trim(category_desc),2))=6 or cint(right(trim(category_desc),2))=7 or cint(right(trim(category_desc),2))=12 or 
+ cint(right(trim(category_desc),2))=3 
+ cint(right(trim(category_desc),2))=9  
+Click Page Setup Button in the Form and Select the Page as 'A4' and Orientation as 'Landscape'.  OTHERWISE, the printouts will not be proper ! 
+Click Page Setup Button in the Form and Select the Page as 'Legal' and Orientation as 'Landscape'.  OTHERWISE, the printouts will not be proper ! 
+Click Page Setup Button in the Form and Select the Page as 'Legal' and Orientation as 'Portrait'.  OTHERWISE, the printouts will not be proper ! 
+Click Page Setup Button in the Form and Select the Page as 'Legal'.  OTHERWISE, the printouts will not be proper ! 
+'),closed_batch_shift='Day' where dr_no=
+  colspan=11 align=left><font face=Arial size=1><b>
+ colspan=3 align=right><strong><font face=Arial size=1>
+ colspan=4 align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+ colspan=4 align=right><strong><font face=Arial size=1>
+ colspan=6 align=left><font face=Arial size=1>
+Concessional Rate of Duty For Gold / Silver Goods And Free Allowance of 20 Gms Subject o Maximum of Rs.50000 / 40 Gms subject to Maximum of Rs.1 Lakh on Gold Jewellery
+confiscation under Section 125 of the Customs Act 1962 within 7 days from
+Connection to Server Could Not Be Made.  Please Check the following : (1) Wi-fi Network at the Right Bottom of Your Screen, Disconnect and Reconnect the wifi named 'airport'.  Then Click the B/R Software Icon.  (2) If the procedures mentioned in (1) does not work, LogOff YOUR COUNTER Computer  ! (3) Otherwise Contact System Administrator ! 
+Connection to Server Could Not Be Made.  Please Click the Wi-fi Network at the Right Bottom of Your Screen, Disconnect and Reconnect.  Then Click the B/R Software Icon.  Otherwise Restart YOUR COUNTER Computer  ! 
+Connection to Server Lost.  Please Click the Wi-fi Network at the Right Bottom of Your Screen, Disconnect and Reconnect.  Then Click the B/R Software Icon.  Otherwise Restart YOUR COUNTER Computer  ! 
+CONSISTENCY REPORT ON OFFENCE CASES DATA FROM 
+CONSISTENCY REPORT ON VALUABLES RECEIPTS & DISPOSALS FROM 
+CONSISTENCY REPORT ON WAREHOUSE DATA (OTHER GOODS) FROM 
+CONSISTENCY REPORT ON WAREHOUSE DATA (VALUABLES) FROM 
+.  Contact System Administrator ! 
+COPS Data Imported Into Server Database ! 
+ cops_items.items_duty_type,cops_items.items_sno from cops_items,cops_master where cops_items.os_date>=cdate('
+ cops_items.items_duty_type,cops_items.items_sno from cops_items,cops_master where cops_items.os_date=cops_master.os_date and cops_items.os_no=cops_master.os_no and cops_items.location_code=cops_master.location_code 
+ could not be retrieved from database. Contact System Administrator ! 
+Country
+'),country_of_departure='
+',country_of_departure='
+country_of_departure
+country_of_departure='
+country_of_departure=null where unique_no=
+created_by
+created_on
+CREATE TABLE margin_master (br_top_margin number,dr_top_margin number)
+CREATE TABLE shift_timing_master (day_shift_from_hrs number,day_shift_to_hrs number,night_shift_from_hrs number,night_shift_to_hrs number)
+Customs Act, 1962 from the date of receipt of this Order.&nbsp; 
+Customs Act, 1962 from the date of receipt of this Order.&nbsp; Any appeal
+database created
+Database Not Available. Please contact System Administrator !   
+Database Password Wrong. Contact System Administrator ! 
+Data Displayed Not Found in Appeal Database for Importing into B.R Database.  Contact System Administartor ! 
+Data Displayed Not Found in D/R Database for Importing into B.R Database.  Contact System Administartor ! 
+Data Displayed Not Found in DR Database for Importing into W/H Database.  Contact System Administartor ! 
+Data Displayed Not Found in O/S Database for Importing into B.R Database.  Contact System Administartor ! 
+Data Displayed Not Found in OS Database for Importing into D/R Database.  Contact System Administartor ! 
+Data Displayed Not Found in O/S Database of Server for Importing into B.R Database.  Contact System Administartor ! 
+ Data Error.  Contact Sys.Administrator ! 
+Data Error.  Contact System Administrator ! 
+Data Error. Contact System Administrator ! 
+ Data Error.  Item Details Not Found in DR Database. Contact System Administrator ! 
+ Data Error.  Item Details Not Found in F/M Database. Contact System Administrator ! 
+Data Error.  No Item Details Found for the Entered D.R.No. & Year.  Please Check or Contact System Administrator ! 
+Data Error !  Rectify the Data Errors Before Generating Printout !
+Data Error.  Warehouse Release No. Not Found.  Contact System Administrator !
+Data Not Found in OS Database for Importing into BR Database.  Contact System Administartor ! 
+Data of Backup Not Found in Current Items Table for BR No   
+day_shift_from_hrs
+ Days. The Minimum Stay Required For Availing TR Facility is less than 90 days.TR Facility is Not Admissible !
+ Days. The Minimum Stay Required For Concessional Duty Rate for Import of Gold / Silver is less than 180 days.  Concessional Rate of Duty is Not Admissible.  Please Change the Duty Rate to Merit Rate !
+ Days. The Minimum Stay Required For Concessional Duty Rate for Import of Gold / Silver is less than 180 days.  Concessional Rate of Duty is Not Admissible.  USE FLIGHT BAGGAGE B/R !
+ Days. The Minimum Stay Required For Concessional Duty Rate for Import of Gold / Silver is less than 180 days.  Please Check !
+ Days. The Minimum Stay Required For Concessional Duty Rate for Import of Gold / Silver is less than 180 days.  Please Check or Quit !
+DC / AC NAMES IN BR AND OS DATA FROM 
+ (Deleted)
+Deleted
+Deleted 
+Deleted B/Rs
+Deleted B/Rs: 
+Deleted O/S Nos. 
+delete * from 
+delete * from br_items
+delete * from br_master
+delete * from cops_items
+delete * from cops_items where os_date=
+delete * from cops_master
+delete * from cops_master where os_no='
+delete * from fuel_master where bank_date=#
+delete * from fuel_master where br_no=
+delete * from item_trans
+delete * from item_trans where item_osdate=
+delete * from old_br_items where br_date=
+delete * from old_br_master where br_date=
+delete * from os_master
+delete * from os_master where osdate=
+Delete the Fuel Duty Receipt Details
+DETAILS OF CLOSED D.Rs. WHICH WERE ISSUED DURING THE PERIOD FROM 
+DETAILS OF OFFENCE CASES HAVING 
+DETAILS OF PASSENGERS WHO CLEARED GOLD ON MERIT DUTY DURING THE PERIOD FROM 
+DETAILS OF SEIZURES OTHER THAN GOLD FROM SRILANKAN NATIONALS 
+DISCREPANCY IN GOLD / SILVER DETAILS OF BAGGAGE RECEIPTS FROM 
+Disposal Details of MHB Goods Updated in Database ! 
+Disposal Details of Warehoused Goods Updated in Database ! 
+ do not tally.  Please Select It From The Drop Down Combo List !
+ do not tally.  Please Select It From The Drop Down Combo List ! 
+ do not tally.  Please Select It from the Drop-drown Combo List ! 
+Do not type.  Select from Combo List ! 
+Do Not type. Select from the Combo List ! 
+Do Not Type.  Select from the Combo List ! 
+Do Not Type Special Characters like '/','-',','.  Only Use the Alphabets 'A to Z', Numbers '0 to 9'  ! 
+Do Not Type Special Characters like '/','-',','.  Only Use the Alphabets 'A to Z', Numbers '0 to 9' ! 
+Do Not Type Special Characters like '/','-',','.  Only Use the Alphabets 'A to Z', Numbers '0 to 9' and semi-colan(;) for multiple Passports ! 
+D.R. DATA COULD NOT BE RESTORED FROM BACKUP.  CONTACT SYSTEM ADMINISTRATOR ! 
+D.R. Data Restored From Backup To Client Machine !
+D.R. Details Deleted  ! 
+D/R Details Deleted ! 
+D.R. DETAILS OF MHB PASSENGERS HAVING '
+D.R. DETAILS OF PASSENGERS HAVING '
+DRI CUS-7 REPORT FOR THE PERIOD FROM 
+D.R. No. Cannot be More than 6 digits.  Contact System Administrator ! 
+D.R. No. Cannot be More than 8 digits.  Contact System Administrator ! 
+D.R.REGISTER FOR THE PERIOD FROM 
+ DRs / FMs pertain to the Detention Period from 
+Duration of Stay Cannot Be Blank.  For Indian Nationalities, Please enter Departure Date of the Pax from India in 'dd/mm/yyyy' Format.  For Foreign Nationals, if Departure Date From India is Not Available, Enter 'N.A.' as Date of Departure ! 
+Duty Payable as per Master and Item Details Not Tallied.  Please use the option 'Print B/R' from Main Menu for taking this B/R Printout ! 
+Duty Payment Details Updated ! 
+Duty Rate Charged For Gold Under O/S Category is less than Merit Rate i.e.35%.  Revenue Loss. Contact System Administrator ! 
+Duty Rate Charged For Silver Under O/S Category is less than Merit Rate i.e.35%.  Revenue Loss. Contact System Administrator ! 
+Duty Rate Charged is less than 100%.  Revenue Loss. Contact System Administrator ! 
+Duty Rate Master Not Found.  Contact System Administrator ! 
+Entered Flight No. Not Found in Database.  Please Add through 'Master Creation' option from Main Menu ! 
+entry_deleted
+ (Entry Deleted)
+ (entry_deleted is null or entry_deleted<>'Y') 
+ (entry_deleted is null or entry_deleted<>'Y') and 
+Error in Remote Backup Connection. Check the wifi connection at the right bottom of your screen ! 
+Error in Remote Connection. Check the wifi connection at the right bottom of your screen ! 
+Error records with null category in item details could not be rectified.  Contact System Administrator ! 
+Font Size has Changed.  Take B.R. Printout from Main Menu ! 
+For Detained Goods, Minimum Handling Charges of Rs.20 Per Pkg Has To Be Charged.  Please Enter Handling Charges Amount ! 
+For Detained & Warehoused Goods, Minimum Handling Charges of Rs.20 Per Pkg Has To Be Charged.  Please Enter Handling Charges Amount ! 
+Foreign Destination from where the Aircraft Arrived at Chennai Cannot be Null.  Please Ente It ! 
+For Export Cases, Free Allowance is Not Admissible.  Data Error.  Contact System Administrator ! 
+For Granting Free Allowance, Residence of the Pax Has To Be Selected. Please Select Residence of the Pax !
+For Indian Nationality or Foreigners Residing in India, the Date of Departure (from India) has to be entered.  Please Enter the Date of Departure of the Pax from India ! 
+For Indian Nationals, the Date of Departure From India has to be Entered.  Please Enter it ! 
+For the entered O.S.No. & Year, the Adjudication has not been completed.  Please Adjudicate it before selecting for duty payment! 
+Free Allowance Value Should Not Exceed the Maximum Limit of Rs.
+FREQUENT FLIER REPORT FOR THE PERIOD FROM 
+ from 
+FROM 
+ from br_items where cint(left(items_duty_type,2))>=2 and cint(left(items_duty_type,2))<=6 and flight_no='
+ from br_items where cint(left(items_duty_type,2))>=2 and cint(left(items_duty_type,2))<=6 and flight_no  is not null 
+ from br_items where cint(left(items_duty_type,2))>=7 and cint(left(items_duty_type,2))<=8 and flight_no='
+ from br_items where cint(left(items_duty_type,2))>=7 and cint(left(items_duty_type,2))<=8 and flight_no  is not null 
+ from br_items where cint(left(items_duty_type,2))>=9 and cint(left(items_duty_type,2))<=11 and flight_no='
+ from br_items where cint(left(items_duty_type,2))>=9 and cint(left(items_duty_type,2))<=11 and flight_no is not null 
+ from br_items where left(items_duty_type,2)='01' and flight_no='
+ from br_items where left(items_duty_type,2)='01' and flight_no is not null 
+ from br_items where left(items_duty_type,2)='12' and flight_no='
+ from br_items where left(items_duty_type,2)='12' and flight_no is not null 
+ from br_items where mid(items_duty_type,1,12)='01.Bagg_Gold' and 
+ from br_items where mid(items_duty_type,1,12)='01.Bagg_Silv' and 
+ from br_items where (mid(items_duty_type,1,2)='09' or mid(items_duty_type,1,2)='10' or mid(items_duty_type,1,2)='11') and  bank_date=
+ from br_items where mid(items_duty_type,1,2)='0'+trim(cstr(
+ from br_items where mid(items_duty_type,1,2)='17' and 
+ from br_items where mid(items_duty_type,1,2)=trim(cstr(
+ From br_master, br_items WHERE br_master.br_date>=#06/17/2016# And br_master.br_no=br_items.br_no 
+ from br_master where flight_no='
+ from br_master where flight_no is not null 
+ from br_master where flight_no is not null and pp_amount<>0
+ from br_master where flight_no is not null and ref_amount<>0
+ from br_master where flight_no is not null and rf_amount<>0
+ from br_master where flight_no is not null and total_duty_amount<>0
+ from br_master where flight_no is not null and (wh_amount+other_amount)<>0 
+ from br_master where (passport_no like '%
+ from br_master where passport_no like '%
+From B.R.No. Cannot be Greater Than the To B.R.No.  Please Check ! 
+ From Client Database 
+ From Client Database(No. of Records = 
+ From Client Machines ! 
+ from cops_items,cops_master where cops_items.os_no=cops_master.os_no and cops_items.os_year=cops_master.os_year 
+ from cops_master where (passport_no like '%
+ from cops_master where passport_no like '%
+from_date
+ from dr_master where dr_no=
+ from dr_master where passport_no like '%
+ from dr_master where pax_name like '%
+ from fuel_master where (aircraft_no like '%
+ from fuel_master where aircraft_no like '%
+ from mhb_master where aoc_no=
+ from mhb_master where dr_no=
+ from mhb_master where mhb_no=
+ from mhb_master where passport_no like '%
+ from mhb_master where pax_name like '%
+From O/S NO. Cannot be null.  Please Enter it ! 
+From Regional Settings, Please Set the Date in 'dd/mm/yyyy' Format ! 
+ From Server Database 
+ From Server Database(No. of Records = 
+From W/H NO. Cannot be null.  Please Enter it ! 
+Fuel Duty Receipt Details Deleted ! 
+FUEL DUTY RECEIPT DETAILS OF AIRLINES HAVING '
+GIST OF OFFENCE CASES DETECTED BY A.I.U. DURING THE PERIOD FROM  
+going to bkup update
+GOLD SEIZURES FROM 
+Group
+ group by adj_offr_name order by adj_offr_name 
+ group by br_items.br_no
+ group by br_no
+' group by br_no 
+ group by br_type+cstr(br_no)
+ GROUP BY (challan_no) 
+ GROUP BY (cstr(bank_date)+' - '+bank_shift+' - '+dc_code) 
+ group by cstr(dr_no)+' / '+detained_by
+ group by cstr(dr_no)+'  Dt.  '+cstr(dr_date) 
+ group by (cstr(wh_no)+cstr(wh_date))
+ group by datevalue(month_year)
+ group by dc_code 
+' group by detained_pkg_no 
+' group by detained_pkg_type 
+ group by dr_no
+# group by dr_no
+# group by flight_no 
+ group by items_duty_type+' Unit Price - '+cstr(items_value/items_qty) 
+ group by os_no+cstr(os_year) 
+ group by (os_no+' - '+cstr(year(os_date))) 
+ group by passport_no 
+ group by passport_no having count(*)>=
+Grouping
+ Has Already Been Updated.  Please Check ! 
+Have You Selected the Correct AC / DC on duty for the selected Batch ? 
+Have You Set the Page as 'Legal' and Orientation as 'Landscape' in Page Setup ? 
+Have You Set the Page as 'Legal' and Orientation as 'Portrait' in Page Setup ? 
+Have You Set the Page as 'Legal' in Page Setup ? 
+HKEY_CURRENT_USER\Software\Microsoft\Internet Explorer\PageSetup\margin_left
+HKEY_CURRENT_USER\Software\Microsoft\Internet Explorer\PageSetup\margin_right
+I also order absolute confiscation of the goods valued at Rs.
+If Required, Change the Page Size as 'Legal' By Clicking 'Page Setup' Button in the Form and Selecting the Page as 'Legal' ! 
+If You Type 'DOMESTIC' or 'UNCLAIMED',  then you cannot change passport number.  For changing the Passport No.,  Click 'Exit' and Select the Required Option From DR Module ! 
+I&nbsp;also&nbsp; Order Confiscation of the goods, valued at Rs.
+I&nbsp; Order confiscation of the goods valued at Rs.
+I&nbsp; Order Confiscation of the goods, valued at Rs.
+I&nbsp;Order Confiscation of the goods, valued at Rs.
+In case of Export Cases, Please modify the Concerned Sections of Customs Act In the System Prepared Draft Order ! 
+insert into 
+insert into batch_with_many_dc(current_batch_date,current_batch_shift,marked_dc_codes,correct_dc_name) 
+insert into br_items(
+insert into br_master(
+insert into challan_master(batch_date,batch_shift,sdo_code,sdo_name,challan_no,challan_amount) 
+insert into cops_items(
+insert into cops_items_deleted Select * from 
+insert into cops_items_deleted select * from cops_items_temp where os_no='
+insert into cops_items_deleted select * from cops_items where os_date=
+insert into cops_master(
+insert into cops_master_deleted select * from 
+insert into cops_master_deleted select * from cops_master_temp where os_no='
+insert into cops_master_deleted select * from cops_master where os_no='
+insert into dr_items(
+insert into dr_master(
+insert into dr_update_from_br(sl_no,dr_no,dr_date,br_type,br_no,br_date,auto_update_remarks) values (
+insert into Dup_BRs_Deleted_in_Tfr (Batch_date,Batch_shift,BR_Nos) values (cdate('
+insert into fuel_master(
+insert into item_trans_deleted select * from item_trans where item_osdate=
+INSERT INTO margin_master VALUES (0.310,0.310)
+INSERT INTO margin_master VALUES (0.321,0.321)
+insert into mhb_items(
+insert into modified_item_br_nos(batch_date,batch_shift,br_no,br_date,br_type,items_sno,items_desc,
+insert into modified_master_br_nos(batch_date,batch_shift,br_no,br_date,br_type,pax_name,passport_no,
+insert into old_br_items(
+insert into old_br_items (br_no,br_date,br_shift,br_type,test_field) values (
+insert into old_br_master(
+insert into old_br_master (br_no,br_date,br_shift,br_type,test_field) values (
+insert into os_master_deleted select * from os_master where osdate=
+INSERT INTO shift_timing_master VALUES (10,22,22,10)
+insert into uos_items select * from cops_items where os_no='
+insert into uos_master select * from cops_master where os_no='
+insert into Users(user_Name,user_desig,User_ID,User_Pwd,created_by,created_on,user_status,user_role) values ('
+insert into valuation_items select * from dr_items where unique_no=
+insert into valuation_master select * from dr_master where dr_no=
+insert into wh_items(
+insert into wh_master(
+Insert the Adjn. Forms One By One In the Printer !
+Insert the O.S. Forms One By One In the Printer !
+In terms of FEMA 6/2000-RB dated 03.05.2000 issued by the Reserve Bank of India, Indians going abroad are permitted to take with them Foreign Currency without any limit <u>so long as the same has been purchased from an authorised foreign exchange dealer and he should carry a document of purchase.</u></font></td>
+In terms of Foreign Trade Policy notified by the Government in pursuance to Section 3(1) & 3(2) of the Foreign Trade (Development & Regulation) Act, 1992 read with the Rules framed thereunder, also read with Section 11(2)(u) of Customs Act, 1962, import of 'goods in commercial quantity / goods in the nature of non-bonafide baggage' is not permitted without a valid import licence, though exemption exists under clause 3(h) of the Foreign Trade (Exemption from application of Rules in certain cases) order 1993 for import of goods by a passenger from abroad only to the extent admissible under the Baggage Rules framed under Section 79 of the Customs Act, 1962.</font></td>
+I order absolute confiscation of the goods valued at Rs.
+ is 'Deleted'.  Please Check ! 
+Is this the O.S. For Which Has to be imported into Warehouse Database ? 
+, item_cat_master SET items_duty_type = category_code 
+, item_cat_master SET items_duty_type = category_code where 
+Item Details Deleted ! 
+Item Details for the O.S. Not Found. Please Enter them or Contact System Administrator ! 
+Item Details Not found for the Entered W/H No. & Year.  Contact System Administrator ! 
+Item Details of the Entered O.S.No. & Date transferred from server ! 
+ Item Group 
+Item Grouping Not updated ! 
+ (items_desc like '%GOLD%' or items_desc like '%BANGLE%' OR items_desc like '%JEWEL%') 
+ (items_desc like '%SILVER%') 
+ (items_duty_type='01.Bagg_Gold_Primary' or items_duty_type='01.Bagg_Gold_Jewelry') order by br_master.br_date,br_master.br_no,items_sno 
+ (items_duty_type is null or len(trim(items_duty_type))=0) order by os_date,os_no 
+ (items_duty_type is null or len(trim(items_duty_type))=0) order by wh_date,wh_no 
+ items_duty_type not in (select category_code from item_cat_master) 
+items_qty,items_uqc,items_value,items_fa,items_duty,login_id from br_items where 
+  ((items_value-items_fa)<>0 or (items_value=0 and items_fa=0)) and items_dr_no=0 order by items_sno 
+ ((items_value-items_fa)<>0 or (items_value=0 and items_fa=0))  and items_dr_no=0 order by items_sno 
+  ((items_value-items_fa)<>0 or (items_value=0 and items_fa=0)) order by items_sno 
+ ((items_value-items_fa)<>0 or (items_value=0 and items_fa=0)) order by items_sno 
+LIST OF OFFENCE CASES OVER 5 LAKHS FOR THE PERIOD  FROM  
+LIST OF OFFENCE CASES OVER 5 LAKHS FOR THE PERIOD FROM  
+Local Network Identifier Details Not Found.  Contact System Administrator ! 
+Machine No. Not Found.  Contact System Administrator !
+Manifests Database Could Not be Opened.   Contact System Administrator 
+Margin Master Created in Database ! 
+Margin Master Not Found. It will be Created now.  Click 'Ok' to continue !
+Master Data of Backup Not Found in Current Table for BR No   
+Master Details of the Entered O.S.No. & Date transferred from server ! 
+  (Max F.A.
+Maximum Code for D.C's. reached.  Contact System Administrator ! 
+M.H.B. Data Transferred From Local Machine to Server !
+MHB D.R. DETAILS OF PASSENGERS HAVING '
+ MHB DRs Pertain To the Detention Period From 
+ MHB DRs Were Received Within the Detention Period i.e. From 
+Missing B/Rs Found in Deleted Data : 
+ Modification Not Allowed For This D/R No.  Contact System Administrator ! 
+ Modification Not Allowed For This O/S No.  Contact System Administrator ! 
+MONTHWISE REVENUE REPORT FOR THE PERIOD FROM 
+More Than 1 D/R Exist for the Entered D/R No.  Cannot generate printout.  Contact System Administrator ! 
+More Than 1 Entry Exist for the Entered D.R.No. & Date.  Data Error.  Contact System Administrator ! 
+More Than 1 Entry Exist for the Entered D.R.No. & Year.  Data Error.  Contact System Administrator ! 
+More Than 1 Entry Exist for the Entered O.S.No. & Year.  Data Error.  Contact System Administrator ! 
+More Than 1 Entry Exist for the Entered O.S.No. & Year.  Data Error.  Do you Want to Delete the details of the entered O/S No. ?  
+More Than 1 Entry Exist for the Entered W/H No. & Year.  Data Error.  Contact System Administrator ! 
+More Than 1 Entry Exists for the Entered Fuel Duty Receipt No.   Contact System Administrator ! 
+More Than 1 Entry exists for the entered Warehouse No. & Year. Data Error.  Contact System Administrator ! 
+More Than 1 O.S. Entry Found for the entered O.S.No. & Year.  Contact System Administrator ! 
+More than 1 OS found with the entered O.S.No. & Year.  Data Error.  Contact System Administrator ! 
+&nbsp;From (Port)&nbsp;&nbsp;
+New Password Updated in Database
+New User Created 
+ night_shift_from_hrs=
+night_shift_from_hrs
+No B/Rs Found for the Selected Date / Batch ! 
+No. Data Found. Contact System Administrator ! 
+No Error Records for Inconsistency between the Master & Item Tables of GENERAL W/H GOODS regarding the Total Value ! 
+No Error Records for Inconsistency between the Master & Item Tables of VALUABLES regarding the Total Value ! 
+No Error Records for Inconsistency between the Master Table & Item Table regarding the Total / Confiscated / Redeemed / Re-Export Values and Amount Payable ! 
+No Error Records for Reconciliation Between General WH Items and DR Items ! 
+No Error Records for Reconciliation Between Valuables Items and DR Items ! 
+No Item of the Selected Category is available for disposal ! 
+No Items For Adjudication.  Contact System Administrator ! 
+No O.S. Items Data Available for Transfer From Server.  !
+ Nos. of D/Rs Were Closed Within the period of Detention i.e. From 
+ Nos. of F/Ms Were Handed Over To Warehouse Within the period of Seizure i.e. From 
+ Not Matched.  Please Select the Pkg Type From The Drop-Down List As '
+ Not updated.  Please Update the Challan Details before exporting data for statistical reports ! 
+Office of the Additional / Joint Commissioner of Customs, Preventive Dept.,
+Once you Confirm 'Yes', Then You Cannot Modify Changes in the B/R Details. Are You SURE To Take The B/R Printout ? 
+Once you Confirm 'Yes', Then You Cannot Modify Changes in the O/S Details. Are You SURE To Take The Printout ? 
+ONLINE B/R GENERATION FROM APPEAL DETAILS 
+ONLINE B/R GENERATION FROM D/R DETAILS 
+ONLINE B/R GENERATION FROM D/R DETAILS @ SERVER 
+ONLINE B/R GENERATION FROM O/S DETAILS 
+ONLINE B/R GENERATION FROM W/H DETAILS 
+ONLINE D/R GENERATION FROM O/S DETAILS 
+ONLINE F/M GENERATION FROM O/S DETAILS 
+Only One Active User Exists.  Please create another User and close this User ID 
+Only One Item Exists in this B/R.  Cannot Delete ! 
+Only One Item Exists in this D/R.  Cannot Delete ! 
+Only One Item Exists in this O/S.  Cannot Delete ! 
+on payment of 7.5% of the duty demanded where duty or duty and penalty are in dispute, or penalty, where penalty alone is in dispute.  The Appeal shall be filed 
+%' or aircraft_no like '%
+' or br_items.items_desc like '
+ order by aircraft_no desc 
+ order by airlines_name desc 
+ order by bank_date,challan_no 
+ order by batch_date,batch_shift 
+' order by batch_date,batch_shift 
+ order by batch_date,batch_shift,br_no 
+' order by batch_date,batch_shift,br_no 
+ order by batch_date,batch_shift,cint(challan_no) 
+ order by batch_date,batch_shift,unique_no 
+' order by batch_date,br_no 
+') order by batch_shift,unique_no
+ order by br_date,br_no 
+%' order by br_date desc
+%' order by br_date desc 
+%')  order by br_date desc
+%') order by br_date desc 
+ order by br_date desc,br_no
+ order by br_date desc,br_no 
+ order by br_items.br_date desc,br_items.br_no
+ order by br_master.br_date desc,br_master.br_no
+ order by br_master.br_no desc 
+ order by br_no
+ order by br_no 
+' order by br_no desc 
+ order by br_no,flight_no
+ order by br_no,flight_no 
+ order by cint(detained_pkg_no),items_sno 
+' order by cint(detained_pkg_no),items_sno  
+ order by cint(os_no) 
+ order by cops_master.location_code desc,cops_master.os_date desc,cops_master.os_no
+ order by cops_master.os_date,cops_master.os_no
+ order by cops_master.os_date,cops_master.os_no 
+' order by cops_master.os_date,cops_master.os_no 
+ order by count(*) desc 
+ order by detained_pkg_no 
+ order by detained_pkg_no,items_sno 
+%') order by detaining_date desc 
+' order by detaining_date desc 
+ order by detaining_date,os_no 
+' order by detaining_date,os_no 
+ order by detaining_date,system_reference_no 
+' order by dr_date desc 
+ order by dr_date,dr_no 
+' order by dr_date,dr_no 
+ order by dr_date,dr_no,mhb_year,mhb_no 
+ order by DR_Date,unique_no 
+ order by dr_master.dr_date desc 
+# order by dr_no 
+' order by dr_no 
+' order by dr_no desc 
+' order by flight_no 
+ order by flight_no,br_no 
+ order by items_desc,br_date,br_no 
+ order by items_sno 
+# order by items_sno 
+'  order by items_sno 
+' order by items_sno
+' order by items_sno 
+' order by items_sno  
+) order by items_sno
+ order by items_sno,release_date 
+' order by items_value 
+ order by items_value desc 
+ order by mhb_master.dr_date desc 
+' order by mhb_no 
+ order by os_date desc 
+%') order by os_date desc 
+' order by os_date desc 
+ order by os_date desc,os_no 
+' order by os_date desc,os_no
+') order by os_date desc,os_no 
+ order by os_date,os_no 
+ order by os_date,os_no  
+# order by os_date,os_no
+' order by os_date,os_no
+' order by os_date,os_no 
+' order by os_date,os_no  
+ order by os_date,os_no,items_sno
+ order by os_date,os_no,items_sno 
+' order by os_date,os_no,items_sno  
+ order by os_date,unique_no 
+' order by os_no 
+ order by passport_no 
+# order by passport_no 
+ ORDER BY passport_no,br_master.br_date,br_master.br_no 
+ order by passport_no,br_master.br_date desc,br_master.br_no 
+%' order by passport_no,wh_date 
+ order by passport_no,wh_date,wh_no 
+ order by pax_name,wh_date 
+ order by release_date,items_sno 
+ order by release_date,wh_release_no 
+ order by valuables_master.wh_date,valuables_master.wh_no 
+ order by wh_date,wh_no
+ order by wh_date,wh_no 
+ order by wh_date,wh_no  
+ order by wh_date,wh_no desc 
+ order by wh_master.wh_date,wh_master.wh_no 
+ order by wh_no 
+' order by wh_no 
+' or mid(items_duty_type,1,2)='17') and (entry_deleted is null or entry_deleted<>'Y') 
+%'  or passport_no like '%
+%' or passport_no like '%
+' or passport_no like '%
+%' or pax_name_modified_by_vig like '%
+%' or pax_name_modified_by_Vig like '%
+' or port_of_departure='NOT AVAILABLE') order by dr_date,dr_no 
+ (os_category is null or len(trim(os_category))=0) order by os_date,os_no 
+ os_category not in (select category_code from item_cat_master) 
+O.S. Data Imported to B.R.Details.  Use Print B.R. Option to take Printout of B.R.No. 
+O.S. Data Imported to Detention Details Under Mahazar.  Use the Option 'Print F/M ' to take Printout of this Mahazar Detention. 
+O.S. Data Imported to D.R.Details.  Use the Option 'Print D/R' to take Printout of D.R.No. 
+O.S. Data Imported to F.M.Details.  Use the Option 'Print F/M' to take Printout of the F/M of the O/S ! 
+O.S. Data Upto Previous Batch From Server Loaded in Local Machine Memory ! 
+O/S Details Deleted ! 
+ O.S. Details NOT SAVED Due to Error in Data.  Contact System Administrator or Log in afresh ! 
+OS_FROM_DR
+O.S. No. Cannot be More than 6 digits.  Contact System Administrator ! 
+O.S. No. Cannot be More than 8 digits.  Contact System Administrator ! 
+ os_no like '%
+O.S. REGISTER FOR THE O/S Nos. FROM  
+O.S. REGISTER FOR THE PERIOD FROM  
+OUTRIGHT SMUGGLING CASES
+<p align=justify style=line-height: 150%><font face=Arial size=1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 2. An Appeal against this Order lies to the 
+<p align=left font=arial size=2>
+<p align=left><font face=Arial size=1><b>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Name & Signature of S.D.O.
+<p align=left><font face=Arial size=1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<p align=Right><b><font face=Arial size=1>Signature of the Passenger</font></b></td>
+<p align=Right><b><font face=Verdana size=1><i>Signature of the Passenger</i></font></b></td>
+<p align=Right><font face=Arial size=1><b>&nbsp;</b></font></td>
+<p align=Right><font face=Arial size=1><b>Received the Order-in-Original</b></font></td>
+<p align=Right><font face=Arial size=1>&nbsp;</font></td>
+ passport_no like '%
+ pax_date_of_birth,pax_status,residence_at,country_of_departure,pax_nationality from 
+ pax_date_of_birth,pax_status,residence_at,country_of_departure,pax_nationality from br_master where br_no=
+ pax_date_of_birth,pax_status,residence_at,country_of_departure,pax_nationality from br_master where passport_no like '%
+ pax_date_of_birth,pax_status,residence_at,country_of_departure,pax_nationality from br_master where pax_name like '%
+ pax_date_of_birth,pax_status,residence_at,country_of_departure,pax_nationality from cops_master where passport_no like '%
+ pax_date_of_birth,pax_status,residence_at,country_of_departure,pax_nationality from cops_master where (pax_name like '%
+Pax is Eligible for Concession Rate of Duty For Import of Gold / Silver and Free Allowance of 20 Gms Subject to Maximum of Rs.50000 / 40 Gms Subject to Maximum of Rs.1 Lakh on Gold Jewellery for Male / Female Pax Respectively ! 
+ (pax_name like '%
+pax_name,pax_address1,pax_address2,pax_address3,items_desc,items_qty,items_uqc,items_value,items_fa,(items_bcd+items_cvd),(items_cess+items_hec),items_duty,items_duty_type from 
+pax_status='PAX OF INDIAN ORIGIN (FIRST VISIT)',country_of_departure='
+pax_status='PAX OF INDIAN ORIGIN (VISITED EARLIER)',country_of_departure='
+pax_status='TOURIST OF FOREIGN ORIGIN',country_of_departure='
+Please Check the B/R Details Before Taking Printout ! 
+Please Check the D/R Details Before Taking Printout ! 
+Please Check the O/S Details Before Taking Printout ! 
+Please Check The W/H Charges Calculation is Displayed At the Right Bottom.  If the W/H Charges Calculated by the System Requires Change, modify it ! 
+Please Check The W/H Charges Calculation is Displayed At the Right Corner.  If the W/H Charges Calculated by the System Requires Change, modify it ! 
+Please Collect the Goods from Warehouse Before preparing B/R ! 
+Please Ensure that Correct Type of B/R is displayed.  Otherwise select from the Combo List ! 
+Please Enter Departure Date in 'dd/mm/yyyy' format or Select the Appropriate Category of Pax ! 
+Please Enter From Date in 'dd/mm/yyyy' Format 
+Please Enter From No. & To No. With Same No. of Digits ! 
+Please Enter From / To Date in 'dd/mm/yyyy' Format 
+Please Enter Item Description Before Selecting Duty Rate ! 
+Please Enter OS_DATE as the date on Which the Batch / AIU  assumed their Duty ! 
+Please Enter the Appeallate Authority Name, Designation, Appeal Order No. And Date ! 
+Please Enter the Date on Which the AIU Batch Assumed Duty ! 
+Please Enter the From No.of the selected BR Type Series ! 
+Please Enter the Officer Name from Whom the goods are received by the W.H.O. ! 
+Please Enter the To Date Greater than the From Date ! 
+Please Enter the To No.of the selected BR Type Series ! 
+Please Select At Least One Item for Duty / Re-Export ! 
+Please Select At Least One Item for Duty / Re-Export or Click Atleast One of the Boxes Against R.F.Amount / R.E.F. Amount / P.P. Amount ! 
+Please Select At Least One Item for Re-Export or Redemption of Goods ! 
+Please Select At Least One Item for Release Under Duty / Re-Export / Release Under B/G or Click Atleast One of the Boxes Against R.F.Amount / R.E.F. Amount / P.P. Amount ! 
+Please Select At One Payment Category from the Payable List ! 
+Please Select B.R.Type ! 
+Please Select DC Name on Duty or login afresh ! 
+Please Select the B.R.Type ! 
+Please Select the Correct AC / DC On Duty for the Selected Batch ! 
+Please Select the Country From which the Passenger Arrived ! 
+Please Select the Country From Which the Pax Arrived ! 
+Please Select the Country of Residence ! 
+Please Select the D.C.Name on Duty ! 
+Please Select the Item Duty Type ! 
+Please Select the Period ! 
+Please Select The Required Report ! 
+Please Select the Residence of the Passenger ! 
+Please Select the Residence of the Pax ! 
+Please Select the Shift on which the AIU / Batch assumed Duty ! 
+.  Please Update Challan Nos. 
+  Please Use the option 'B/R from D/R' for preparing B/R ! 
+Please Wait Till the Database from the Server is Loaded into Memory.  Click Ok Button to Proceed ! 
+Prepare B/R From D/R Data 
+Prepare B/R From O/S Data 
+Previous B/R Details Could not be retrieved from Database. Please Check from Combined Query on B.R & O.S. Data from B/R Module. Otherwise proceed with B/R Preparation by entering the Required Details !
+Previous D/R Details Could not be retrieved from Database. Please Check from Combined Query on B.R & O.S. Data from B/R Module. Otherwise proceed with B/R Preparation by entering the Required Details !
+Previous Fuel Duty Receipt(s) Details Could not be retrieved from Database. Please Check from Query on Fuel Data from B/R Module. Otherwise proceed with B/R Preparation by entering the Required Details !
+Printout Has already been generated for this B.R. No.  Cannot Modify its details ! 
+Processing Already Enabled For Current Shift.  No Need to By-pass Data Transfer From Server  ! 
+RECEIPTS &  DISPOSAL REGISTER OF M.H.B. GOODS FOR THE PERIOD FROM  
+RECONCILIATION BETWEEN DR & GENERAL WH TABLES FROM 
+RECONCILIATION BETWEEN DR & VALUABLES TABLES FROM 
+RECONCILIATION BETWEEN DR & VALUABLE TABLES FROM 
+RECONCILIATION BETWEEN ITEM TABLES OF GENERAL WH GOODS AND DETENTION RECEIPTS FROM 
+RECONCILIATION BETWEEN ITEM TABLES OF VALUABLE AND DETENTION RECEIPTS FROM 
+RECONCILIATION BETWEEN ITEM TABLES OF VALUABLES GOODS AND DETENTION RECEIPTS FROM 
+RecordCount
+ref_amount,pp_amount,wh_amount,other_amount,br_amount,login_id from br_master where 
+REPORT ON CONTINUITY IN USAGE OF DIFFERENT B/Rs FROM 
+REPORT ON ITEM DESCRIPTION Vis ITEM DUTY TYPE IN BAGGAGE RECEIPTS FROM 
+residence_at=Null,pax_status=Null,country_of_departure=null,departure_date=null,pax_date_of_birth=null, 
+ restored from bkup ! 
+REVENUE COLLECTION REPORT FOR THE PERIOD FROM 
+REVENUE ON GOLD DURING THE PERIOD FROM 
+REVENUE ON SILVER DURING THE PERIOD FROM 
+ (right(trim(os_no),1)='A' or right(trim(os_no),1)='1' or right(trim(os_no),1)='2' or right(trim(os_no),1)='3' or right(trim(os_no),1)='4' or right(trim(os_no),1)='5' or right(trim(os_no),1)='6' or right(trim(os_no),1)='7' or right(trim(os_no),1)='8' or right(trim(os_no),1)='9' or right(trim(os_no),1)='0') and 
+ select * 
+ select *  
+select * 
+ select airlines_name,aircraft_no,assessable_value,total_duty_amount,rf_amount,pp_amount,br_no,br_date,os_no,os_date,br_amount,br_date, ref_amount,wh_amount,ref_amount,other_amount,br_amount,unique_no 
+ select airlines_name,aircraft_no,assessable_value,total_duty_amount,rf_amount,pp_amount,br_no,br_date,os_no,os_date,br_amount,br_date,ref_amount,wh_amount,ref_amount,other_amount,br_amount,unique_no 
+ select batch_date,batch_shift,br_no,br_date,br_type,items_sno,items_desc,
+ select batch_date,batch_shift,br_no,br_date,br_type,pax_name,passport_no,
+select br_master.br_no,br_master.br_date,br_master.flight_no,br_master.flight_date,pax_nationality,passport_no,passport_date,
+SELECT br_master.br_no, br_master.br_date, br_master.flight_no, br_master.flight_date, pax_nationality, passport_no, passport_date,pax_name, pax_address1, pax_address2, pax_address3, items_desc, items_qty, items_uqc, items_value, items_duty 
+select br_no from br_master where bank_date>=#
+select br_top_margin from margin_master 
+SELECT cops_items.os_no,cops_items.os_date,cops_items.os_year,cops_items.location_code,cops_items.items_desc,cops_items.items_qty,cops_items.items_uqc,
+SELECT cops_items.os_no,cops_items.os_date,cops_items.os_year,cops_items.location_code,cops_items.items_desc,cops_items.items_qty,cops_items.items_uqc,cops_items.items_value,cops_items.items_duty,cops_items.items_duty_type,cops_master.os_no,cops_master.os_date,cops_master.os_year,cops_master.location_code,cops_master.booked_by,cops_master.pax_name,cops_master.passport_no,cops_master.passport_date,cops_master.adjudication_date,cops_master.adj_offr_name,cops_master.adj_offr_designation,cops_master.rf_amount,cops_master.ref_amount,cops_master.pp_amount,cops_items.items_category from cops_items,cops_master where cops_items.os_no=cops_master.os_no and cops_items.os_year=cops_master.os_year and cops_master.location_code=cops_items.location_code and adjudication_date between 
+SELECT cops_items.os_no,cops_items.os_date,cops_items.os_year,cops_items.location_code,cops_items.items_desc,cops_items.items_qty,cops_items.items_uqc,cops_items.items_value,cops_items.items_duty,cops_items.items_duty_type,cops_master.os_no,cops_master.os_date,cops_master.os_year,cops_master.location_code,cops_master.booked_by,cops_master.pax_name,cops_master.passport_no,cops_master.passport_date,cops_master.adjudication_date,cops_master.adj_offr_name,cops_master.adj_offr_designation,cops_master.rf_amount,cops_master.ref_amount,cops_master.pp_amount,cops_items.items_category from cops_items,cops_master where cops_items.os_no=cops_master.os_no and cops_items.os_year=cops_master.os_year and cops_master.location_code=cops_items.location_code and cops_master.os_date between 
+SELECT cops_items.os_no,cops_items.os_date,cops_items.os_year,cops_items.location_code,cops_items.items_desc,cops_items.items_qty,cops_items.items_uqc,cops_items.items_value,cops_items.items_duty,cops_items.items_duty_type,cops_master.os_no,cops_master.os_date,cops_master.os_year,cops_master.location_code,cops_master.booked_by,cops_master.pax_name,cops_master.passport_no,cops_master.passport_date,cops_master.adjudication_date,cops_master.pax_nationality,cops_master.adj_offr_designation,cops_master.rf_amount,cops_master.ref_amount,cops_master.pp_amount,cops_items.items_category from cops_items,cops_master where cops_items.os_no=cops_master.os_no and cops_items.os_year=cops_master.os_year and cops_master.os_date between 
+select count(*) from 
+select count(*) from  
+Select count(*) from 
+select count(*) from br_items
+select count(*) from br_items 
+select count(*) from br_items where br_date<=#
+select count(*) from br_items where br_date=#
+select count(*) from br_master 
+select count(*) from br_master where bank_date=
+Select count(*) from br_master where bank_date>=
+select count(*) from br_master where br_date<=#
+select count(*) from br_master where br_date=#
+Select count(*) from br_master where br_date>=
+SELECT count(*) from cops_arrests where os_date between 
+select count(*) from cops_items
+select count(*) from cops_items 
+select count(*) from cops_items  
+select count(*) from cops_master 
+select count(*) from cops_master  
+select count(*) from cops_master where 
+select count(*) from cops_master where adjudication_date between 
+select count(*) from cops_master where cops_master.os_date between 
+Select count(*) from cops_master where os_date>=
+SELECT count(*) from cops_master where os_date between 
+Select count(*) from dr_items where dr_no=
+select count(*) from dr_master where 
+select count(*) from fuel_master 
+Select count(*) from fuel_master where br_no=
+Select count(*) from mahazar_items where os_no='
+Select count(*) from mahazar_items where system_reference_no=
+select count(*) from mahazar_master where 
+select count(*) from users where user_status='Active' 
+select count(*) from valuables_master where  
+select count(*) from valuables_master where dr_no=0 and dr_type='AIU' 
+select count(*) from valuables_master where dr_no<>0 and dr_type='Bagg' 
+select count(*) from valuables_master where dr_type<>'AIU' and dr_type<>'Bagg' 
+Select count(*) from wh_master1 
+select count(*) from wh_master where 
+select count(*) from wh_master where dr_no=0 and dr_type='AIU' 
+select count(*) from wh_master where dr_no<>0 and dr_type='Bagg' 
+select count(*) from wh_master where dr_no<>0 and dr_type='MHB' 
+select count(*) from wh_master where dr_type<>'AIU' and dr_type<>'Bagg' and dr_type<>'MHB' 
+select count(*) from wh_master where dr_type<>'MHB' 
+select count(*),sum(br_amount) 
+select count(*),sum(br_amount) from 
+select count(*),sum(br_amount) from br_master where 
+select count(*),sum(br_amount) from br_master where bank_date=
+select count(*),sum(br_amount) from fuel_master where bank_date=#
+select count(*),sum(fuel_charges_paid) from fuel_master where 
+select count(*),sum(items_bcd),sum(items_cvd),sum(items_cess),sum(items_hec),sum(items_duty) 
+Select count(*),sum(items_value) from 
+Select count(*),sum(items_value),sum(items_fa),sum(items_duty) from 
+Select count(*),sum(items_value),sum(items_fa),sum(items_duty) from appeal_items where os_no='
+Select count(*),sum(items_value),sum(items_fa),sum(items_duty) from cops_items where os_no='
+select count(*),sum(pp_amount) 
+select count(*),sum(pp_amount) from br_master where bank_date=
+SELECT count(*),sum(redeemed_value+re_export_value+confiscated_value),sum(total_duty_amount),sum(rf_amount),sum(pp_amount) from cops_master where adjudication_date between 
+SELECT count(*),sum(redeemed_value+re_export_value+confiscated_value),sum(total_duty_amount),sum(rf_amount),sum(pp_amount) from cops_master where os_date between 
+select count(*),sum(ref_amount) 
+select count(*),sum(ref_amount) from br_master where bank_date=
+select count(*),sum(rf_amount) 
+select count(*),sum(rf_amount) from br_master where bank_date=
+select count(*),sum(total_duty_amount) 
+select count(*),sum(total_duty_amount),sum(rf_amount),sum(ref_amount),sum(pp_amount),sum(wh_amount),sum(other_amount),sum(br_amount) from br_master where 
+SELECT count(*),sum(total_items_value) from cops_master where os_date between 
+select count(*),sum(total_items_value),sum(dutiable_value), sum(redeemed_value), sum(re_export_value), sum(confiscated_value), sum(total_duty_amount), sum(rf_amount), sum(ref_amount), sum(pp_amount) from cops_master where 
+select count(*),sum(wh_amount+other_amount) 
+select count(*),sum(wh_amount+other_amount) from br_master where bank_date=
+select distinct(adj_offr_name) from cops_master where adj_offr_name is not null and os_date>=
+select distinct(adj_offr_name) from cops_master where os_date=
+select distinct(adj_offr_name) from cops_master where os_date>=#
+select distinct(bank_date) from br_master where bank_date>=
+Select distinct(bank_date) from br_master where (bank_date=#
+Select distinct(bank_date) from br_master where bank_date>=
+Select distinct(bank_date) from br_master where bank_date>=#
+Select distinct(bank_date) from fuel_master where bank_date=#
+select distinct(br_items.br_no) from br_master,br_items where 
+select distinct(br_no),count(*) from br_items where bank_date=
+select distinct(br_no) from br_items where 
+ select distinct(br_no) from br_items  where mid(items_duty_type,1,12)='01.Bagg_Gold'  and 
+ select distinct(br_no) from br_items  where mid(items_duty_type,1,12)='01.Bagg_Silv'  and 
+ select distinct(br_no) from br_items  where (mid(items_duty_type,1,2)='02' or mid(items_duty_type,1,2)='03' or mid(items_duty_type,1,2)='04' or mid(items_duty_type,1,2)='05' or mid(items_duty_type,1,2)='06')  and 
+ select distinct(br_no) from br_items where (mid(items_duty_type,1,2)='07' or mid(items_duty_type,1,2)='08') and 
+select distinct(br_type+'-'+cstr(br_no)) from fuel_master where bank_date=#
+Select distinct(br_type+cstr(br_no)),sum(items_duty) from br_items where bank_date=
+select distinct(category_desc) from item_cat_master where ((ISNULL(active_ind)=TRUE or len(trim(active_ind))=0))group by category_desc order by category_desc 
+select distinct(challan_no),count(*),sum(br_amount) from br_master where bank_date=
+select DISTINCT (challan_no) from br_master where 
+select DISTINCT (cstr(bank_date)+' - '+bank_shift+' - '+dc_code) from br_master where 
+select distinct(cstr(bank_date)+'-'+bank_shift) from br_master where br_date>=#
+select distinct(cstr(dr_no)+' / '+detained_by) from mhb_master where 
+select distinct(cstr(dr_no)+'  Dt.  '+cstr(dr_date)),count(*) from 
+select distinct(cstr(wh_no)+cstr(wh_date)) from wh_release where 
+SELECT distinct(datevalue(month_year)),sum(baggage_duty+addl_duty),sum(sadcess_duty),sum(gold_duty),sum(silver_duty),
+select distinct(dc_code) from br_master where bank_date=
+select distinct(dc_code) from dc_master 
+select distinct(detained_by),count(*) from dr_master where 
+select distinct(detained_by),count(*) from mahazar_master where 
+select distinct(detained_pkg_no) from 
+Select distinct(detained_pkg_no) from 
+select distinct(detained_pkg_type) from 
+select distinct(detained_pkg_Type) from 
+select distinct(dri_cus_10_desc) from item_cat_master where ((ISNULL(active_ind)=TRUE or len(trim(active_ind))=0))group by dri_cus_10_desc order by dri_cus_10_desc 
+select distinct(dri_cus_11_desc) from item_cat_master where ((ISNULL(active_ind)=TRUE or len(trim(active_ind))=0))group by dri_cus_11_desc order by dri_cus_11_desc 
+select distinct(dr_no) from dr_master where  (closure_ind is null or closure_ind<>'Y') and (entry_deleted is null or entry_deleted<>'Y') and dr_type='Bagg' and dr_date>=#
+select distinct(dr_no) from mhb_master where 
+select distinct(dr_no) from wh_master where dr_no<>0 and dr_type='MHB' 
+select distinct(flight_no) from br_master where location_code='
+select distinct(flight_no) from flt_manifests where flight_date=#
+select distinct(items_duty_type),sum(items_value) from 
+select distinct(items_duty_type),sum(items_value) from cops_items where 
+select distinct(items_duty_type+' Unit Price - '+cstr(items_value/items_qty)) from cops_items where 
+select distinct(items_uqc) from cops_items where items_duty_type<>'mat_object' and os_date between 
+select distinct(items_uqc) from cops_items where os_date between 
+select distinct(nationality) from nationality_master group by nationality 
+select distinct(nationality) from nationality_master where nationality<>'NOT AVAILABLE' group by nationality 
+select distinct(os_no+cstr(os_year)) from cops_items where 
+select distinct(os_no+' - '+cstr(year(os_date)))from br_master where len(trim(os_no))<>0 and len(trim(os_date))<>0 and 
+select distinct(passport_no),count(*),sum(total_items_value),sum(total_fa_value),sum(total_duty_amount) from br_master where 
+select distinct(passport_no) from br_master where 
+select distinct(passport_no) from br_master where batch_date=#
+select distinct(port_of_departure) from port_master group by port_of_departure 
+select distinct(port_of_departure) from port_master where port_of_departure<>'CHENNAI' and port_of_departure<>'NOT AVAILABLE' group by port_of_departure 
+select distinct(port_of_departure) from port_master where port_of_departure<>'CHENNAI' group by port_of_departure 
+select distinct(port_of_departure) from port_master where port_of_departure<>'NOT AVAILABLE' group by port_of_departure 
+select distinct(seal_no),count(*) from dr_master where 
+select distinct(seal_no),count(*) from mahazar_master where 
+select dr_no from dr_master where (entry_deleted is null or entry_deleted<>'Y') and (closure_ind is null or closure_ind<>'Y') and dr_type='Bagg' and dr_date>=#
+select dr_top_margin from margin_master 
+Select flight_no from arrival_flight_master where flight_no like '
+ select * from 
+select * from 
+Select * from 
+Select * from airlines_mast 
+select * from airlines_mast order by ucase(airline_name)
+select * from airlines_mast where airline_code='
+select * from airport_master 
+select * from airport_master where airport_status='Active'
+select * from appeal_items 
+Select * from appeal_items where dr_no=
+Select * from appeal_items  where location_code='
+Select * from appeal_items where location_code='
+select * from appeal_items where os_date=
+Select * from appeal_items where os_no='
+select * from appeal_items where unique_no=
+select * from appeal_master 
+ select * from appeal_master where 
+select * from appeal_master where os_date=
+select * from appeal_master where os_no='
+Select * from appeal_master where os_no='
+Select * from arrival_flight_master 
+select * from arrival_flight_master order by flight_no 
+select * from arrival_flight_master where flight_no='
+select * from arrival_flight_master where mid(flight_no,1,2)='
+select * from batch_master 
+select * from batch_master order by current_batch_date, current_batch_shift 
+select * from batch_master where current_batch_date=
+select * from batch_master where current_batch_date=#
+select * from batch_with_many_dc where current_batch_date=#
+select * from br_items 
+Select * from br_items 
+select * from br_items order by bank_date,bank_shift 
+select * from br_items where 
+Select * from br_items where bank_date=
+Select * from br_items where bank_date=#
+select * from br_items where batch_date=
+Select * from br_items where batch_date>=
+select * from br_items where br_date=
+select * from br_items where br_date>=
+Select * from br_items where br_date>=
+select * from br_items where br_date>=#02/22/2012# order by br_date,br_no
+select  * from br_items where br_no=
+select * from br_items where br_no=
+Select * from br_items where br_no=
+select * from br_master 
+Select * from br_master 
+select * from br_master,br_items where ff_ind='Y' and 
+select * from br_master,br_items where ff_ind='Y' and br_master.br_date<=#
+select * from br_master order by bank_date,bank_shift 
+select * from br_master order by batch_date,batch_shift,br_no 
+select * from br_master order by batch_date,batch_shift,unique_no 
+select * from br_master order by br_date,br_no 
+select * from br_master where 
+select * from br_master where bank_date=
+select * from br_master where bank_date=#
+select * from br_master where bank_date>=#
+Select * from br_master where bank_date=
+Select * from br_master where bank_date=#
+select * from br_master where bank_date>=#01/01/2014# and bank_date<=#14/01/2014# and challan_no is not null and (entry_deleted is null or entry_deleted<>'Y') and (bkup_taken is null or bkup_taken<>'Y') 
+select * from br_master where batch_date=
+select * from br_master where batch_date=#
+Select * from br_master where batch_date>=
+select * from br_master where br_date=
+select * from br_master where br_date>=
+Select * from br_master where br_date>=
+select * from br_master where br_date>=#02/22/2012# order by br_date,br_no
+select * from br_master where br_no=
+Select * from br_master  where br_no=
+Select * from br_master where br_no=
+select * from br_master where  br_type='
+select * from br_master where  (br_type='OS' or br_type='OOS' or br_type='Bagg') and br_no=
+select * from br_master where  (br_type='SDO') and br_no=
+Select * from br_master where (entry_deleted is null or entry_deleted<>'Y') and batch_date=cdate('
+select * from br_master where passport_no='
+select * from br_master where unique_no<>
+select * from br_no_limits order by br_type
+select * from br_no_limits where br_type='
+Select * from br_print_gaps 
+select * from cops_items
+select * from cops_items 
+Select * from cops_items 
+select * from cops_items order by os_date,os_no
+Select * from cops_items_temp where os_no='
+select * from cops_items where 
+Select * from cops_items where location_code='
+select * from cops_items where os_date=
+select * from cops_items where os_date>=
+select * from cops_items where os_date>=#
+Select * from cops_items where os_date>=
+select * from cops_items where os_date>=#01/01/2009# and os_date<=#12/31/2011#  order by os_date,os_no,items_sno
+select * from cops_items where os_no='
+Select * from cops_items where os_no='
+Select * from cops_items where os_no in (select os_no from cops_master where 
+select * from cops_items where trim(os_no)='
+select * from cops_items where unique_no=
+select * from cops_items where year(os_date)=
+select * from cops_master
+select * from cops_master 
+Select * from cops_master 
+select * from cops_master order by os_date,os_no
+select * from cops_master order by os_date,unique_no 
+ select * from cops_master_temp where 
+select * from cops_master_temp where month(os_date)=
+ select * from cops_master where 
+select * from cops_master where 
+SELECT * from cops_master where adj_offr_name='
+SELECT * from cops_master where adjudication_date between 
+select * from cops_master where booked_by like 'DRI%' and 
+SELECT * from cops_master where br_amount<total_payable and os_date between 
+select * from cops_master where location_code='
+select * from cops_master where month(os_date)=
+select * from cops_master where os_date=
+select * from cops_master where os_date>=
+select * from cops_master where os_date>=#
+Select * from cops_master where os_date>=
+SELECT * from cops_master where os_date < 
+SELECT * from cops_master where os_date <= 
+Select * from cops_master where os_date>=#01/01/2014# and os_date<=#03/31/2015# and location_code='
+SELECT * from cops_master where  os_date between 
+SELECT * from cops_master where os_date between 
+ select * from cops_master where os_no='
+select * from cops_master where os_no='
+Select * from cops_master where os_no='
+select * from cops_master where os_no=cdbl(
+select * from cops_master where os_no like '
+select * from cops_master where os_year=
+select * from cops_master where os_year=2013 order by os_date,os_no
+Select * from cops_master where os_year=2014 and total_items_value>500000 and location_code='
+select * from cops_master where (passport_no= '
+select * from cops_master where (passport_no='
+select * from cops_master where passport_no= '
+select * from cops_master where passport_no='
+Select * from cops_master where passport_no='XXXXXXXXX' order by os_date,os_no 
+select * from cops_master where trim(os_no)='
+select * from data_master 
+select * from data_master where batch_date=#
+Select * from dc_master order by dc_name 
+select * from dc_master order by ucase(dc_name)
+select * from dc_master where dc_code='
+Select * from dc_master where dc_status is null or dc_status<>'C' order by dc_name 
+select * from dc_master where left(dc_name,1)=left('
+select * from dri_master where (passport_no='
+select * from dri_master where passport_no='
+select * from dr_items 
+select * from dr_items where dr_date=
+select * from dr_items where dr_date>=
+Select * from dr_items where dr_date>=
+select * from dr_items where dr_no=
+Select * from dr_items  where dr_no=
+Select * from dr_items where dr_no=
+Select * from dr_items where unique_no=
+select * from dr_master 
+select * from dr_master where 
+select * from dr_master where dr_date=
+select * from dr_master where dr_date>=
+select * from dr_master where dr_no=
+Select * from  dr_master  where dr_no=
+Select * from dr_master where dr_no=
+Select * from dr_master where location_code='
+select * from dr_master  where os_no='
+ select * from dr_master where passport_no='
+select * from duty_rate_master  
+Select * from duty_rate_master where (active_ind is null or len(trim(active_ind))=0) and mid(duty_category,1,2)='16' 
+Select * from duty_rate_master where active_ind is null or len(trim(active_ind))=0 order by cint(mid(duty_category,1,2)) 
+select * from duty_rate_master where duty_category='
+select * from duty_rate_master where duty_category='17.Tfr_of_Residence' and (ISNULL(active_ind)=TRUE or len(trim(active_ind))=0) order by duty_category 
+Select * from duty_rate_master where from_date>=#
+select * from duty_rate_master where (((ISNULL(active_ind)=TRUE or len(trim(active_ind))=0))) and (cint(mid(duty_category,1,2))>=2 and cint(mid(duty_category,1,2))<=6) order by duty_category 
+select * from duty_rate_master where (((ISNULL(active_ind)=TRUE or len(trim(active_ind))=0))) and (cint(mid(duty_category,1,2))>=7 and cint(mid(duty_category,1,2))<=8) order by duty_category 
+select * from duty_rate_master where (ISNULL(active_ind)=TRUE or len(trim(active_ind))=0) and duty_category='16.Fuel_Duty' order by duty_category 
+select * from duty_rate_master where (((ISNULL(active_ind)=TRUE or len(trim(active_ind))=0))) and (mid(duty_category,1,2)='01' or (cint(mid(duty_category,1,2))>=9) and cint(mid(duty_category,1,2))<=12) order by duty_category 
+select * from duty_rate_master where (((ISNULL(active_ind)=TRUE or len(trim(active_ind))=0))) and (mid(duty_category,1,2)='01' or cint(mid(duty_category,1,2))>=9) order by duty_category 
+select * from duty_rate_master where (((ISNULL(active_ind)=TRUE or len(trim(active_ind))=0))) order by duty_category 
+select * from duty_rate_master where ((ISNULL(active_ind)=TRUE or len(trim(active_ind))=0))order by duty_category 
+select * from duty_rate_master where (ISNULL(active_ind)=TRUE or len(trim(active_ind))=0) order by duty_category 
+select * from duty_rate_master where mid(duty_category,1,2)='17' and (ISNULL(active_ind)=TRUE or len(trim(active_ind))=0) order by duty_category 
+Select * from duty_rate_master where to_date is not null and 
+select * from flt_manifests where flight_no='
+select * from fuel_master 
+select * from fuel_master order by bank_date,bank_shift,unique_no 
+select * from fuel_master order by batch_date,batch_shift 
+select * from fuel_master order by batch_date,batch_shift,unique_no 
+select * from fuel_master where 
+ select * from fuel_master where aircraft_no like '%
+ select * from fuel_master where airlines_name like '%
+select * from fuel_master where bank_date=
+select * from fuel_master where bank_date=#
+select * from fuel_master where bank_date>=#
+Select * from fuel_master where bank_date=
+select * from fuel_master where batch_date=
+select * from fuel_master where batch_date=#
+ select * from fuel_master where br_no=
+select * from fuel_master where br_no=
+Select * from fuel_master  where br_no=
+Select * from fuel_master where br_no=
+select * from fuel_master where len(trim(br_date))<>0 and batch_date=#
+select * from fuel_master where month(bank_date)=month(cdate('
+select * from ip_addrs_table 
+select * from ip_addrs_table where status='Active' 
+select * from item_cat_master 
+select * from item_cat_master  
+select * from item_cat_master where active_ind<>'C' order by category_code 
+select * from item_cat_master where active_ind is null or len(trim(active_ind))=0 order by category_desc 
+select * from item_cat_master where category_code='
+select * from item_cat_master where (category_code is not null or len(trim(category_code))<>0) and (active_ind is null or active_ind<>'C') order by dri_cus_10_sno,cint(right(category_desc,2))
+select * from item_cat_master where (category_code is not null or len(trim(category_code))<>0) and (active_ind is null or active_ind<>'C') order by dri_cus_11_sno,cint(right(category_desc,2))
+select * from item_cat_master where (category_code is not null or len(trim(category_code))<>0) and (active_ind is null or active_ind<>'C') order by right(category_desc,2)
+select * from item_cat_master where category_desc='
+select * from item_cat_master where category_desc='Electronic Goods-21' and (ISNULL(active_ind)=TRUE or len(trim(active_ind))=0)
+select * from item_cat_master where dri_cus_10_desc='
+select * from item_cat_master where dri_cus_11_desc='
+select * from item_cat_master where (ISNULL(active_ind)=TRUE or len(trim(active_ind))=0) and category_code<>'jwl_gold' order by category_desc 
+select * from item_cat_master where (ISNULL(active_ind)=TRUE or len(trim(active_ind))=0) and (right(category_desc,2)='03' or right(category_desc,2)='09' or right(category_desc,2)='10' or right(category_desc,2)='11') order by category_desc 
+select * from item_cat_master where ((ISNULL(active_ind)=TRUE or len(trim(active_ind))=0))order by category_code 
+select * from item_cat_master where (ISNULL(active_ind)=TRUE or len(trim(active_ind))=0) order by category_code 
+select * from item_cat_master where ((ISNULL(active_ind)=TRUE or len(trim(active_ind))=0))order by category_desc 
+select * from item_cat_master where (ISNULL(active_ind)=TRUE or len(trim(active_ind))=0) order by category_desc 
+select * from item_cat_master where right(trim(category_desc),2)='
+select * from item_trans
+select * from item_trans 
+Select * from item_trans where item_lcode='TRY' 
+select * from item_trans where item_osdate=
+select * from item_trans where item_os_no='
+select * from mahazar_items 
+select * from mahazar_items where detaining_date=
+select * from mahazar_items where detaining_date>=
+Select * from mahazar_items where dr_type='
+Select * from mahazar_items where os_no='
+Select * from mahazar_items where system_reference_no=
+select * from mahazar_master 
+select * from mahazar_master where detaining_date=
+select * from mahazar_master where detaining_date>=
+Select * from mahazar_master where dr_type='
+Select * from mahazar_master where location_code='
+Select * from  mahazar_master  where os_no='
+Select * from mahazar_master where os_no='
+Select * from  mahazar_master  where system_reference_no=
+select * from margin_master 
+select * from mhb_items 
+Select * from mhb_items where aoc_no=
+select * from mhb_items where dr_date=
+select * from mhb_items where dr_date>=
+Select * from mhb_items where dr_no=
+Select * from mhb_items where mhb_no=
+select * from mhb_master 
+select * from mhb_master where dr_date=
+select * from mhb_master where dr_date>=
+select * from mhb_master where dr_no=
+Select * from  mhb_master  where dr_no=
+Select * from mhb_master where dr_no=
+select * from nationality_master order by nationality
+select * from nationality_master order by ucase(nationality)
+select * from old_br_items order by br_date,br_shift 
+select * from old_br_items where br_no=
+select * from old_br_items where br_no=110034
+select * from old_br_master order by br_date,br_shift,br_no 
+select * from old_br_master where br_no=110034
+select * from os_item_compare_remarks where remarks1='
+select * from os_master 
+Select * from os_master where location_code='TRY' 
+select * from os_master where osdate=
+select * from os_master where trim(osnumber)='
+select * from os_rpt_items 
+select * from os_rpt_master 
+select * from os_rpt_master where os_no='
+select * from port_master order by port_of_departure
+select * from port_master order by ucase(port_of_departure)
+select * from rev_challans 
+select * from rev_challans where rev_date=
+select * from revenue 
+select * from revenue where rev_date=
+select * from revenue where rev_date>=
+select * from shift_timing_master 
+select * from short_collection_master 
+select * from type_changed_brs where 
+select * from uos_master where os_no='
+select * from users 
+select * from users where ucase(trim(user_id))='
+select * from users where user_id='
+select * from users where user_id='cops' and user_status='Active' 
+select * from val_items_recons_remarks where remarks1='
+select * from val_master_recons_remarks where remarks1='
+select * from valuables_items 
+select * from valuables_items_recons_remarks where remarks1='
+select * from valuables_items where 
+Select * from valuables_items where 
+Select * from valuables_items where wh_date>=
+Select * from valuables_items where wh_no=
+select * from valuables_master 
+Select * from valuables_master where os_no='
+select * from valuables_master where unique_no=
+Select * from valuables_master where wh_date>=
+select * from valuables_master where wh_no=
+Select * from valuables_master where wh_no=
+select * from wh_gnl_rpt_items 
+select * from wh_gnl_rpt_master 
+select * from wh_items 
+select * from wh_items_recons_remarks where remarks1='
+select * from wh_items where dr_type<>'MHB' and 
+Select * from wh_items where wh_date>=
+Select * from wh_items where wh_no=
+select * from wh_location_change 
+select * from wh_master 
+select * from wh_master_recons_remarks where remarks1='
+Select * from wh_master where dr_type<>'MHB' and wh_date>=
+ Select * from wh_master where os_no='
+select * from wh_master where unique_no=
+select * from wh_master where wh_date=
+Select * from wh_master where wh_date>=
+Select * from wh_master where wh_master.wh_date>=
+select * from wh_master where wh_no=
+Select * from wh_master where wh_no=
+select * from wh_release 
+Select * from wh_release where wh_no=
+select * from wh_val_rpt_items 
+select * from wh_val_rpt_master 
+Select items_qty from 
+select max(batch_date) from br_master  
+Select max(batch_date) from br_master where (entry_deleted is null or entry_deleted<>'Y') and len(trim(challan_no))<>0 
+Select max(br_date) from br_master  
+select max(br_no) from 
+select max(br_no) from br_master where br_date<>#01/01/2014# and year(br_date)=year(cdate('
+select max(br_no) from br_master where (br_type='Bagg' or br_type='OS' or br_type='OOS') and year(br_date)=year(cdate('
+select max(br_no) from br_master where (br_type='Bagg' or br_type='OS' or br_type='OOS' or br_type='SDO') and year(br_date)=year(cdate('
+select max(br_no) from br_master where br_type='Gold' and year(br_date)=year(cdate('
+select max(br_no) from br_master where br_type='SDO' and year(br_date)=year(cdate('
+select max(br_no) from br_master where br_type='Silv' and year(br_date)=year(cdate('
+select max(br_no) from br_master where year(br_date)=year(cdate('
+select max((challan_no)) from br_master where year(bank_date)=year(cdate('
+select max(cint(challan_no)) from fuel_master where year(batch_date)=year(cdate('
+select max(detaining_date) from mahazar_master  
+select max(dr_date) from dr_master  
+select max(dr_date) from mhb_master  
+select max((dr_no)) from 
+select max((dr_no)) from dr_master where dr_date in (Select max(dr_date) from dr_master where year(dr_date)=
+Select max(items_sno) from 
+Select max(os_date) from br_master  
+select max(os_date) from cops_master  
+select max(os_date) from cops_master where location_code='
+select max((os_no)) from 
+select max((os_no)) from cops_master where os_date in (Select max(os_date) from cops_master where year(os_date)=
+select max(rev_date) from revenue where rev_date>=
+select max(sl_no) from dr_update_from_br 
+select max(system_reference_no) from 
+select max(system_reference_no) from mahazar_master where location_code='
+select max(unique_no) from 
+select max(unique_no) from  
+select max(unique_no) from appeal_items 
+select max(unique_no) from appeal_master 
+select max(unique_no) from br_items 
+select max(unique_no) from br_master 
+select max(unique_no) from cops_items 
+select max(unique_no) from cops_master 
+select max(unique_no) from dr_items 
+select max(unique_no) from dr_master 
+select max(unique_no) from fuel_master 
+select max(unique_no) from fuel_master  
+select max(unique_no) from mahazar_items 
+select max(unique_no) from mahazar_master 
+select max(unique_no) from mhb_items 
+select max(unique_no) from mhb_master 
+select max(unique_no) from os_rpt_items 
+select max(unique_no) from os_rpt_master 
+select max(unique_no) from valuables_items 
+select max(unique_no) from valuables_master 
+select max(unique_no) from wh_gnl_rpt_items 
+select max(unique_no) from wh_gnl_rpt_master 
+select max(unique_no) from wh_items 
+select max(unique_no) from wh_location_change 
+select max(unique_no) from wh_master 
+select max(unique_no) from wh_release 
+select max(unique_no) from wh_val_rpt_items 
+select max(unique_no) from wh_val_rpt_master 
+select max(wh_no) from valuables_master where year(wh_date)=year(cdate('
+select max(wh_no) from wh_master where dr_type='MHB' and year(wh_date)=year(cdate('
+select max(wh_no) from wh_master where year(wh_date)=year(cdate('
+select max(wh_release_no) from wh_release where year(release_date)=year(cdate('
+select max(wh_release_no) from wh_release where year(release_date)=year(now()) 
+Select Only 'Security Deposit' or 'Appeal Fees' ! 
+ (select os_no from cops_items where (right(trim(os_no),1)='0' or right(trim(os_no),1)='1' or right(trim(os_no),1)='2' or right(trim(os_no),1)='3' or right(trim(os_no),1)='4' or right(trim(os_no),1)='5' or right(trim(os_no),1)='6' or right(trim(os_no),1)='7' or right(trim(os_no),1)='8' or right(trim(os_no),1)='9') And location_code= '
+select os_no from cops_master_deleted where 
+select os_no from cops_master where 
+ (select os_no from cops_master where (right(trim(os_no),1)='0' or right(trim(os_no),1)='1' or right(trim(os_no),1)='2' or right(trim(os_no),1)='3' or right(trim(os_no),1)='4' or right(trim(os_no),1)='5' or right(trim(os_no),1)='6' or right(trim(os_no),1)='7' or right(trim(os_no),1)='8' or right(trim(os_no),1)='9') and location_code='
+select os_no from mahazar_master where detaining_date>=#
+ select pax_name,passport_no,passport_date,br_master.br_no,br_master.br_date,br_master.br_type,pax_address1,pax_address2,pax_address3,br_master.unique_no,br_master.flight_no,br_master.entry_deleted,br_master.location_code,br_items.Items_desc,br_items.Items_qty,br_items.items_uqc,br_items.items_value,br_items.items_fa,br_items.items_duty,br_master.batch_shift, 
+ select pax_name,passport_no,passport_date,cops_master.os_no,cops_master.os_date,pax_address1,pax_address2,pax_address3,cops_master.unique_no,cops_master.flight_no,cops_master.location_code,cops_items.Items_desc,cops_items.Items_qty,cops_items.items_uqc,cops_items.items_value,cops_items.items_fa,cops_items.items_duty, 
+ select pax_name,passport_no,passport_date,total_items_value,total_duty_amount,rf_amount,pp_amount,br_no,br_date,os_no,os_date,br_amount,br_date,pax_address1,pax_address2,pax_address3, ref_amount,wh_amount,ref_amount,other_amount,br_amount,unique_no,total_fa_value,flight_no,table_name 
+ select pax_name,passport_no,passport_date,total_items_value,total_duty_amount,rf_amount,pp_amount,br_no,br_date,os_no,os_date,br_amount,br_date,pax_address1,pax_address2,pax_address3, ref_amount,wh_amount,ref_amount,other_amount,br_amount,unique_no,total_fa_value,flight_no,table_name,br_type,image_filename,batch_shift,entry_deleted,location_code,flight_date,departure_date,dr_no,dr_date,challan_no,bank_date,bank_shift, 
+ select pax_name,passport_no,passport_date,total_items_value,total_duty_amount,rf_amount,pp_amount,br_no,br_date,os_no,os_date,br_amount,br_date,pax_address1,pax_address2,pax_address3, ref_amount,wh_amount,ref_amount,other_amount,br_amount,unique_no,total_fa_value,flight_no,table_name,br_type,image_filename,batch_shift,entry_deleted,location_code,flight_date,departure_date,dr_no,dr_date,challan_no,bank_date,bank_shift,   
+ select pax_name,passport_no,passport_date,total_items_value,total_duty_amount,rf_amount,pp_amount,br_no,br_date,os_no,os_date,br_amount,br_date,pax_address1,pax_address2,pax_address3, ref_amount,wh_amount,ref_amount,other_amount,br_amount,unique_no,total_fa_value,flight_no,table_name,entry_deleted,location_code,flight_date, 
+select sum(br_amount) from br_master where month(bank_date)=month(cdate('
+select sum(confiscated_value+redeemed_value+re_export_value) from cops_master where 
+select sum(confiscated_value+redeemed_value+re_export_value),sum(total_duty_amount),sum(rf_amount),sum(ref_amount),sum(pp_amount),sum(total_duty_amount+rf_amount+ref_amount+pp_amount) from cops_master where 
+select sum(fuel_charges_paid) from fuel_master where bank_date>=#
+select sum(fuel_charges_paid) from fuel_master where batch_date>=#
+SELECT Sum(fuel_charges_paid) From fuel_master WHERE DateValue(Mid(CStr(bank_date),4,7))='
+select sum(fuel_charges_paid) from fuel_master where month(bank_date)=month(cdate('
+select sum(items_bcd+items_cvd) 
+ select sum(items_bcd+items_cvd) from br_items where mid(items_duty_type,1,10)='01.Baggage' and 
+  select sum(items_bcd+items_cvd) from br_items where mid(items_duty_type,1,12)='01.Bagg_Gold' and 
+  select sum(items_bcd+items_cvd) from br_items where mid(items_duty_type,1,12)='01.Bagg_Silv' and 
+ select sum(items_bcd+items_cvd) from br_items  where (mid(items_duty_type,1,2)='02' or mid(items_duty_type,1,2)='03' or mid(items_duty_type,1,2)='04' or mid(items_duty_type,1,2)='05' or mid(items_duty_type,1,2)='06') and 
+  select sum(items_bcd+items_cvd) from br_items where (mid(items_duty_type,1,2)='07' or mid(items_duty_type,1,2)='08') and 
+ select sum(items_bcd+items_cvd) from br_items where (mid(items_duty_type,1,2)='09' or mid(items_duty_type,1,2)='10' or mid(items_duty_type,1,2)='11') and 
+ select sum(items_bcd+items_cvd) from br_items where mid(items_duty_type,1,2)='12' and 
+select sum(items_bcd+items_cvd),sum(items_qty) 
+select sum(items_bcd),sum(items_cvd),sum(items_cess+items_hec),sum(items_duty) from br_items where  
+select  sum(items_bcd),sum(items_cvd),sum(items_cess),sum(items_hec) from br_items where br_no=
+select sum(items_bcd),sum(items_cvd),sum(items_cess),sum(items_hec),sum(items_duty) 
+select sum(items_bcd),sum(items_cvd),sum(items_qty) from br_items where bank_date=
+  select sum(items_cess) from br_items where 
+select sum(items_cess+items_hec) from br_items where bank_date=
+Select sum(items_duty),count(*) from br_items where br_no=
+Select sum(items_duty) from br_items where br_no=
+Select sum(items_duty) from cops_items where os_no='
+Select sum(items_fa*items_qty/items_value) from 
+select sum(items_fa),sum(items_duty) from 
+  select sum(items_hec) from br_items where 
+Select sum(items_qty) from 
+ select sum(items_qty),sum(items_bcd+items_cvd) from br_items  where mid(items_duty_type,1,16)='01.Bagg_Gold_Jew'  and 
+ select sum(items_qty),sum(items_bcd+items_cvd) from br_items  where mid(items_duty_type,1,16)='01.Bagg_Gold_Pri'  and 
+ select sum(items_qty),sum(items_bcd+items_cvd) from br_items  where mid(items_duty_type,1,16)='01.Bagg_Silv_Jew'  and 
+ select sum(items_qty),sum(items_bcd+items_cvd) from br_items  where mid(items_duty_type,1,16)='01.Bagg_Silv_Pri'  and 
+ select sum(items_qty),sum(items_bcd+items_cvd) from br_items  where mid(items_duty_type,1,2)='02'  and 
+ select sum(items_qty),sum(items_bcd+items_cvd) from br_items  where mid(items_duty_type,1,2)='03'  and 
+ select sum(items_qty),sum(items_bcd+items_cvd) from br_items  where mid(items_duty_type,1,2)='04'  and 
+ select sum(items_qty),sum(items_bcd+items_cvd) from br_items  where mid(items_duty_type,1,2)='05'  and 
+ select sum(items_qty),sum(items_bcd+items_cvd) from br_items  where mid(items_duty_type,1,2)='06'  and 
+ select sum(items_qty),sum(items_bcd+items_cvd) from br_items  where mid(items_duty_type,1,2)='07'  and 
+ select sum(items_qty),sum(items_bcd+items_cvd) from br_items  where mid(items_duty_type,1,2)='08'  and 
+select sum(items_qty),sum(items_duty) 
+SELECT sum(items_qty),sum(items_value) from cops_items,cops_master where 
+select sum(items_qty),sum(items_value),sum((items_bcd+items_cvd)) from br_items where 
+select sum(items_qty),sum(items_value),sum((items_bcd+items_cvd)) from br_master,br_items where 
+select sum(items_qty),sum(items_value),sum((items_duty)) from cops_items where 
+Select sum(items_value) from 
+Select sum(items_value)from 
+Select sum(items_value) from appeal_items where os_no='
+Select sum(items_value)from appeal_items where os_no='
+Select sum(items_value) from cops_items where os_no='
+Select sum(items_value)from cops_items where os_no='
+Select sum(items_value) from valuables_items where wh_no=
+Select sum(items_value) from wh_items where dr_type<>'MHB' and wh_no=
+SELECT sum(items_value),sum(items_duty) from cops_items,cops_master where cops_master.os_no=cops_items.os_no and cops_master.os_date=cops_items.os_date and adjudication_date between 
+Select sum(items_value),sum(items_fa) from dr_items where dr_no=
+SELECT sum(items_value),sum(items_qty) from cops_items,cops_master where cops_master.os_date between 
+SELECT sum(items_value),sum(items_qty) from cops_items where os_date between 
+SELECT sum(items_value),sum(items_qty),sum(items_fa) from cops_items,cops_master where cops_master.os_date between 
+Select sum(released_qty) from wh_release where wh_no=
+SELECT sum(rf_amount),sum(ref_amount),sum(pp_amount),sum(total_duty_amount) from cops_master where os_date between 
+select sum(rf_amount),sum(ref_amount),sum(pp_amount),sum(wh_amount+other_amount) from br_master where 
+select sum(rf_amount),sum(ref_amount),sum(pp_amount),sum(wh_amount),sum(other_amount) from br_master where 
+select SUM(TOTAL_DUTY_AMOUNT), SUM(RF_AMOUNT+REF_AMOUNT), SUM(PP_AMOUNT) from br_master where len(trim(os_no))<>0 and 
+select sum(total_duty_amount),sum(rf_amount),sum(pp_amount),sum(ref_amount),sum(wh_amount),sum(other_amount),sum(total_duty_amount+rf_amount+pp_amount+ref_amount+wh_amount+other_amount),sum(br_amount) from br_master where 
+select sum(total_duty_amount),sum(rf_amount),sum(pp_amount),sum(ref_amount),sum(wh_amount),sum(other_amount),sum(total_duty_amount+rf_amount+pp_amount+ref_amount+wh_amount+other_amount),sum(br_amount) from fuel_master where 
+ (Select the BR Type as 'Online OS') ! 
+select ucase(airline_name+' - '+airline_code) from airlines_mast order by ucase(airline_name+' - '+airline_code)
+Select valuables_master.wh_no,valuables_master.wh_date,* from valuables_master,valuables_items where valuables_master.wh_date>=
+Select valuables_master.wh_no,valuables_master.wh_date,valuables_master.dr_type,* from valuables_master,valuables_items where valuables_master.wh_date>=
+Select valuables_master.wh_no,valuables_master.wh_date,valuables_master.dr_type,* from valuables_master where valuables_master.wh_date>=
+Select wh_master.wh_no,wh_master.wh_date,wh_master.dr_type,* from wh_master,wh_items where wh_master.wh_date>=
+select wh_no from valuables_master where 
+select wh_no from wh_master where dr_type<>'MHB' and 
+Serial No. missing in Item Category.  Contact System Administrator ! 
+Server Identifier Details Not Found In Node.  Contact System Administrator ! 
+set adjudication_date=cdate('
+ set adjudication_date=NULL,adj_offr_designation='  ',adjn_offr_remarks=null,rf_amount=0,pp_amount=0,ref_amount=0 where os_no='
+ set batch_shift='
+ set br_date=cdate('
+  set br_no=
+ set br_no=
+ set br_printed='Y' where br_no=
+ set br_type='
+ set closure_ind='Y',closure_remarks='
+ set closure_remarks='
+ set detained_pkg_type='
+ set dr_no=
+ set dr_printed='Y' where dr_no=
+ set entry_deleted='Y' 
+ set entry_deleted='Y' where dr_no=
+ set entry_deleted='Y' where location_code='
+ set entry_deleted='Y' where unique_no=
+ set flight_no='
+ set fm_printed='Y' where system_reference_no=
+ set items_desc='
+ set items_dr_no=
+ set items_dr_no=0,items_dr_year=0  
+ set items_dr_no=cdbl(
+ set items_fa=0,items_bcd=
+ set items_fa=0,items_duty=
+ set items_release_category='
+ set online_adjn='C' where os_date=
+ set online_adjn='N',adjudication_date=cdate('
+ set online_adjn='Y',adjudication_date=cdate('
+  SET os_category = '
+ SET os_category = '
+ set os_no='
+ set os_printed='Y' where os_no='
+  set released_qty=released_qty+cdbl(
+set rf_amount=cdbl(
+ set storage_location='
+ set total_DRs=
+ set total_fa_value=cdbl(
+ set total_items=
+ set total_items=cdbl(
+ set total_items=total_items+
+ set total_pkgs=cint(
+shift_timing_master
+Shift Timing Master Created in Database ! 
+Shift Timings For Day & Night Batches Modified ! 
+Shift Timings Master Not Found. It will be Created now.  Click 'Ok' to continue !
+Status of MHB Data Transfer from Server 
+Status of MHB Data Transfer From Server 
+ Sum (rf_amount), Sum(ref_amount), Sum(pp_amount), Sum(misc_amount), sum(total_duty) From revenue 
+</table>
+<table>
+Table
+<table border=0 align=center width=100% cellspacing=0 cellpadding=0>
+<table border=0  align=center width=1120 cellspacing=0 cellpadding=0>
+<table border=0 align=center width=80% cellspacing=0 cellpadding=0>
+<table border=0  align=center width=80% cellspacing=0 cellpadding=0>
+<table border=0 align=center width=96% cellspacing=0 cellpadding=0>
+<table border=0  align=center width=96% cellspacing=0 cellpadding=0>
+<table border=0 cellpadding=0 cellspacing=0 colspan=7 width=100% id=AutoNumber2>
+<table border=0 cellpadding=0 cellspacing=0 colspan=8 width=100% id=AutoNumber2>
+<table border=0 cellpadding=0 cellspacing=0 colspan=8 width=94% id=AutoNumber2>
+<table border=0 cellpadding=0 cellspacing=0 colspan=8 width=95% id=AutoNumber2>
+<table border=0 cellpadding=0 cellspacing=0 width=100% id=AutoNumber3>
+<table border=0 cellpadding=0 cellspacing=0 width=100% id=AutoNumber4>
+<table border=0 cellpadding=0 cellspacing=0 width=90% id=AutoNumber2>
+<table border=0 cellpadding=0 cellspacing=0 width=94% id=AutoNumber2>
+<table border=0 cellpadding=0 cellspacing=0 width=96% id=AutoNumber2>
+<table border=0 width=100% cellspacing=0 cellpadding=0>
+<table border= 0  width= 100%  id= table1 >
+<table border= 0  width= 100%  id= table1><tr>
+<table border=0 width=1050 cellspacing=0 cellpadding=0>
+<table border=0 width=1070 cellspacing=0 cellpadding=0>
+<table border=0 width=1160 cellspacing=0 cellpadding=0>
+<table border=0 width=1200 cellspacing=0 cellpadding=0>
+<table border=0 width=1230 cellspacing=0 cellpadding=0>
+<table border=0 width=1240 cellspacing=0 cellpadding=0>
+<table border= 0  width= 90%  id= table1 >
+<table border=0  width=90%  id= table1 >
+<table border= 0  width= 90%  id= table2 >
+<table border= 0  width= 94%  id= table1 >
+<table border= 0  width= 94%  id= table1><tr>
+<table border=0 width=96%>
+<table border=1 align=center width=65% cellspacing=0 cellpadding=0>
+<table border=1 align=center width=80% cellspacing=0 cellpadding=0>
+<table border=1  align=center width=80% cellspacing=0 cellpadding=0>
+<table border=1 align=center width=96% cellspacing=0 cellpadding=0>
+<table border=1  align=center width=96% cellspacing=0 cellpadding=0>
+<table border=1 cellpadding=0 cellspacing=0 colspan=4 width=100% id=AutoNumber2>
+<table border=1 cellpadding=0 cellspacing=0 colspan=4 width=94% id=AutoNumber2>
+<table border=1 cellpadding=0 cellspacing=0 width=96% id=AutoNumber2>
+<table border=1 colspan=4 align=center width=96% cellspacing=0 cellpadding=0>
+<table border=1 width=100% cellspacing=0 cellpadding=0>
+<table border=1 width=100% colspan=12 align=center cellspacing=0 cellpadding=0>
+<table border=1 width=1050 cellspacing=0 cellpadding=0>
+<table border=1 width=1070 cellspacing=0 cellpadding=0>
+<table border=1 width=1160 cellspacing=0 cellpadding=0>
+<table border=1 width=1200 cellspacing=0 cellpadding=0>
+<table border=1 width=1230 cellspacing=0 cellpadding=0>
+<table border=1 width=1240  align=center cellspacing=0 cellpadding=0>
+<table border=1 width=1240 cellspacing=0 cellpadding=0>
+<table border=1 width=65% align=center cellspacing=0 cellpadding=0>
+<table border=1 width=90% cellspacing=0 cellpadding=0>
+<table border= 1  width= 90%  id= table1 >
+<table border= 1  width= 90%  id= table3 >
+<table border=1 width=94%>
+<table border=1 width=940 align=center cellspacing=0 cellpadding=0>
+<table border= 1  width= 94%  id= table1 >
+<table border= 1  width= 94%  id= table1><tr>
+<table border= 1  width= 94%  id= table2 >
+<table border=1 width=96%>
+<table border=1 width=96% cellspacing=0 cellpadding=0>
+</table></center>
+table_name
+Table_Name
+TableName
+Table Type 
+<td align=justify width=100%><font face=Arial size=1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The Charges have been orally communicated to me in respect of the goods mentioned overleaf and exported by me.  Orders in the case may please be passed without issue of Show Cause Notice.  However I may kindly be given a Personal Hearing.</font></td>
+<td align=justify width=100%><font face=Arial size=1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The Charges have been orally communicated to me in respect of the goods mentioned overleaf and imported by me.  Orders in the case may please be passed without issue of Show Cause Notice.  However I may kindly be given a Personal Hearing.</font></td>
+<td align=justify width=100%><p align=justify style=line-height: 150%><font face=Arial size=1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The Charges have been orally communicated to me in respect of the goods mentioned overleaf and imported by me. Orders in the case may please be passed without issue of Show Cause Notice.  However I may kindly be given a Personal Hearing.</font></td>
+<td align=right width=100%><b><font face=Arial size=1>Addl. / Joint Commissioner of Customs (Airport)
+<td align=right width=100%><b><font face=Arial size=1>Deputy / Asst. Commissioner of Customs (Airport)
+<td width=100% align=center><b><font face=Arial size=1><u>ORDER (ORIGINAL)</u> </font></b></td>
+<td width=100% align= center ><b><font face=Arial size=1><u>ORDER</u></font></b></td></tr>
+<td width=100% align= center><b><u><font face=Arial size=1>ORDER</font></u></b></td></tr>
+<td width=100% align=center><b><u><font face=Arial size=1>ORDER (ORIGINAL) </font></u></b></td>
+<td  width=100% align=justify><p align=justify style=line-height: 150%><font face=Arial size=1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2. An Appeal against this Order lies to the 
+<td  width=100% align=justify><p align=justify style=line-height: 150%><font face=Arial size=1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2. An Appeal against this Order lies to the Commissioner (Appeals), Central Revenue Buildings, B.B.Kulam, Madurai-625 002
+<td  width=100% align=justify><p align=justify style=line-height: 150%><font face=Arial size=1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2. An Appeal against this Order shall lie before the 
+<td  width=100% align=justify><p align=justify style=line-height: 150%><font face=Arial size=1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2. An Appeal against this Order shall lie before the 
+<td width=100% align=left colspan=10><font face=Arial size=1><b>No.of Release From Warehouse : 
+<td width=100% align=left colspan=11><font face=Arial size=1><b>Pending MHB DR No(s).
+<td width=100 align=left><font face=Arial size=1><b>
+<td width=100 align=left><font face=Arial size=1><small>
+<td width=100% align=right><b><font face=Verdana size=1><i>Signature of Passenger</i></font></b>
+<td width=100% align=right><b><font face=Verdana size=1>&nbsp;</font></b>
+<td width=100 align=right><font face=Arial size=1><b>
+<td width=100% align=right><strong><font face=Arial size=1>
+<td width=100% colspan=12 align=left><strong><font face=Arial>(*) As all the cases have not been adjudicated, the total duty could not be furnished. </font></strong></td>
+<td width=100% colspan=2 align=left><font face=Arial size=1>
+<td width=100% colspan=2 align=left><p align=justify style=line-height: 150%><font face=Arial size=1>
+<td width=100% colspan=2 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=100% colspan=2 align=left><strong><font face=Arial size=1>
+<td width=100% colspan=2 align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=100% colspan=2 height=20 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=100% colspan=3 align=center><b><font face=Arial size=1><u>ORDER (ORIGINAL)</u> </font></b></td>
+<td width=100% colspan=3 height=30 align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td>
+<td width=100% colspan=4 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=100% colspan=4 align=left><strong><font face=Arial size=1>
+<td width=100% colspan=4 align=left><strong><font face=Arial size=1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;However, I may kindly be given a personal hearing.
+<td width=100% colspan=4 align=left><strong><font face=Arial size=2>
+<td width=100% colspan=4 align=left><strong><font face=Arial size=2>&nbsp;</font></strong></td> 
+<td width=100% colspan=4 align=right><b><font face=Arial  size=2>
+<td width=100% colspan=4 align=right><strong><font face=Arial size=1>
+<td width=100% colspan=4 height=10 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=100% colspan=4 height=17 align=left><strong><font face=Arial size=small>&nbsp;</font></strong></td> 
+<td width=100% colspan=4 height=17 align=right><strong><font face=Arial size=1>&nbsp;Batch Date :
+<td width=100% colspan=4 height=18 align=Left><strong><font face=Arial size=1>
+<td width=100% colspan=4 height=19 align=Left><strong><font face=Arial size=1>
+<td width=100% colspan=4 height=20 align=Left><strong><font face=Arial size=1>
+<td width=100% colspan=4 height=22 align=Left><strong><font face=Arial size=1>
+<td width=100% colspan=4 height=24 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=100% colspan=4 height=24 align=left><strong><font face=Arial size=1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;However, I may kindly be given a personal hearing.
+<td width=100% colspan=4 height=25 align=left><strong><font face=Arial size=1>
+<td width=100% colspan=4 height=25 align=Left><strong><font face=Arial size=1>
+<td width=100% colspan=5 align=left height=10><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=100% colspan=5 align=right><b><font face=Arial  size=1><U>
+<td width=100% colspan=5 align=right><b><font face=Arial  size=2>
+<td width=100% colspan=5 align=right><b><strong><font face=Arial size=1><u>B.R.No.&nbsp;
+<td width=100% colspan=5 height=10 align=left>
+<td width=100% colspan=5 height=15 align=left>
+<td width=100% colspan=5 height=18 align=left>
+<td width=100% colspan=5 height=20 align=left>
+<td width=100% colspan=5 height=26 align=left>
+<td width=100% colspan=5 height=7 align=left>
+<td width=100% colspan=6 align=left><font face=Arial size=1>
+<td width=100% colspan=7 align=left><font face=Arial size=2>
+<td width=100% colspan=7 align=left><strong><font face=Arial size=1>
+<td width=100% colspan=7 align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=100% colspan=7 height=15 align=left>
+<td width=100% colspan=8 align=left><font face=Arial size=2>
+<td width=100% colspan=8 align=left><strong><font face=Verdana><i><small>(*) - The Details of Arrests may be obtained from RSI Section&nbsp;</small></i></font></strong></td>
+<td width=100% colspan=9 align=left><font face=Arial size=2><b>
+<td width=100% height=19 colspan=4 align=Left><strong><font face=Arial size=1>
+<td width=100% height=20 colspan=4 align=right><strong><font face=Arial size=1>
+<td width=100% height=21 colspan=4 align=right><strong><font face=Arial size=1>
+<td width=100% height=21 colspan=6 align=left><strong><font face=Arial size=2>&nbsp;</font></strong></td> 
+<td width=100% height=25 colspan=4 align=right><strong><font face=Arial size=1>
+<td width=100% height=29 colspan=2 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=100% height=30 colspan=2 align=left><strong><font face=Arial size=1>
+<td width=100% height=30 colspan=2 align=right><strong><font face=Arial size=1>
+<td width=100% height=32 colspan=4 align=right><strong><font face=Arial size=1>
+<td width=100 rowspan=1 align=left><font face=Arial size=1>
+<td width=1050 colspan=11 height=40 align=left><font face=Arial size=1><b>
+<td width=105 align=left rowspan=2><font face=Arial size=1><b>
+<td width=1070 align=left colspan=13><font face=Arial size=1><b>
+<td width=10% align=left><font face=Arial size=1>
+<td width=10% align=left><font face=Arial size=2>
+<td width=10% align=left><font face=Arial><small>
+<td width=10% align=left><font face=Arial><small><small>
+<td width=10% align=left><small><small><font face=Arial>
+<td width=10% align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=10% align=left><strong><font face=Arial size=1>
+<td width=10% align=left><strong><font face=Arial  size=1>&nbsp;</font></strong></td>
+<td width=10% align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=10% align=left><strong><font face=Arial size=2>
+<td width=10% align=right><font face=Arial>
+<td width=10% align=right><font face=Arial Narrow size=2><b>
+<td width=10% align=right><font face=Arial size=1>
+<td width=10% align=right><font face=Arial size=2>
+<td width=10% align=right><font face=Arial size=2><b>
+<td width=10% align=right><font face=Arial><small>
+<td width=10% align=right><font face=Arial><small><b>
+<td width=10% align=right><small><small><b><font face=Arial>
+<td width=10% align=right><small><small><font face=Arial>
+<td width=10% align=right><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=10% align=right><strong><font face=Arial size=1>
+<td width=10% align=right><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=10% align=right><strong><font face=Arial size=1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<td width=10% align=right><strong><font face=Arial><small>
+<td width=10% align=right><strong><font face=Arial><small><b>
+<td width=10% align=right><strong><font face=Arial><small>&nbsp;</small></font></strong></td>
+<td width=10% height=22 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=10% height=22 align=left><strong><font face=Arial  size=1>&nbsp;</font></strong></td>
+<td width=10% height=22 align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td>
+<td width=10% height=28 align=right><strong><font face=Arial size=1>
+<td width=10% height=29 align=right><strong><font face=Arial size=1>
+<td width=10% height=30 align=Left><strong><font face=Arial size=1>
+<td width=10% height=30 align=right><strong><font face=Arial size=1>
+<td width=11% align=left><font face=Arial><small>
+<td width=11% align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=11% align=right><small><small><b><font face=Arial>
+<td width=11% align=right><small><small><font face=Arial>
+<td width=11% colspan=1 align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=11% colspan=2 align=left><small><small><b><font face=Arial>
+<td width=11% colspan=2 align=left><small><small><font face=Arial>
+<td width=11% colspan=2 align=right><small><small><font face=Arial>
+<td width=11% height=29 align=right><strong><font face=Arial size=1>
+<td width=11% height=35 align=right><strong><font face=Arial size=1>&nbsp;</font></strong></td>
+<td width=11% height=35  align=right><strong><font face=Arial size=1>&nbsp;</font></strong></td>
+<td width=120 align=left><font face=Arial size=1><b>
+<td width=12% align=left><font face=Arial size=1>
+<td width=12 align=left><font face=Arial><small>
+<td width=12% align=left><font face=Arial><small>
+<td width=12% align=left><font face=Arial><small><small>
+<td width=12% align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=12% align=left><strong><font face=Arial size=1>
+<td width=12% align=right><font face=Arial size=1>
+<td width=12% align=right><font face=Arial size=1><b>
+<td width=12% align=right><font face=Arial><small>
+<td width=12% align=right><small><small><b><font face=Arial>
+<td width=12% align=right><small><small><font face=Arial>
+<td width=12% align=right><strong><font face=Arial size=1><b>
+<td width=12% align=right><strong><font face=Arial><small>
+<td width=12% height=28 align=left><strong><font face=Arial size=1>
+<td width=13% align=left><font face=Arial><small><small>
+<td width=13% align=left><strong><font face=Arial>&nbsp;</font></strong></td>
+<td width=13% align=left><strong><font face=Arial size=1>
+<td width=13% align=right><small><small><b><font face=Arial>
+<td width=13% align=right><small><small><b><font face=Arial size=1>
+<td width=13% align=right><small><small><font face=Arial>
+<td width=13% align=right><strong><font face=Arial size=1>
+<td width=13% align=right><strong><font face=Arial size=2>
+<td width=13% height=40  align=right><strong><font face=Arial size=1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<td width=140 align=left><font face=Arial size=1><b>
+<td width=14% align=left><font face=Arial size=2><b>
+<td width=14% align=right><small><small><b><font face=Arial>
+<td width=14% align=right><small><small><font face=Arial>
+<td width=150 align=left><font face=Arial size=1><b>
+<td width=150 align=left><font face=Arial><small>
+<td width=150 align=right><font face=Arial size=1><b>
+<td width=15% align=left><font face=Arial size=1>
+<td width=15% align=left><font face=Arial><small><small>
+<td width=15% align=left><strong><font face=Arial>&nbsp;</font></strong></td>
+<td width=15% align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=15% align=left><strong><font face=Arial size=1>
+<td width=15% align=left><strong><font face=Arial  size=1>&nbsp;</font></strong></td>
+<td width=15% align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=15% align=left><strong><font face=Arial size=2>
+<td width=15% align=right><small><small><b><font face=Arial>
+<td width=15% align=right><strong><font face=Arial>
+<td width=15% align=right><strong><font face=Arial>&nbsp;&nbsp;&nbsp;&nbsp;
+<td width=15% align=right><strong><font face=Arial size=1>
+<td width=15% align=right><strong><font face=Arial size=1>&nbsp;&nbsp;
+<td width=15% align=right><strong><font face=Arial size=1>&nbsp;&nbsp;&nbsp;&nbsp;
+<td width=15% align=right><strong><font face=Arial size=1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<td width=15% height=19 align=left><strong><font face=Arial  size=1>&nbsp;</font></strong></td>
+<td width=15% height=21 align=left><strong><font face=Arial size=2>
+<td width=15% height=21 align=left><strong><font face=Arial size=2>&nbsp;</font></strong></td> 
+<td width=15% height=22 align=left><strong><font face=Arial size=1>
+<td width=15% height=25 align=left><strong><font face=Arial size=1>
+<td width=15% height=25 align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=15% height=28 align=right><strong><font face=Arial size=1>
+<td width=15% height=32 align=left><strong><font face=Arial size=1>
+<td width=15% height=32 align=right><strong><font face=Arial size=1>
+<td width=15% height=35 align=right><strong><font face=Arial size=1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<td width=15% height=35  align=right><strong><font face=Arial size=1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<td width=15% height=40 align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=16% align=left><strong><font face=Arial>&nbsp;</font></strong></td>
+<td width=17% align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=17% align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=180 align=left><font face=Arial size=1><b>
+<td width=18% align=left><font face=Arial><small><small>
+<td width=18% align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=18% height=21 align=left><strong><font face=Arial size=2>
+<td width=19% align=left><strong><font face=Arial size=1>
+<td width=19% height=44 align=left><strong><font face=Arial size=1>
+<td width=200 align=left><font face=Arial size=1><small>
+<td width=20% align=left><font face=Arial size=1>
+<td width=20% align=left><font face=Arial size=1><b>
+<td width=20% align=left><font face=Arial><small>
+<td width=20% align=left><font face=Arial><small><b>
+<td width=20% align=left><strong><font face=Arial>
+<td width=20% align=left><strong><font face=Arial size=1>
+<td width=20% align=left><strong><font face=Arial  size=1>&nbsp;</font></strong></td>
+<td width=20% align=left><strong><font face=Arial size=2>&nbsp;&nbsp;&nbsp;
+<td width=20% align=left><strong><font face=Arial size=2>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<td width=20% align=left><strong><font face=Arial size=2>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<td width=20% align=left><strong><font face=Arial><small>
+<td width=20% align=right><font face=ArialNarrow size=2><b>
+<td width=20% align=right><font face=Arial size=2><b>
+<td width=20% align=right><strong><font face=Arial size=1>B.R.No.&nbsp;
+<td width=20% align=right><strong><font face=Arial size=2>B.R.No.&nbsp;
+<td width=20% height=20 align=left><strong><font face=Arial size=1>
+<td width=20% height=21 align=left><strong><font face=Arial size=2>2222&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;22/10/2012</font></strong></td> 
+<td width=20% height=21 align=right><strong><font face=Arial size=2>&nbsp;&nbsp;&nbsp;10000/-</font></strong></td> 
+<td width=20% height=21 align=right><strong><font face=Arial size=2>&nbsp;&nbsp;&nbsp;14235/-</font></strong></td> 
+<td width=20% height=21 align=right><strong><font face=Arial size=2>&nbsp;&nbsp;&nbsp;5000/-</font></strong></td> 
+<td width=20% height=22 align=left><strong><font face=Arial  size=1>
+<td width=20% height=23 align=right><strong><font face=Arial size=1>&nbsp;</font></strong></td>
+<td width=20% height=27 align=right><strong><font face=Arial size=1>&nbsp;</font></strong></td>
+<td width=20% height=28 align=right><strong><font face=Arial size=1>B.R.No.&nbsp;
+<td width=20% height=28 align=right><strong><font face=Arial size=1>&nbsp;</font></strong></td>
+<td width=220 height=40 align=left><font face=Arial size=1><b>
+<td width=225 align=left rowspan=2><font face=Arial size=1><b>
+<td width=22% colspan=2 align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=22% colspan=3 align=right><font face=Arial><b>MONTH : 
+<td width=230 align=left><font face=Arial size=1><b>
+<td width=23% align=left><strong><font face=Arial size=1>
+<td width=23% colspan=2 align=left><font face=Arial size=1>
+<td width=23% colspan=2 align=left><font face=Arial size=1><b>
+<td width=240 align=left><font face=Arial size=1><b>
+<td width=24% align=left><strong><font face=Arial>
+<td width=24% align=left><strong><font face=Arial size=1>
+<td width=24% height=35 align=left><strong><font face=Arial size=1>
+<td width=24% height=35  align=left><strong><font face=Arial size=1>
+<td width=24% height=40  align=left><strong><font face=Arial size=1>
+<td width=25% align=left><font face=Arial size=1>
+<td width=25% align=left><font face=Arial size=1><b>
+<td width=25% align=left><font face=Arial size=2><strong>
+<td width=25% align=left><font face=Arial><small>
+<td width=25% align=left><font face=Arial><small><small>
+<td width=25% align=left><strong><font face=Arial>
+<td width=25% align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=25% align=left><strong><font face=Arial size=1>
+<td width=25% align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=25% align=left><strong><font face=Arial size=2>
+<td width=25% align=left><strong><font face=Arial size=2>&nbsp;</font></strong></td> 
+<td width=25% align=left><strong><font face=Arial size=2>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(*)</font></strong></td> 
+<td width=25% align=left><strong><font face=Arial size=2>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(*)</font></strong></td> 
+        <td width=25% align=right><b><font face=Arial size=1>Supdt. of Customs</font></b></td>
+<td width=25%><b><font face=Arial size=1>From&nbsp;&nbsp;&nbsp;&nbsp; /&nbsp;&nbsp;&nbsp;&nbsp;
+<td width=25% colspan=3 align=left><font face=Arial size=1>
+<td width=25% colspan=3 align=left><font face=Arial size=1><b>
+<td width=25%><font face=Arial size=1><b>Minors</b>&nbsp;&nbsp;
+<td width=25% height=25 align=left><strong><font face=Arial  size=1>
+<td width=25% height=25 align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=25% height=25 align=right><strong><font face=Arial size=1>
+<td width=25% height=25 align=right><strong><font face=Arial size=1>Balance Paid </font></strong></td> 
+<td width=25% height=25 align=right><strong><font face=Arial size=1>Less : Customs Duty Payable</font></strong></td> 
+<td width=25% height=25 align=right><strong><font face=Arial size=1>Total Amount Received</font></strong></td> 
+<td width=25% height=27 align=left><strong><font face=Arial size=2>&nbsp;</font></strong></td> 
+        <td width=25% height=36 align=right><b><font face=Arial size=1>Signature of Passenger</font></b></td>
+<td width=27% colspan=3 align=center><strong><font face=Arial>Addl. / Joint Commissioner</font></strong></td>
+<td width=28% align=left><font face=Arial><small>
+<td width=28% align=left><font face=Arial><small><small>
+<td width=29% colspan=2 align=left><font face=Arial><small><b>
+<td width=29% colspan=2 align=left><strong><font face=Arial>
+<td width=29% colspan=2 align=left><strong><font face=Arial  size=1>
+<td width=29% colspan=2 align=left><strong><font face=Arial size=1>
+<td width=29% colspan=2 align=left><strong><font face=Arial><small><b>
+<td width=29% colspan=4 align=left><strong><font face=Arial size=1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<td width=2% align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=2% align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=2% height=35 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=30% align= left><b><font face=Arial size=1>&nbsp;</font></b></td></td>
+<td width=30% align= left><b><font face=Verdana size=1><i>&nbsp;</i></font></b></td></td>
+<td width=30% align= left><b><font face=Verdana size=1>&nbsp;</font></b></td></td>
+<td width=30% align=left><font face=Arial size=1>
+<td width=30 align=left><font face=Arial size=1><small>
+<td width=30% align=left><font face=Arial size=2><b>
+<td width=30% align=left><font face=Arial size=2>&nbsp;
+<td width=30% align=left><font face=Arial size=2><strong>
+<td width=30% align=left><font face=Arial size=2><strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<td width=30% align=left><strong><font face=Arial>
+<td width=30% align=left><strong><font face=Arial>&nbsp;
+<td width=30% align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=30% align=left><strong><font face=Arial size=1>
+<td width=30% align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=30% align=left><strong><font face=Arial size=2>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<td width=30% align=right><b><font face=Arial size=1>Signature of Passenger</font></b></td>
+<td width=30 align=right><font face=Arial size=1><b>
+<td width=30% align=right height=29><strong><font face=Arial size=1>
+<td width=30 align=right rowspan=2><font face=Arial size=1><b>
+<td width=30% align=right><strong><font face=Arial size=1>
+<td width=30% align=right><strong><font face=Arial size=2>
+<td width=30% colspan=3 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=30% colspan=3 align=left><strong><font face=Arial size=1>
+<td width=30% height=21 align=left><strong><font face=Arial size=2>&nbsp;</font></strong></td> 
+<td width=30% height=21 align=left><strong><font face=Arial size=2>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;WH1234&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;23/10/2012</font></strong></td> 
+<td width=30% height=22 align=right><strong><font face=Arial  size=1>
+<td width=30% height=22 align=right><strong><font face=Arial size=1>
+<td width=30% height=27 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=30% height=28 align=left><strong><font face=Arial size=1>
+<td width=30% height=29 align=left><strong><font face=Arial size=1>
+<td width=30% height=30 align=left><font face=Arial size=2><strong>
+<td width=30% height=30 align=left><strong><font face=Arial size=1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<td width=30% height=35 align=left><font face=Arial size=2><strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<td width=30 height=40 align=left><font face=Arial size=1><b>
+<td width=320 align=left><font face=Arial size=1><small>
+<td width=32% align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=32% colspan=2 align=left><strong><font face=Arial>
+<td width=32% colspan=2 align=left><strong><font face=Arial size=1>
+<td width=32% colspan=3 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=32% colspan=3 align=left><strong><font face=Arial size=1>
+<td width=32% colspan=4 align=left><strong><font face=Arial size=1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<td width=32% height=28 align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=32% height=29 align=left><strong><font face=Arial size=1>
+<td width=33% align=left><strong><font face=Arial size=1>
+<td width=33% align=left><strong><font face=Arial size=1><br>Signature of the <br> Passenger</font></strong></td> 
+<td width=33% align=right><strong><font face=Arial size=1><br>Name & Signature of the <br> Bank Manager</font></strong></td> 
+<td width=33% height=25 align=left><strong><font face=Arial size=1>
+<td width=33% height=28 align=left><strong><font face=Arial size=1>
+<td width=340 height=40 align=left><font face=Arial size=1><b>
+<td width=34% align=left><strong><font face=Arial size=1>
+<td width=34% colspan=2 align=left><strong><font face=Arial>
+<td width=34% colspan=2 align=left><strong><font face=Arial  size=1>
+<td width=34% colspan=2 align=left><strong><font face=Arial size=1>
+<td width=34% colspan=2 align=left><strong><font face=Arial  size=1>&nbsp;
+<td width=34% colspan=3 align=right><font face=Arial size=1>
+<td width=35% align=left><font face=Arial size=1>
+<td width=35 align=left><font face=Arial size=1><b>
+<td width=35% align=left><font face=Arial size=1><b><i>
+<td width=35% align=left height=30><strong><font face=Arial size=1>
+<td width=35% align=left><strong><font face=Arial>
+<td width=35% align=left><strong><font face=Arial><small>
+<td width=35 align=right><font face=Arial size=1><b>
+<td width=35% align=right><strong><font face=Arial size=1>
+<td width=35% align=right><strong><font face=Arial size=1>Date of Departure :&nbsp;
+<td width=35% colspan=3 align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=35% height=21 align=left><strong><font face=Arial size=2>&nbsp;</font></strong></td> 
+<td width=35% height=27 align=left><strong><font face=Arial size=1>
+<td width=35% height=28 align=left><strong><font face=Arial size=1>
+<td width=35% height=30 align=left><strong><font face=Arial size=1>
+<td width=35% height=32 align=left><strong><font face=Arial size=1>
+<td width=35%  height=40 align=left><strong><font face=Arial size=1>
+<td width=36% align=left><strong><font face=Arial size=1>Dt. 
+<td width=36% height=28 align=left><strong><font face=Arial size=1>Dt. 
+<td width=37% align=left><strong><font face=Arial size=1>
+<td width=38% align=left colspan=2><strong><font face=Arial size=1>
+<td width=38% colspan=2 align=left><font face=Arial size=1><b>
+<td width=38% colspan=2 align=left><strong><font face=Arial size=1>
+<td width=38% colspan=3 align=left><font face=Arial size=1>
+<td width=3% align=left><font face=Arial><small>
+<td width=3% align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=40% align= center><b><u><font face=Arial size=1>ORDER</font></u></b></td></td>
+<td width=40% align=left colspan=2><strong><font face=Arial size=1>
+<td width=40% align=left><font face=Arial size=1>
+<td width=40% align=left><font face=Arial size=1><b>
+<td width=40% align=left><font face=Arial size=2>
+<td width=40% align=left><font face=Arial size=2><b>
+<td width=40 align=left><font face=Arial><small>
+<td width=40% align=left><font face=Arial><small>
+<td width=40% align=left height=24 colspan=2><strong><font face=Arial size=1>
+<td width=40% align=left><strong><font face=Arial  size=1>
+<td width=40% align=left><strong><font face=Arial size=1>
+<td width=40% align=left><strong><font face=Arial size=1>Flight No. :
+<td width=40% align=right><b><font face=Arial size=1>Date of Order / Issue&nbsp;:&nbsp;
+<td width=40 align=right><font face=Arial size=1><b>
+<td width=40% align=right><strong><font face=Arial  size=1>
+<td width=40% align=right><strong><font face=Arial size=1>
+<td width=40% colspan=2 align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=40% colspan=2 height=24 align=right><strong><font face=Arial size=1>
+<td width=40% height=19 align=right><strong><font face=Arial size=1>
+<td width=40%  height=40 align=right><strong><font face=Arial size=1>&nbsp;
+<td width=42% align=left><font face=Arial><small><small>
+<td width=42% align=left><small><small><b><font face=Arial>
+<td width=42% align=left><small><small><font face=Arial>
+<td width=43% align=left><strong><font face=Arial  size=1>
+<td width=43% align=left><strong><font face=Arial size=1>
+<td width=43% colspan=2 height=30 align=left><strong><font face=Arial size=1>
+<td width=43% height=24 align=left colspan=2><strong><font face=Arial size=1>
+<td width=43% height=24 align=left><strong><font face=Arial  size=1>
+<td width=43% height=24 align=left><strong><font face=Arial size=1>
+<td width=43% height=24 align=left><strong><font face=Arial size=1>Flight No. :
+<td width=44% align=left><small><small><b><font face=Arial>
+<td width=44% align=left><small><small><font face=Arial>
+<td width=44% colspan=3 align=left><strong><font face=Arial size=1>Date of Departure :&nbsp;
+<td width=44% colspan=3 align=left><strong><font face=Arial size=1>Departure Date :&nbsp;
+<td width=45% align=left><font face=Arial size=2>
+<td width=45% align=left><small><small><b><font face=Arial>
+<td width=45% align=left><small><small><font face=Arial>
+<td width=45% align=left><strong><font face=Arial  size=1>
+<td width=45% align=left><strong><font face=Arial size=1>
+<td width=45 align=right><font face=Arial size=1><b>
+<td width=45% align=right><strong><font face=Arial size=1>
+<td width=45% colspan=2 align=left><strong><font face=Arial size=1>
+<td width=45% colspan=2 align=left><strong><font face=Arial size=2>
+<td width=45% colspan=2 align=left><strong><font face=Arial size=2>&nbsp;</font></strong></td> 
+<td width=45% colspan=2 align=right><strong><font face=Arial>
+<td width=45% colspan=2 height=27 align=right><strong><font face=Arial size=1>
+<td width=45% colspan=2 height=28 align=left><strong><font face=Arial size=1>
+<td width=45% colspan=2 height=30 align=right><strong><font face=Arial size=1>
+<td width=45% colspan=4 align=right><small><small><b><font face=Arial>
+<td width=45% height=19 align=left><strong><font face=Arial size=1>
+<td width=45% height=25 align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=45% height=26 align=right><strong><font face=Arial size=1>&nbsp;
+<td width=45% height=27 colspan=2 align=left><strong><font face=Arial size=2>
+<td width=45% height=28 align=left><strong><font face=Arial size=1>
+<td width=45% height=30 align=left><strong><font face=Arial size=1>
+<td width=46% align=left><small><small><b><font face=Arial>
+<td width=46% align=left><small><small><font face=Arial>
+<td width=47% align=left><strong><font face=Arial  size=1>
+<td width=47% align=left><strong><font face=Arial size=1>
+<td width=47% colspan=3 align=left><strong><font face=Arial size=1>
+<td width=47% height=29 align=left><strong><font face=Arial size=1>
+<td width=47% height=30 align=left><strong><font face=Arial size=1>
+<td width=48% align=left><font face=Arial>
+<td width=48% align=left><small><small><b><font face=Arial>
+<td width=48% align=left><small><small><font face=Arial>
+<td width=48% colspan=5 align=right><small><small><b><font face=Arial>
+<td width=48%  height=35 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=49% align=left><b><font face=Arial size=1>
+<td width=49% colspan=3 align=left><strong><font face=Arial size=1>
+<td width=49% colspan=3 align=left><strong><font face=Arial size=1>Date of Departure :&nbsp;
+<td width=49% colspan=5 align=right><small><small><b><font face=Arial>
+<td width=49% colspan=6 align=right><small><small><b><font face=Arial>
+<td width=49% height=30 align=left><b><font face=Arial size=1>
+<td width=4% align=left><font face=Arial size=1>
+<td width=4% align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=4% align=right><font face=Arial size=1>
+<td width=4% align=right><font face=Arial size=2><b>
+<td width=4% align=right><font face=Arial><small>
+<td width=4% height=25 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=50 align=left><font face=Arial size=1><small>
+<td width=50% align=left><font face=Arial size=2><b>
+<td width=50% align=left><strong><font face=Arial>
+<td width=50% align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=50% align=left><strong><font face=Arial  size=1>
+<td width=50% align=left><strong><font face=Arial size=1>
+<td width=50% align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=50% align=left><strong><font face=Arial size=1>&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;B.R.No.&nbsp;
+<td width=50 align=right><font face=Arial size=1><b>
+<td width=50 align=right><font face=Arial><small>
+<td width=50 align=right><strong><font face=Arial><small>
+<td width=50% colspan=2 align=left><font face=Arial size=1>
+<td width=50% colspan=2 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=50% colspan=2 align=left><strong><font face=Arial size=2>&nbsp;&nbsp;&nbsp;
+<td width=50% colspan=5 align=left><font face=Arial size=2><b>
+<td width=50% colspan=5 align=right><small><small><b><font face=Arial>
+<td width=50% colspan=6 align=right><small><small><b><font face=Arial>
+<td width=50% height=22 align=left><strong><font face=Arial size=1>
+<td width=50% height=25 rowspan=3 colspan=2 align=left><b><small><small><i><font face=Arial><small><small>Please preserve this form in case of Foreign Currency Transaction.  It helps you in reconverting the balance of Indian Rupees into Foreign Currency.</small></small></font></i></b></td> 
+<td width=50%  height=35 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=50% height=35  align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=50% height=40  align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=51% align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=51% height=30 align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=53% colspan=2 align=left><strong><font face=Arial>
+<td width=53% colspan=2 align=left><strong><font face=Arial size=1>
+<td width=54% colspan=3 align=left><strong><font face=Arial size=1>
+<td width=54% height=25 align=left colspan=2><strong><font face=Arial size=1>
+<td width=55% align=left><strong><font face=Arial  size=1>
+<td width=55 align=right><font face=Arial size=1><b>
+<td width=55% colspan=2 height=28 align=left><strong><font face=Arial size=1>
+<td width=55% colspan=2  height=28 align=left><strong><font face=Arial size=1>
+<td width=55% colspan=5 align=right><small><small><b><font face=Arial>
+<td width=55% height=22 colspan=3 align=left><strong><font face=Arial size=1>
+<td width=55% height=26 align=left><strong><font face=Arial  size=1>
+<td width=56% height=25 align=left colspan=2><strong><font face=Arial size=1>
+<td width=56% height=26 align=left colspan=2><strong><font face=Arial size=1>
+<td width=57% align=left><strong><font face=Arial size=1>&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;B.R.No.&nbsp;
+<td width=57% colspan=4 align=left><strong><font face=Arial size=1>B.R.No.&nbsp;
+<td width=57% height=24 align=left><strong><font face=Arial size=1>
+<td width=57% height=24 align=right><strong><font face=Arial size=1>&nbsp;</font></strong></td>
+<td width=59% height=26 align=left colspan=3><strong><font face=Arial size=1>
+<td width=59% height=26 align=left colspan=3><strong><font face=Arial size=1>&nbsp;</font></strong></td>
+<td width=5% align=left><font face=Arial size=1>
+<td width=5% align=left><font face=Arial size=1>&nbsp;</font></td> 
+<td width=5% align=left><font face=Arial size=2><b>
+<td width=5% align=left><font face=Arial><small>
+<td width=5% align=left><font face=Arial><small><b>
+<td width=5% align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=5% align=left><strong><font face=Arial size=1>
+<td width=5% align=left><strong><font face=Arial size=1>Dt. </font></strong></td> 
+<td width=5% align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=5% align=left><strong><font face=Arial size=2>Dt. </font></strong></td> 
+<td width=5 align=right><font face=Arial size=1><b>
+<td width=5% align=right><font face=Arial size=2><b>
+<td width=5% align=right><font face=Arial><small>
+<td width=5% align=right><font face=Arial><small><b>
+<td width=5% align=right><strong><font face=Arial><small>
+<td width=5% align=right><strong><font face=Arial><small><b>
+<td width=5% align=right><strong><font face=Arial><small>&nbsp;</small></font></strong></td>
+<td width=5%  height=20 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=5% height=20 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=5% height=22 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=5% height=25 align=left><strong><font face=Arial>&nbsp;</font></strong></td>
+<td width=5% height=25 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=5% height=35 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=5% height=35  align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=5%  height=40 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=5% height=40 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=5% height=40  align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=60% align=left><b><font face=Arial size=1>Order Passed by :  Shri. / Smt. / Kum. 
+<td width=60% align=left><font face=Arial size=2><b>
+<td width=60% align=left><strong><font face=Arial size=1>
+<td width=60% align=left><strong><font face=Arial size=1>Passenger Name : 
+<td width=60 align=right><font face=Arial size=1><b>
+<td width=60% align=right><strong><font face=Arial size=1>&nbsp;</font></strong></td>
+<td width=60% colspan=2 align=left><font face=Arial size=2><b>
+<td width=60% colspan=2 align=left><strong><font face=Arial size=1>
+<td width=60% colspan=2 align=right><strong><font face=Arial size=1>&nbsp;</font></strong></td>
+<td width=60% colspan=2 height=24 align=left><strong><font face=Arial size=1>
+<td width=60% colspan=2 height=24 align=right><strong><font face=Arial size=1>&nbsp;</font></strong></td>
+<td width=60% colspan=6 align=left><font face=Arial size=1><b><i>
+<td width=61% align=left><font face=Arial><small>
+<td width=62% align=left colspan=3><strong><font face=Arial size=1>
+<td width=62% align=left colspan=3><strong><font face=Arial size=1>&nbsp;</font></strong></td>
+<td width=62% align=left><strong><font face=Arial size=1>
+<td width=62% height=26 align=left colspan=3><strong><font face=Arial size=1>
+<td width=62% height=26 align=left colspan=3><strong><font face=Arial size=1>&nbsp;</font></strong></td>
+<td width=65% align=left height=30><strong><font face=Arial size=1>
+<td width=65 align=right><font face=Arial size=1><b>
+<td width=65% colspan=2 align=left><strong><font face=Arial size=1>
+<td width=65% colspan=2 align=right><b><font face=Arial size=1>Date of Order / Issue<font face=Arial size=1>&nbsp;:&nbsp;
+<td width=65% colspan=2 align=right><b><font face=Arial size=1>Date of Order / Issue&nbsp;:&nbsp;
+<td width=65% height=30 align=left><strong><font face=Arial size=1>
+<td width=67% align=left><strong><font face=Arial size=1>
+<td width=67% align=right><strong><font face=Arial size=1>
+<td width=67% colspan=4 align=left><font face=Arial size=1>
+<td width=67% height=25 align=left><strong><font face=Arial size=1>
+<td width=67% height=28 align=left><strong><font face=Arial size=1>
+<td width=6% align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=6% align=right><font face=Arial><small>
+<td width=6% align=right><small><small><b><font face=Arial>
+<td width=6% align=right><small><small><font face=Arial>
+<td width=6% height=25 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=6% height=26 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=6% height=35 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=6% height=35  align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=70 align=left><font face=Arial size=1><b>
+<td width=70 align=right><font face=Arial size=1>
+<td width=70 align=right><font face=Arial size=1><b>
+<td width=70 Align=right><font face=Arial size=1><b>
+<td width=70% colspan=2 align=left><b><font face=Arial size=1>Passed by :  Shri. / Smt. / Kum. 
+<td width=70% colspan=2 align=left><b><font face=Arial size=1>Passed by :  Shri. / Smt. / Kum.&nbsp;
+<td width=70% colspan=3 align=left><strong><font face=Arial size=1>
+<td width=70% colspan=3 align=left><strong><font face=Arial size=2>&nbsp;</font></strong></td> 
+<td width=70% colspan=3 align=left><strong><font face=Arial size=2>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;7 (Seven)</font></strong></td> 
+<td width=70% colspan=3 align=left><strong><font face=Arial size=2>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;7 (Seven)</font></strong></td> 
+<td width=70% colspan=3 align=left><strong><font face=Arial size=2>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;---</font></strong></td> 
+<td width=70% colspan=3 align=right><strong><font face=Arial>
+<td width=70% height=20 colspan=2 align=left><strong><font face=Arial size=1>
+<td width=70% height=30 colspan=3 align=left><strong><font face=Arial size=2>&nbsp;</font></strong></td> 
+<td width=70% height=35 colspan=3 align=left><strong><font face=Arial size=2>&nbsp;</font></strong></td> 
+<td width=70 height=40 align=right><font face=Arial size=1><b>
+<td width=70 rowspan=1 align=left><font face=Arial size=1>
+<td width=71% colspan=6 align=left><small><small><b><font face=Arial size=1>
+<td width=75 align=right><font face=Arial><small>
+<td width=75 align=right><strong><font face=Arial><small>
+<td width=75% colspan=3 align=right><strong><font face=Arial size=2>
+<td width=76% colspan=4 align=left><small><small><b><font face=Arial>
+<td width=78% colspan=4 align=left><small><small><b><font face=Arial>
+<td width=7% align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=7% align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=7% align=right><font face=Arial><small>
+<td width=7% align=right><font face=Arial><small><b>
+<td width=7% align=right><small><small><b><font face=Arial>
+<td width=7% align=right><small><small><font face=Arial>
+<td width=7% align=right><strong><font face=Arial><small><b>&nbsp;</b></small></font></td>
+<td width=7% align=right><strong><font face=Arial><small>&nbsp;</small></font></strong></td>
+<td width=7% height=35 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=80 align=left><font face=Arial size=1><b>
+<td width=80 align=left><font face=Arial size=1><small>
+<td width=80 align=right><font face=Arial size=1><b>
+<td width=80 align=right><font face=Arial size=1><small>
+<td width=80% colspan=3 height=23 align=left><strong><font face=Arial size=1>
+<td width=81% height=44 colspan=3 align=right><strong><font face=Arial size=1>
+<td width=83% colspan=5 align=left><small><small><b><font face=Arial>
+<td width=85% colspan=3 height=30 align=left><strong><font face=Arial size=1>
+<td width=85% colspan=5 align=left><small><small><b><font face=Arial>
+<td width=85% colspan=6 align=left><small><small><b><font face=Arial>
+<td width=85% height=32 colspan=3 align=left><strong><font face=Arial size=1>Batch Date :&nbsp;
+<td width=88% colspan=5 align=left><small><small><b><font face=Arial>
+<td width=8% align=left><font face=Arial><small>
+<td width=8% align=left><font face=Arial><small><small>
+<td width=8% align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=8% align=right><font face=Arial size=1>
+<td width=8% align=right><font face=Arial size=1><b>
+<td width=8% align=right><font face=Arial size=2>
+<td width=8% align=right><font face=Arial size=2><b>
+<td width=8% align=right><font face=Arial><small>
+<td width=8% align=right><small><small><b><font face=Arial>
+<td width=8% align=right><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=8% align=right><strong><font face=Arial size=1>
+<td width=8% align=right><strong><font face=Arial size=1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<td width=8% align=right><strong><font face=Arial><small>
+<td width=8% height=35 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=8% height=35 align=left><strong><font face=Arial size=1>&nbsp;</font></strong></td> 
+<td width=8% height=40 align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=90 align=left><font face=Arial size=1><b>
+<td width=90 align=right><font face=Arial size=1><b>
+<td width=90% colspan=3 height=30 align=left><strong><font face=Arial size=1>
+<td width=90 height=40 align=left><font face=Arial size=1><b>
+<td width=92% colspan=8 align=left><strong><font face=Arial size=2>
+<td width=93% colspan=5 align=left><strong><font face=Arial size=2>
+<td width=94% colspan=4 align=left><strong><font face=Arial size=1>
+<td width=95% align=left colspan=7><font face=Arial size=2><b>
+<td width=96% align=left><font face=Arial size=1>
+<td width=96% align=left><font face=Arial size=1><b>
+<td width=96% align=left><font face=Arial size=1><b>All cases below 5 Lakhs Booked by Batch ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>All cases Over 5 Lakhs Booked by AIU ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>All the Categories of General W/H Items Found in Item Category Master ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>All the Categories of Master Table Found In Item Table ! <font face=Arial size=1><b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>All the Categories of O/S Items Found in Item Category Master ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>All the Categories of O/S Master Found in Item Category Master ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>All the Categories of Valuables Items Found in Item Category Master ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>All the General W/H Item Entries Updated with Item Category<font face=Arial size=1><b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>All the O/S Entries of Items Updated with O/S Category<font face=Arial size=1><b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>All the O/S Entries of Master Updated with O/S Category<font face=Arial size=1><b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>All the O/S Nos. in the entered period are Continous ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>All the Valuable Item Entries Updated with Item Category<font face=Arial size=1><b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>Bank & BR Date Discrepancy BRs - 
+<td width=96% align=left><font face=Arial size=1><b>Cases Booked by DRI :
+<td width=96% align=left><font face=Arial size=1><b>Category Not Found In Items For O/S No(s). :
+<td width=96% align=left><font face=Arial size=1><b>Category of General W/H Items Data Not Found In Item Category Master :
+<td width=96% align=left><font face=Arial size=1><b>Category of O/S Items Data Not Found In Item Category Master :
+<td width=96% align=left><font face=Arial size=1><b>Category of O/S Master Data Not Found In Item Category Master :
+<td width=96% align=left><font face=Arial size=1><b>Category of Valuables Items Data Not Found In Item Category Master :
+<td width=96% align=left><font face=Arial size=1><b>Duty Paid B/R FOUND for the Cancelled B/R No. 
+<td width=96% align=left><font face=Arial size=1><b>Duty Paid B/R Not Found for the Cancelled B/R No. 
+<td width=96% align=left><font face=Arial size=1><b>Flight & BR Date Discrepancy BRs - 
+<td width=96% align=left><font face=Arial size=1><b>Flight & OS Date Discrepancy OS Nos - 
+<td width=96% align=left><font face=Arial size=1><b>Missing Category in General W/H Items :
+<td width=96% align=left><font face=Arial size=1><b>Missing Category in O/S Items :
+<td width=96% align=left><font face=Arial size=1><b>Missing Category in Valuables Items :
+<td width=96% align=left><font face=Arial size=1><b>Missing Catetory in O/S Master :
+<td width=96% align=left><font face=Arial size=1><b>Nationality Discrepancy B/Rs - 
+<td width=96% align=left><font face=Arial size=1><b>Nationality Discrepancy Detention Receipts (D/Rs) - 
+<td width=96% align=left><font face=Arial size=1><b>Nationality Discrepancy O/S - 
+<td width=96% align=left><font face=Arial size=1><b>No BR Details found for the entered period.<font face=Arial size=1><b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No B/R found with Nationality as 'Not Applicable' or 'Not Available' ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No B/Rs Found for the entered period ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No B/Rs Found for the entered period for checking BR & Bank Dates ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No B/Rs Found for the entered period for checking BR & Flight Dates ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No B/Rs Found for the entered period for checking Challan Nos. ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No B/Rs Found for the entered period for checking DC Names ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No B/Rs Found for the entered period for checking PP No. ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No B/Rs under 
+<td width=96% align=left><font face=Arial size=1><b>No B/R Was Deleted during the entered period  ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Cigaratee / Liquor Cases During the Entered Period ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Currency Cases During the Entered Period ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Detention Receipt (D/R) found with Nationality as 'Not Applicable' or 'Not Available' ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Discrepancy in BR & Bank Dates of B/R Data ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Discrepancy in BR & Flight Dates of B/R Data ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Discrepancy in DC Names of B/R Data ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Discrepancy in Nationality of B/R Data ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Discrepancy in Nationality of Detention Receipts (D/R) Data ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Discrepancy in Nationality of O/S Data ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Discrepancy in OS & Flight Dates of O/S Data ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Discrepancy in Port of Departure of D/R Data ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Discrepancy in Port of Departure of O/S Data ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Discrepancy in PP Nos. of B/R Data ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Discrepancy in PP Nos. of O/S Data ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No D/R found with Port of Departure same as Location Code 
+<td width=96% align=left><font face=Arial size=1><b>No DRI Cases<font face=Arial size=1><b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Entry Found For Duty On Fuel Charges ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Entry Found in Master for the entered period !<font face=Arial size=1><b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No General W/H Details Found for the entered period for Continuity of V- Nos. ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Gold Cases During the Entered Period ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No O/S Entry found in the Deleted Data ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No O/S Found for the entered period for checking OS & Flight Dates ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No O/S Found for the entered period for checking PP No. ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No O/S Found for the entered period for Continuity of O/S Nos. ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No O/S found with Nationality as 'Not Applicable' or 'Not Available' ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No O/S found with Port of Departure same as Location Code !
+<td width=96% align=left><font face=Arial size=1><b>No O/S with multiple passengers in a single case ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Valuables Details Found for the entered period for Continuity of V- Nos. ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>Only Gold B/Rs have been prepared for Gold Items Under Concessional Rate of Duty !</b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>Only Silver B/Rs have been prepared for Silver Items Under Concessional Rate of Duty !</b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>O/S Less Than 5 Lakhs Initiated by AIU : 
+<td width=96% align=left><font face=Arial size=1><b>O/S Over 5 Lakhs Initiated by Batch : 
+<td width=96% align=left><font face=Arial size=1><b>O/S with Multiple Passengers : 
+<td width=96% align=left><font face=Arial size=1><b>Port of Departure Discrepancy D/Rs - 
+<td width=96% align=left><font face=Arial size=1><b>Port of Departure Discrepancy O/S - 
+<td width=96% align=left><font face=Arial size=1><b>PP No. Discrepancy BRs - 
+<td width=96% align=left><font face=Arial size=1><b>PP No. Discrepancy O/S - 
+<td width=96% align=left><font face=Arial size=1><b><u>Gold B/Rs Used For Merit Rate of Duty For Gold Items:-</u></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b><u>Silver B/Rs Used For Merit Rate of Duty For Silver Items:-</u></b></font></td>
+<td width=96% align=right><font face=Arial size=1><b>Report Date :
+<td width=98% colspan=7 align=left><font face=Arial size=2>
+<td width=98% colspan=7 align=left><strong><font face=Arial size=1>
+<td width=9% align=left><font face=Arial size=1>
+<td width=9% align=left><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=9% align=left><strong><font face=Arial size=1>
+<td width=9% align=right><font face=Arial size=1>
+<td width=9% align=right><font face=Arial size=2>
+<td width=9% align=right><font face=Arial size=2><b>
+<td width=9% align=right><font face=Arial><small>
+<td width=9% align=right><small><small><b><font face=Arial>
+<td width=9% align=right><small><small><font face=Arial>
+<td width=9% align=right><strong><font face=Arial>
+<td width=9% align=right><strong><font face=Arial>&nbsp;</font></strong></td> 
+<td width=9% align=right><strong><font face=Arial><small>
+<td width=9% align=right><strong><small>
+<td width=9% height=35 align=right><strong><font face=Arial size=1>&nbsp;</font></strong></td>
+The Adjudication Details have already been updated for the Entered OS No. & Year.  Cannot Adjudicate Again ! 
+The Adjudication Details have already been updated for the Entered OS No. & Year.  Cannot Modify its details ! 
+The B.R.Details of All the Demand Amounts Have already been updated for the Entered OS No. & Year.  Cannot Modify its details ! 
+The B/R Items include various types of B/R like Gold, Silver.  Click Categorywise Items for B/R Preparation. !
+. The B/R Printout will be Generated Now !
+The Challan Details Have Already been updated For this B.R.No.  Cannot Modify its details.  Contact System Administrator ! 
+The Challan No. has already been updated for this FDR No.  Cannot Modify Its Details.  Contact System Administrator ! 
+The Challan No. has been updated for this Fuel Duty Receipt No.  Cannot delete its details ! 
+The Challan No(s). for all the FDRs in the entered batch have been updated ! 
+The Challan No(s). for all the Fuel Duty Receipts in the entered batch have been updated ! 
+The Database Not Found.  Contact System Administrator.  This Application will be closed!  
+the date of receipt of this Order, Duty extra.</font></td>
+the date of receipt of this Order.</font></td>
+ The Entered BR No. Does not Pertain to Current Batch or Previous Batch.  Cannot Modify its details. Contact System Administrator ! 
+The Entered B/R No. has been deleted.  Cannot generate Printout ! 
+The Entered Challan No(s) have been updated in the Database ! 
+The Entered D/R No. has been deleted.  Cannot generate Printout ! 
+The Entered FDR Has been deleted.  Cannot Change Its Batch ! 
+The Entered O.S.No. Was Not an Online OS.  Cannot Generated Printout ! 
+The Fuel Receipt No. Cannot be More than 8 digits.  Contact System Administrator ! 
+The Goods of this D/R has been handed over to warehouse.  Have you collected the goods from Warehouse ? 
+The Item Has Already been selected for Disposal in Sl.No. 
+The (Master Table) Fuel Duty Receipt(s) 
+The Maximum Allowance Allowed For Gold Jewellery for Female Passengers is Rs.
+The Maximum Allowance Allowed For Gold Jewellery for Male Passengers is Rs.
+The No. of Items in the O/S is more than 10.  Please Enter the Range (i.e. From Sl.No. & To Sl.No.) of the Items for B/R preparation ! 
+The Printout has already been generated for this B.R. No.  Cannot Modify Its Details.  Contact System Administrator ! 
+The Remarks of the Adjudicating Officer exceeds 700 Characters.  Please Use the Option of 'Print Adjn. Order On Legal Size Blank Paper' From the Print Menu For Printing all the Remarks of the Adjudicating Officer ! 
+The Revenue Details for Statistics Has Already been Updated Upto 
+The Total Value of the O/S do not tally with the break-up values of Dutiable / Redeemable / Re-Export / Confiscated Goods.  Please Check & modify the values ! 
+This D/R was generated from O/s. Cannot Modify its details ! 
+This option is applicable for Mahazar Cases Where the Total No. of Passengers is More Than 1.  For Single passengers, Use the option 'Addition of Online Offence Cases ! 
+ Total Duty Collected From Offence Cases during the period 
+ Total Error Records regarding consistency of items / duty between Master & Items of B.Rs.  
+Total No. of Items in the O/S Master Details Do not tally with the No.of Items in the Item Details.  Please Check & modify the values ! 
+ Total Penalty Collected From Offence Cases during the period 
+ Total Redemption / Re-Export Fine Collected From Offence Cases during the period 
+ Total Revenue Collected From Offence Cases during the period 
+.  Total Value with Breakup values of Dutiable/ RF / REF / Confiscation  do not tally with breakup of duty / rf / ref / penalty / other amounts for O.S. No. 
+<tr><td width=100% colspan=12 align=center><font face=Arial><b>Abstract of Outright Smuggling And Commerical Fraud Cases For the Month of 
+<tr><td width=100% colspan=12 align=left><font face=Arial>Commissionerate-I, New Custom House,
+<tr><td width=100% colspan=12 align=left><font face=Arial>Dated : 
+<tr><td width=100% colspan=12 align=left><font face=Arial>F.No.S13/21/2002-AIR (ADMIN) 
+<tr><td width=100% colspan=12 align=left><font face=Arial>Meenambakkam, Chennai-600 027.
+<tr><td width=100% colspan=12 align=left><font face=Arial>The Superintendent of Customs (Appg. Main)
+<tr><td width=100% colspan=12 align=left><font face=Arial>To
+<tr><td width=100% colspan=12 align=right><font face=Arial>(Airport Admin - Stats) 
+<tr><td width=100% colspan=12 align=right><font face=Arial>Superintendent of Customs 
+<tr><td width=100% colspan=8 align=left><font face=Arial>Commissionerate-I, New Custom House,
+<tr><td width=100% colspan=8 align=left><font face=Arial>Dated : 
+<tr><td width=100% colspan=8 align=left><font face=Arial>F.No.S13/21/2002-AIR (ADMIN) 
+<tr><td width=100% colspan=8 align=left><font face=Arial>Meenambakkam, Chennai-600 027.
+<tr><td width=100% colspan=8 align=left><font face=Arial>The Superintendent of Customs (Appg. Main)
+<tr><td width=100% colspan=8 align=left><font face=Arial>To
+<tr><td width=100% colspan=8 align=right><font face=Arial>Superintendent of Customs 
+<tr><td width=68% colspan=5 align=left><font face=Arial><b>Commissionerate : CUSTOMS COMMISSIONERATE-I, CHENNAI-27 
+<tr><td width=78% colspan=9 align=LEFT><font face=Arial><b>COMMISSIONERATE : CUSTOMS COMMISSIONERATE-I, CHENNAI-27 
+ union select * from br_master where batch_date=#
+update 
+Update
+update airport_master set airport_status='Closed' where airport_status='Active' 
+update appeal_items set items_desc='
+update appeal_master set 
+update appeal_master set online_adjn='N',adjudication_date=cdate('
+update appeal_master set online_adjn='Y',adjudication_date=cdate('
+update appeal_master set total_items=
+update batch_with_many_dc set sdo_code='
+update br_items set bkup_taken='Y' where br_date>=
+update br_items  set br_no=
+update br_items set entry_deleted='Y' where br_no=
+update br_master set bkup_taken='Y' 
+update br_master set bkup_taken='Y' where br_date>=
+update br_master set br_no=
+update br_master set dc_code=right('
+update br_master set entry_deleted='Y'  
+update br_master set ff_ind=null 
+update br_master set ff_ind='Y' where passport_no='
+update br_no_limits set br_series_from=
+update cops_items, item_cat_master SET items_duty_type = category_code 
+update cops_items, item_cat_master SET items_duty_type = category_code where 
+update cops_items set bkup_taken='Y' where os_date>=
+update cops_items set items_desc='
+update cops_items set items_release_category='
+update cops_items_temp set items_dr_no=0, items_dr_year=0 where location_code='
+update cops_master_deleted set adjn_offr_remarks1='ADJN. CANCELLED' where os_no='
+update cops_master set 
+update cops_master set bkup_taken='Y' where os_date>=
+update cops_master set online_adjn='N',adjudication_date=cdate('
+update cops_master set online_adjn='Y',adjudication_date=cdate('
+update cops_master set total_DRs=
+update cops_master set total_items=
+update cops_master_temp set dr_no='', dr_year='',total_drs=0 where location_code='
+update dr_items set 
+update dr_items set items_release_category='
+update dr_items set receipt_by_who='D',item_closure_Remarks='Duty Paid Vide 
+update dr_items set receipt_by_who='Y',item_closure_remarks='
+update  dr_master 
+update dr_master 
+update dr_master set closure_ind=' ',closure_Remarks='
+update dr_master set closure_ind='Y',closure_remarks='
+update dr_master set closure_ind='Y',closure_Remarks='Duty Paid For 
+update dr_master set closure_ind='Y',closure_remarks='Handed Over to WHO ' 
+update dr_master set total_items_value=cdbl(
+update dr_master set warehouse_no=trim('
+update duty_rate_master set Active_ind='C',to_date=cdate('
+update from br_items set entry_deleted='Y' where br_no=
+update fuel_master set bank_shift='
+update fuel_master set br_printed='Y' where br_no=
+update fuel_master set challan_no='
+update fuel_master set entry_deleted='D' where 
+update fuel_master set entry_deleted='Y'  
+update fuel_master set fuel_charges_paid=br_amount where br_no>=
+update fuel_master set unique_no=
+update ip_addrs_table set status='Closed' where status='Active' 
+update item_cat_master set Active_ind='C' where category_desc='
+update item_cat_master set bcd_adv_rate=cdbl(
+update mahazar_items set receipt_by_who='Y', item_closure_remarks='
+update mahazar_master set closure_ind='Y',closure_remarks='Handed Over to WHO ', 
+update mahazar_master set warehouse_no=trim('
+update margin_master set br_top_margin=
+update mhb_items set receipt_by_who='Y' where dr_no=
+update mhb_master set closure_ind='Y',closure_remarks='Handed Over to WHO ',wh_no=
+update modified_item_br_nos set new_br_no=
+update modified_master_br_nos set new_br_no=
+update shift_timing_master set day_shift_from_hrs=
+update users list set user_pwd='
+update users set user_status='CLOSED',closed_on='
+update valuables_master 
+update wh_items set released_qty=warehoused_qty,balance_qty=0 
+update wh_master 
+update wh_master set closure_remarks='Forwarded to Disposal Section Vide F.No.S.Misc.'+Trim(' 
+ valuables_master.wh_date=valuables_items.wh_date and valuables_master.dr_type=valuables_items.dr_type order by valuables_master.wh_date,valuables_master.wh_no 
+Value of Items under O.S. Not Entered.  Please Update the Item Values Before entering the Adjudication Details !
+Value of Items under O.S. Not Entered.  Please Update the Item Values Before entering the Adjudication Details ! 
+) values (
+ values (cdate('
+VERY IMPORTANT : In the System Prepared Draft Adjudication Order, for Export Cases, Please modify the Concerned Sections of Customs Act and For Import Cases, Please Include or Delete the Sections of Customs Act which are Applicable to the Case.  Also include Sections / Acts of Allied Acts, wherever applicable, in the System Prepared Draft Order. ! 
+Warehouse Data Transferred From Local Machine to Server !
+WAREHOUSE DETAILS UPDATION FROM O.S. DETAILS 
+WAREHOUSE GOODS (BOTH GENERAL & VALUABLES) RELEASED DURING THE PERIOD FROM  
+ - WAREHOUSE RECEIPTS FROM BATCH D/Rs 
+ - WAREHOUSE RECEIPTS FROM F/M of O/S Cases 
+ - WAREHOUSE RECEIPTS FROM M.H.B. D/Rs 
+WAREHOUSE REGISTER OF GENERAL GOODS FOR THE PERIOD FROM  
+WAREHOUSE REGISTER OF GENERAL GOODS RECEIVED FROM DRI FOR THE PERIOD FROM  
+WAREHOUSE REGISTER OF VALUABLES FOR THE PERIOD FROM  
+WAREHOUSE REGISTER OF VALUABLES RECEIVED FROM DRI FOR THE PERIOD FROM  
+We hereby certify that we have purchased today the Foreign Currency (as per details given below) from the passenger whose Name and Passport particulars are mentioned above and paid the Net Amount after adjustment of customs dues mentioned above in lieu of the Foreign Currency So Purchased. </font></p></td>
+We hereby certify that we have purchased today the Foreign Currency / Indian Currency (as per details given below) from the passenger whose Name and Passport particulars are mentioned above and paid the Net Amount after adjustment of customs dues mentioned above in lieu of the Foreign Currency / Indian Currency So Purchased. </font></p></td>
+W/H DETAILS OF PASSENGERS HAVING '
+ where 
+' where 
+) where 
+ where (adjudication_date is not null or len(trim(adjudication_date))<>0) and online_adjn='Y'  order by os_date,os_no 
+ %  Whereas Levied Duty is 
+ where bank_date=#
+ where batch_date=
+ where batch_date=#
+ where batch_date=cdate('
+ where br_date=
+ where br_date<>#01/01/2014# and year(br_date)=year(cdate('
+  where br_no=
+ where br_no=
+' where br_no=
+' where br_no>=
+') where br_no=
+ where br_type='
+ where (br_type='Bagg' or br_type='OS' or br_type='OOS') and year(br_date)=year(cdate('
+ where (br_type='Bagg' or br_type='OS' or br_type='OOS' or br_type='SDO') and year(br_date)=year(cdate('
+ where br_type='Gold' and year(br_date)=year(cdate('
+ where (br_type='OS' or br_type='OOS' or br_type='Bagg') and br_no=
+ where  (br_type='SDO') and br_no=
+ where br_type='SDO' and year(br_date)=year(cdate('
+ where br_type='Silv' and year(br_date)=year(cdate('
+ where current_batch_date=#
+ where dr_date=
+ where dr_date=cdate('
+ where dr_date in (Select max(dr_date) from 
+  where dr_no=
+ where dr_no=
+' where dr_no=
+') where dr_no=
+ where dr_printed='Y' order by batch_date,batch_shift 
+') where duty_category='
+ Where (isnull(items_duty_type)=true or Len(Trim(items_duty_type)) = 0) And Len(Trim(items_sub_category)) <> 0 And cops_items.items_sub_category = Mid(category_desc, Len(Trim(category_desc)) - 1, 2) 
+ where items_category='Under Duty' and 
+ where items_desc='
+  where location_code='
+ where location_code='
+ where mhb_no=
+ where os_date=
+ where os_date=cdate('
+ where os_date in (Select max(os_date) from 
+  where os_no='
+ where  os_no='
+ where os_no='
+')) where os_no='
+where os_no='
+ where os_no=cdbl(
+  where passport_no like '%
+ where passport_no like '%
+ where pax_name is null or len(trim(pax_name))=0 
+ where pax_name is null or len(trim(pax_name))=0 order by batch_date,batch_shift 
+  where pax_name like '%
+ where pax_name like '%
+Where re-export is permitted,the passenger is advised to intimate the date of departure of flight atleast 48 hours in advance.</font></td>
+ Where rev_date >= #
+ where system_reference_no=
+where system_reference_no=
+  where unique_no<>
+  where unique_no=
+ where unique_no<>
+ where unique_no=
+' where unique_no=
+')) where unique_no=
+where unique_no=
+' where user_id='
+ where wh_date=
+  where wh_no=
+ where wh_no=
+' where wh_no=
+ where wh_no=cdbl(
+ where year(br_date)=year(cdate('
+ where year(dr_date)=
+ where year(os_date)=
+ where year(wh_date)=
+ Where Year(wh_date) = 
+ wh_master.wh_date=wh_items.wh_date and wh_master.dr_type=wh_items.dr_type order by wh_master.wh_date,wh_master.wh_no 
+W.H. No. Cannot be More than 8 digits.  Contact System Administrator ! 
+W/H Release Details Updated in the W/H Database ! Please Note the W/H Release No. & Date on the Releasing Document !
+ WITH D.O. WHICH WERE DETAINED DURING THE PERIOD FROM 
+ WITH D.O. WHICH WERE DETAINED UNDER F.M. DURING THE PERIOD FROM 
+ within 1 Month from the date of this Order.
+You Have Entered the Value Against the Penal Categories of R.F. / R.E.F / Penalty. Please Enter O.S.No. or delete those penal charges ! 
+You have entered the word 'Conceal' in the Remarks of the Supdt., but selected the case type as 'Mis-Declaration' or 'Trade Goods'.  Please Check ! 
+You have selected only Airlines Code. Please Select the Flight No. ! 

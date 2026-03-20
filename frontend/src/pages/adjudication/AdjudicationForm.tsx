@@ -1,0 +1,839 @@
+import { useState, useEffect, useMemo, memo, startTransition } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Gavel, ArrowLeft, Save, XCircle, User, Package, FileText, AlertCircle, CheckCircle, RotateCcw, Edit, Printer } from 'lucide-react';
+import DatePicker from '@/components/DatePicker';
+import api from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface CopsItem {
+  id: number;
+  items_sno: number;
+  items_desc?: string;
+  items_qty: number;
+  items_uqc?: string;
+  items_value: number;
+  value_per_piece?: number;
+  items_release_category?: string;
+  items_duty_type?: string;
+  items_fa?: number;
+  items_fa_type?: string;
+  items_fa_qty?: number;
+  items_fa_uqc?: string;
+  items_duty?: number;
+  cumulative_duty_rate?: number;
+}
+
+interface OSCase {
+  id: number;
+  os_no: string;
+  os_date: string;
+  os_year: number;
+  pax_name?: string;
+  pax_nationality?: string;
+  passport_no?: string;
+  father_name?: string;
+  pax_date_of_birth?: string;
+  pax_address1?: string;
+  pax_address2?: string;
+  pax_address3?: string;
+  pax_status?: string;
+  flight_no?: string;
+  flight_date?: string;
+  country_of_departure?: string;
+  arrived_from?: string;
+  date_of_departure?: string;
+  stay_abroad_days?: number | string;
+  pp_issue_place?: string;
+  residence_at?: string;
+  booked_by?: string;
+  detained_by?: string;
+  detention_date?: string;
+  case_type?: string;
+  seal_no?: string;
+  dr_no?: string;
+  previous_os_details?: string;
+  supdts_remarks?: string;
+  total_items_value: number;
+  total_items: number;
+  items: CopsItem[];
+  adjudication_date?: string;
+  adj_offr_name?: string;
+  adj_offr_designation?: string;
+  adjn_offr_remarks?: string;
+  adjudication_time?: string;
+  online_adjn?: string;
+  closure_ind?: string;
+  rf_amount?: number;
+  pp_amount?: number;
+  ref_amount?: number;
+  br_amount?: number;
+  confiscated_value?: number;
+  redeemed_value?: number;
+  re_export_value?: number;
+  total_duty_amount?: number;
+}
+
+// ── Pure helpers (module-level, never recreated) ──────────────────────────────
+
+const fmtDateStr = (d: string | null | undefined): string => {
+  if (!d) return '—';
+  if (d === 'N.A.' || d === 'NA' || d === 'n.a.') return d;
+  const parts = d.split('-');
+  if (parts.length === 3 && parts[0].length === 4) return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  return d;
+};
+
+const fmtDate = (d: string | null | undefined): string => {
+  if (!d) return '—';
+  try { return new Date(d).toLocaleDateString('en-GB'); } catch { return d; }
+};
+
+const effFaRupees = (item: CopsItem): number => {
+  const rc = item.items_release_category || '';
+  if (rc !== 'Under Duty' && rc !== 'Under OS') return 0;
+  if ((item.items_fa_type || 'value') === 'qty') {
+    const totalQty = item.items_qty || 0;
+    const faQty = item.items_fa_qty || 0;
+    return totalQty > 0 ? Math.min((faQty / totalQty) * (item.items_value || 0), item.items_value || 0) : 0;
+  }
+  return item.items_fa || 0;
+};
+
+const valueAfterFA = (item: CopsItem): number => {
+  const totalVal = item.items_value || 0;
+  const rc = item.items_release_category || '';
+  if (rc === 'CONFS' || !rc) return totalVal;
+  const faT = item.items_fa_type || 'value';
+  if (faT === 'qty') {
+    const tq = item.items_qty || 0;
+    const fq = item.items_fa_qty || 0;
+    const vpp = item.value_per_piece || 0;
+    return Math.max(0, tq - fq) * vpp;
+  }
+  const fa = Math.min(item.items_fa || 0, totalVal);
+  return Math.max(0, totalVal - fa);
+};
+
+const catLabel = (rc: string | undefined): { label: string; cls: string } => {
+  switch (rc) {
+    case 'Under Duty': return { label: 'Under Duty', cls: 'bg-yellow-100 border-yellow-300 text-yellow-800' };
+    case 'CONFS':      return { label: 'Abs. Conf.', cls: 'bg-red-100 border-red-300 text-red-800' };
+    case 'RF':         return { label: 'Redemption', cls: 'bg-green-100 border-green-300 text-green-800' };
+    case 'REF':        return { label: 'Re-Export', cls: 'bg-blue-100 border-blue-300 text-blue-800' };
+    default:           return { label: 'Under OS', cls: 'bg-slate-100 border-slate-300 text-slate-800' };
+  }
+};
+
+
+
+// ── AdjItemRow ────────────────────────────────────────────────────────────────
+const AdjItemRow = memo(function AdjItemRow({ item }: { item: CopsItem; }) {
+  const displayCat = item.items_release_category || 'Under OS';
+  const isConfs = displayCat === 'CONFS';
+  const { label, cls } = catLabel(displayCat);
+
+  const faRupees = effFaRupees(item);
+  const faType = item.items_fa_type || 'value';
+  const faDisplay = (displayCat !== 'Under Duty' && displayCat !== 'Under OS') ? '—'
+    : faType === 'qty'
+      ? (item.items_fa_qty ? `${item.items_fa_qty} ${item.items_fa_uqc || ''}`.trim() : '—')
+      : (faRupees > 0 ? `₹${faRupees.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—');
+
+  const rowBg = displayCat === 'CONFS' ? 'bg-red-50' : displayCat === 'Under Duty' ? 'bg-yellow-50'
+    : displayCat === 'RF' ? 'bg-green-50/40' : displayCat === 'REF' ? 'bg-blue-50/40' : '';
+
+  return (
+    <tr className={`hover:bg-slate-50 ${rowBg}`}>
+      <td className="px-4 py-2.5 text-center text-slate-500">{item.items_sno}</td>
+      <td className="px-4 py-2.5 text-slate-800 font-medium">{item.items_desc || '—'}</td>
+      <td className="px-4 py-2.5 text-slate-700 text-xs">{item.items_duty_type || '—'}</td>
+      <td className="px-4 py-2.5 text-center text-slate-600">{item.items_qty} {item.items_uqc}</td>
+      <td className="px-4 py-2.5 text-right text-slate-600 text-xs">
+        ₹{(item.value_per_piece || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+      </td>
+      <td className="px-4 py-2.5 text-right text-slate-500 text-xs">{faDisplay}</td>
+      <td className="px-4 py-2.5 text-right font-bold text-amber-900 bg-amber-50">
+        ₹{valueAfterFA(item).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+      </td>
+      <td className="px-4 py-2.5 text-center text-slate-500 text-xs">
+        {isConfs ? <span className="text-red-400 italic">N/A</span> : `${item.cumulative_duty_rate ?? 0}%`}
+      </td>
+      <td className={`px-4 py-2.5 text-right font-bold ${isConfs ? 'text-red-400 italic' : 'text-slate-800'}`}>
+        {isConfs ? 'N/A' : `₹${(item.items_duty || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
+      </td>
+      <td className="px-4 py-2.5 text-center">
+        <span className={`inline-block px-2 py-1.5 border text-xs font-bold rounded-lg ${cls}`}>{label}</span>
+      </td>
+    </tr>
+  );
+});
+
+// ── CaseDetailsPanel: memo — NEVER re-renders when adjData changes ─────────────
+const CaseDetailsPanel = memo(function CaseDetailsPanel({ osCase }: { osCase: OSCase }) {
+  const fields: [string, string | undefined][] = [
+    ['Passenger Name', osCase.pax_name],
+    ['Passport No.', osCase.passport_no],
+    ['Place of Issue of PP', osCase.pp_issue_place],
+    ['Nationality', osCase.pax_nationality],
+    ['Normal Residence At', osCase.residence_at],
+    ['Date of Birth', fmtDate(osCase.pax_date_of_birth)],
+    ["Father's Name", osCase.father_name],
+    ['Pax Status', osCase.pax_status],
+    ['Case Type', osCase.case_type],
+    ['Flight No.', osCase.flight_no],
+    ['Flight Date', fmtDate(osCase.flight_date)],
+    ['Date of Departure from India', fmtDateStr(osCase.date_of_departure)],
+    ['Stay Abroad (Days)', osCase.stay_abroad_days != null ? String(osCase.stay_abroad_days) : undefined],
+    ['Arrived From', osCase.arrived_from || osCase.country_of_departure],
+    ['Booked By', osCase.booked_by],
+    ['Detained By', osCase.detained_by],
+    ['Detention Date', fmtDate(osCase.detention_date)],
+    ['D.R. No.', osCase.dr_no],
+    ['Seal No.', osCase.seal_no],
+    ['Previous O/S Cases', osCase.previous_os_details],
+  ];
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="bg-slate-50 px-5 py-3.5 border-b border-slate-200 flex items-center gap-2">
+        <User size={16} className="text-blue-600" />
+        <h2 className="font-bold text-slate-700 text-sm uppercase tracking-wider">Offence Case Details</h2>
+      </div>
+      <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-0 divide-y divide-slate-50">
+        {fields.filter(([, val]) => val != null && val !== '').map(([label, val]) => (
+          <div key={label} className="py-2.5 flex items-start gap-3">
+            <span className="text-xs text-slate-500 uppercase tracking-wide font-semibold w-44 shrink-0 pt-0.5">{label}</span>
+            <span className="text-sm text-slate-800 font-medium">{val || <span className="text-slate-300">—</span>}</span>
+          </div>
+        ))}
+        {osCase.pax_address1 && (
+          <div className="col-span-2 py-2.5 flex items-start gap-3">
+            <span className="text-xs text-slate-500 uppercase tracking-wide font-semibold w-44 shrink-0 pt-0.5">Address</span>
+            <span className="text-sm text-slate-800 font-medium">
+              {[osCase.pax_address1, osCase.pax_address2, osCase.pax_address3].filter(Boolean).join(', ')}
+            </span>
+          </div>
+        )}
+        {osCase.supdts_remarks && (
+          <div className="col-span-2 py-2.5 flex items-start gap-3 bg-amber-50 rounded-lg px-3 -mx-3">
+            <span className="text-xs text-amber-700 uppercase tracking-wide font-bold w-44 shrink-0 pt-0.5">SDO Remarks</span>
+            <span className="text-sm text-slate-800 font-medium leading-relaxed whitespace-pre-wrap">{osCase.supdts_remarks}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
+// ── ItemsPanel: Read-only display of SDO-categorized items ────────────────────
+const ItemsPanel = memo(function ItemsPanel({ osCase }: { osCase: OSCase }) {
+  const totalValAfterFA = osCase.items.reduce((s, i) => s + valueAfterFA(i), 0);
+  const totalDutyAll = osCase.items.reduce((s, i) => s + (i.items_duty || 0), 0);
+
+  // Compute live category-value breakdown
+  let rfVal = 0, refVal = 0, confsVal = 0, underDutyVal = 0, unassignedVal = 0, totalFA = 0;
+  const qtyFaItems: string[] = [];
+  
+  const UQC_LABEL: Record<string, string> = {
+    NOS: 'Nos.', STK: 'Sticks', KGS: 'Kgs.', GMS: 'Gms.', LTR: 'Ltrs.', MTR: 'Mtrs.', PRS: 'Pairs',
+  };
+  const uqcLabel = (code: string) => UQC_LABEL[(code || '').toUpperCase()] ?? (code || 'Nos.');
+
+  const fmtQty = (q: number | string) => {
+    const n = Number(q);
+    return n % 1 === 0 ? Math.trunc(n).toString() : String(q);
+  };
+  
+  for (const item of osCase.items) {
+    const rc = item.items_release_category || 'Under OS';
+    const val = valueAfterFA(item);
+    
+    // Only capture VALUE-based Free Allowance into the numeric totalFA
+    if ((item.items_fa_type || 'value') === 'value') {
+      const origVal = Number(item.items_value) || 0;
+      totalFA += Math.max(0, origVal - val);
+    } else if (Number(item.items_fa_qty) > 0) {
+      // Capture QTY-based FAs for the textual description instead
+      qtyFaItems.push(`${fmtQty(item.items_fa_qty || 0)} ${uqcLabel(item.items_fa_uqc || '')} of ${item.items_desc}`);
+    }
+
+    if (rc === 'CONFS') confsVal += val;
+    else if (rc === 'RF') rfVal += val;
+    else if (rc === 'REF') refVal += val;
+    else if (rc === 'Under Duty') underDutyVal += val;
+    else if (rc === 'Under OS' || !rc) unassignedVal += val;
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="bg-slate-50 px-5 py-3.5 border-b border-slate-200 flex items-center gap-2">
+        <Package size={16} className="text-orange-500" />
+        <h2 className="font-bold text-slate-700 text-sm uppercase tracking-wider">
+          Seized Goods
+        </h2>
+        <span className="ml-auto text-xs text-slate-500">{osCase.total_items} item(s)</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
+            <tr>
+              <th className="px-4 py-3 text-center w-12">S.No</th>
+              <th className="px-4 py-3 text-left">Description</th>
+              <th className="px-4 py-3 text-left">Duty Type</th>
+              <th className="px-4 py-3 text-center">Qty / UQC</th>
+              <th className="px-4 py-3 text-right">Rate / Piece (₹)</th>
+              <th className="px-4 py-3 text-right">Free Allowance</th>
+              <th className="px-4 py-3 text-right bg-amber-50">Value after FA (₹)</th>
+              <th className="px-4 py-3 text-center">Rate (%)</th>
+              <th className="px-4 py-3 text-right">Duty (₹)</th>
+              <th className="px-4 py-3 text-center w-32">Disposal</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {osCase.items.map(item => (
+              <AdjItemRow key={item.id} item={item} />
+            ))}
+          </tbody>
+          <tfoot className="bg-slate-50 border-t border-slate-200 font-bold">
+            <tr>
+              <td colSpan={6} className="px-4 py-2 text-right text-xs text-slate-500 uppercase tracking-wider">
+                Overall Value (after FA):
+              </td>
+              <td className="px-4 py-2 text-right text-base text-amber-800">
+                ₹{totalValAfterFA.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </td>
+              <td colSpan={3} />
+            </tr>
+            <tr className="border-t border-slate-200">
+              <td colSpan={8} className="px-4 py-2 text-right text-xs text-slate-500 uppercase tracking-wider">
+                Overall Duty:
+              </td>
+              <td className="px-4 py-2 text-right text-base text-brand-700">
+                ₹{totalDutyAll.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </td>
+              <td />
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      {/* Live category-wise Value Summary */}
+      <div className="px-5 py-3 border-t border-slate-200 bg-slate-50/50">
+        <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Disposal Value Breakdown (Live)</h4>
+        <div className="flex flex-wrap gap-3">
+          {underDutyVal >= 0 && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+              <div className="text-[10px] text-emerald-700 font-bold uppercase">Under Duty</div>
+              <div className="text-sm font-black text-emerald-800">₹{underDutyVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+            </div>
+          )}
+          {rfVal >= 0 && (
+            <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+              <div className="text-[10px] text-green-700 font-bold uppercase">Redemption Fine (RF)</div>
+              <div className="text-sm font-black text-green-800">₹{rfVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+            </div>
+          )}
+          {refVal >= 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+              <div className="text-[10px] text-blue-700 font-bold uppercase">Re-Export (REF)</div>
+              <div className="text-sm font-black text-blue-800">₹{refVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+            </div>
+          )}
+          {confsVal >= 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              <div className="text-[10px] text-red-600 font-bold uppercase">Abs. Confiscation</div>
+              <div className="text-sm font-black text-red-800">₹{confsVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+            </div>
+          )}
+          {(totalFA > 0 || qtyFaItems.length > 0) && (
+            <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 max-w-[220px]">
+              <div className="text-[10px] text-indigo-700 font-bold uppercase">Free Allowance</div>
+              {totalFA > 0 && (
+                <div className="text-sm font-black text-indigo-800">
+                  ₹{totalFA.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </div>
+              )}
+              {qtyFaItems.length > 0 && (
+                <div className="text-[10px] text-indigo-600 font-bold leading-tight mt-1 truncate whitespace-normal">
+                  {totalFA > 0 ? 'along with ' : ''}{qtyFaItems.join(' & ')}
+                </div>
+              )}
+            </div>
+          )}
+          {unassignedVal > 0 && (
+            <div className="bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
+              <div className="text-[10px] text-orange-600 font-bold uppercase">⚠ Not Assigned</div>
+              <div className="text-sm font-black text-orange-800">₹{unassignedVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+});
+
+// ── Main component ─────────────────────────────────────────────────────────────
+export default function AdjudicationForm() {
+  const { os_no, os_year } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const [osCase, setOsCase] = useState<OSCase | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  // Each adjData field is its own state so only the affected input re-renders
+  const [adjDate, setAdjDate]   = useState(() => new Date().toISOString().split('T')[0]);
+  const [offrName, setOffrName] = useState(() => user?.user_name || '');
+  const [remarks, setRemarks]   = useState('');
+  const [rfAmt, setRfAmt]       = useState(0);
+  const [refAmt, setRefAmt]     = useState(0);
+  const [ppAmt, setPpAmt]       = useState(0);
+  
+  const [closeCase, setCloseCase] = useState(false);
+
+  const REMARKS_MAX = 3000;
+  const remarksLen  = remarks.length;
+  const { redeemedVal, reExportVal, totalConfsValue, underOsValue } = useMemo(() => {
+    if (!osCase) return { redeemedVal: 0, reExportVal: 0, totalConfsValue: 0, underOsValue: 0 };
+    let rf = 0, ref = 0, confs = 0, uos = 0;
+    for (const item of osCase.items) {
+      const rc = item.items_release_category || 'Under OS';
+      const valAfterFa = valueAfterFA(item);
+
+      if (rc === 'CONFS') confs += valAfterFa;
+      else if (rc === 'RF') rf += valAfterFa;
+      else if (rc === 'REF') ref += valAfterFa;
+      else if (rc === 'Under OS' || !rc) uos += valAfterFa;
+    }
+    return { redeemedVal: Math.round(rf), reExportVal: Math.round(ref), totalConfsValue: Math.round(confs), underOsValue: Math.round(uos) };
+  }, [osCase]);
+
+  const totalDuty   = osCase?.total_duty_amount || 0;
+  const totalDemand = totalDuty + rfAmt + refAmt + ppAmt;
+
+  useEffect(() => {
+    if (!os_no || !os_year) return;
+    setLoading(true);
+    api.get(`/os/${os_no}/${os_year}`)
+      .then(res => {
+        const data: OSCase = res.data;
+        startTransition(() => {
+          setOsCase(data);
+          
+          setOsCase(data);
+
+          if (data.adj_offr_name) {
+            setOffrName(data.adj_offr_name || user?.user_name || '');
+            setRemarks(data.adjn_offr_remarks || '');
+            setRfAmt(data.rf_amount || 0);
+            setRefAmt(data.ref_amount || 0);
+            setPpAmt(data.pp_amount || 0);
+          }
+          setLoading(false);
+        });
+      })
+      .catch(err => {
+        setError(err.response?.data?.detail || 'Failed to load case');
+        setLoading(false);
+      });
+  }, [os_no, os_year, user]);
+
+  const handleSave = async () => {
+    if (!offrName.trim()) { setError('Adjudicating Officer Name is required.'); return; }
+    if (remarksLen > REMARKS_MAX) { setError(`Remarks exceeds ${REMARKS_MAX} character limit.`); return; }
+    
+    // Validate: if any Under OS items exist, they must all be categorized by SDO
+    if (osCase) {
+      const uncategorized = osCase.items.filter(i => i.items_release_category === 'Under OS' || !i.items_release_category);
+      if (uncategorized.length > 0) {
+        setError(`Cannot adjudicate. SDO left ${uncategorized.length} item(s) as "Under OS" without specifying a disposal category (RF/REF/CONFS). Return case to SDO to fix.`);
+        return;
+      }
+    }
+    // Validate: RF items require rf_amount > 0
+    if (redeemedVal > 0 && rfAmt <= 0) {
+      setError('You have items under Redemption Fine. Please enter the R.F. Amount.');
+      return;
+    }
+    // Validate: REF items require ref_amount > 0
+    if (reExportVal > 0 && refAmt <= 0) {
+      setError('You have items under Re-Export Fine. Please enter the R.E.F. Amount.');
+      return;
+    }
+
+    setError('');
+    setSubmitting(true);
+    try {
+      await api.post(`/os/${os_no}/${os_year}/adjudicate`, {
+        adj_offr_name: offrName,
+        adj_offr_designation: user?.user_desig || '',
+        adjudication_date: adjDate,
+        adjn_offr_remarks: remarks,
+        rf_amount: rfAmt,
+        ref_amount: refAmt,
+        pp_amount: ppAmt,
+        confiscated_value: totalConfsValue,
+        redeemed_value: redeemedVal,
+        re_export_value: reExportVal,
+        close_case: closeCase,
+      });
+      setSuccess('Case adjudicated successfully. You can now print the O.S. using the button above.');
+      const refreshed = await api.get(`/os/${os_no}/${os_year}`);
+      setOsCase(refreshed.data);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to save adjudication.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handlePrint = () => {
+    navigate(`/query/os/print/${os_no}/${os_year}`);
+  };
+
+  const handleCancelAdjudication = async () => {
+    if (!confirm('Are you sure you want to CANCEL the adjudication for this case? This will reopen the case for re-adjudication.')) return;
+    try {
+      await api.post(`/os/${os_no}/${os_year}/cancel-adjudication`);
+      navigate('/adjudication/pending');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to cancel adjudication.');
+    }
+  };
+
+  const handleRejectOS = async () => {
+    const reason = window.prompt('Enter the reason for rejecting this pending O.S. (This will send it to the Quashed list):');
+    if (!reason || !reason.trim()) return;
+    setSubmitting(true);
+    try {
+      await api.post(`/os/${os_no}/${os_year}/reject`, { reason });
+      setSuccess('O.S. Case Rejected Successfully.');
+      setTimeout(() => navigate('/adjudication/quashed'), 500);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to reject case.');
+      setSubmitting(false);
+    }
+  };
+
+  const handleQuashOS = async () => {
+    const reason = window.prompt('WARNING: Enter the reason for QUASHING this adjudicated O.S.:');
+    if (!reason || !reason.trim()) return;
+    setSubmitting(true);
+    try {
+      await api.post(`/os/${os_no}/${os_year}/quash`, { reason });
+      setSuccess('O.S. Case Quashed Successfully.');
+      setTimeout(() => navigate('/adjudication/quashed'), 500);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to quash case.');
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center space-y-3">
+          <Gavel size={36} className="text-amber-400 mx-auto animate-pulse" />
+          <p className="text-slate-600">Loading case details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!osCase) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-red-700 flex items-start gap-3">
+        <AlertCircle size={20} />
+        <p>{error || 'Case not found.'}</p>
+      </div>
+    );
+  }
+
+  const isAlreadyAdjudicated = !!osCase.adjudication_date;
+  const canQuash = osCase.adjudication_time
+    ? (new Date().getTime() - new Date(osCase.adjudication_time).getTime() < 3600000)
+    : true;
+
+  return (
+    <div className="space-y-5 max-w-full mx-auto">
+
+      {/* Page Header */}
+      <div className="bg-amber-800 text-white px-5 py-4 rounded-xl flex items-center justify-between border border-amber-700">
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate('/adjudication/pending')} className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors">
+            <ArrowLeft size={18} />
+          </button>
+          <div>
+            <h1 className="text-lg font-bold">Adjudication — O/S No. {osCase.os_no}/{osCase.os_year}</h1>
+            <p className="text-amber-200 text-xs">
+              Registered on {fmtDate(osCase.os_date)} · {osCase.booked_by}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          {!isAlreadyAdjudicated && (
+            <button
+              onClick={() => navigate(`/adjudication/edit-sdo/${osCase.os_no}/${osCase.os_year}`)}
+              className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white text-xs px-3 py-1.5 rounded-lg transition-colors border border-white/20"
+              title="Edit SDO Inputs"
+            >
+              <Edit size={14} /> Edit Case Details
+            </button>
+          )}
+          {isAlreadyAdjudicated && (
+            <div className="flex items-center gap-2">
+              <span className="bg-green-500/20 border border-green-400/40 text-green-100 text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                <CheckCircle size={13} /> Adjudicated
+              </span>
+              <button
+                onClick={handleCancelAdjudication}
+                className="flex items-center gap-1.5 bg-red-500/20 hover:bg-red-500/30 border border-red-400/40 text-red-200 text-xs px-3 py-1.5 rounded-lg transition-colors"
+              >
+                <RotateCcw size={12} /> Cancel Adjudication
+              </button>
+              <button
+                onClick={handleQuashOS}
+                disabled={submitting || !canQuash}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors font-bold shadow-md ${!canQuash ? 'bg-slate-300 text-slate-500 border border-slate-300 cursor-not-allowed shadow-none' : 'bg-red-700 hover:bg-red-600 border border-red-500 text-white'}`}
+                title={!canQuash ? 'Quash period expired (1-hour limit).' : 'Permanently revoke adjudication'}
+              >
+                <AlertCircle size={12} /> Quash OS
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Alerts */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg flex items-start gap-3">
+          <AlertCircle size={18} className="shrink-0 mt-0.5" />
+          <p className="text-sm font-medium">{error}</p>
+        </div>
+      )}
+      {success && (
+        <div className="bg-green-50 border border-green-200 text-green-700 p-4 rounded-lg flex items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <CheckCircle size={18} className="shrink-0 mt-0.5" />
+            <p className="text-sm font-medium">{success}</p>
+          </div>
+          <button
+            onClick={() => navigate('/adjudication/pending')}
+            className="shrink-0 flex items-center gap-1.5 bg-white border border-green-300 text-green-700 text-xs font-semibold px-4 py-2 rounded-lg hover:bg-green-50 transition-colors"
+          >
+            Go to Pending List
+          </button>
+        </div>
+      )}
+
+      {/* READ-ONLY panels — CaseDetailsPanel and ItemsPanel */}
+      <CaseDetailsPanel osCase={osCase} />
+      <ItemsPanel osCase={osCase} />
+
+      {/* WRITABLE: Adjudication Order Details */}
+      <div className="bg-white rounded-xl border-2 border-amber-300 overflow-hidden">
+        <div className="bg-amber-700 px-5 py-3.5 flex items-center gap-2">
+          <Gavel size={16} className="text-amber-200" />
+          <h2 className="font-bold text-white text-sm uppercase tracking-wider">Adjudication Order Details</h2>
+          {isAlreadyAdjudicated && (
+            <span className="ml-auto text-xs bg-green-500/20 text-green-200 border border-green-400/30 px-2 py-0.5 rounded-full">
+              Previously Adjudicated — can be modified
+            </span>
+          )}
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* Officer + Date */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-amber-800 uppercase tracking-wider mb-1.5">Adjudication Date *</label>
+              <DatePicker
+                id="input-adjn-date"
+                value={adjDate}
+                onChange={setAdjDate}
+                inputClassName="w-full px-3 py-2.5 border border-amber-300 rounded-lg bg-amber-50 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-slate-800 font-medium"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-amber-800 uppercase tracking-wider mb-1.5">Adjudicating Officer Name *</label>
+              <input
+                id="input-offr-name"
+                type="text"
+                className="w-full px-3 py-2.5 border border-amber-300 rounded-lg bg-amber-50 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-slate-800 font-medium"
+                value={offrName}
+                onChange={e => setOffrName(e.target.value.toUpperCase())}
+                placeholder="Officer Name"
+              />
+            </div>
+          </div>
+
+          {/* Financial Demands & Case Values */}
+          <div>
+            <h3 className="flex items-center gap-2 text-xs font-bold text-amber-800 uppercase tracking-wider mb-3 border-b border-amber-100 pb-2">
+              <FileText size={13} /> Case Values & Demands (₹)
+            </h3>
+            
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
+              <div className="flex items-center justify-between mb-4">
+                 <h4 className="text-[11px] font-bold text-slate-500 uppercase">Seized Goods Disposal Values (Auto-Calculated)</h4>
+                 <div className="text-[11px] font-semibold text-slate-500 bg-white px-3 py-1 border border-slate-200 rounded-full">
+                    Total Under OS: 
+                    <span className="ml-1 font-bold text-slate-800">
+                        ₹{underOsValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                 </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-green-700 mb-1.5">Redeemed Value (RF Items)</label>
+                  <div className="px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-right font-bold text-green-800">
+                    ₹{redeemedVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-blue-700 mb-1.5">Re-Export Value (REF Items)</label>
+                  <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-right font-bold text-blue-800">
+                    ₹{reExportVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-red-700 mb-1.5">Abs. Confiscation Value</label>
+                  <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-right font-bold text-red-800">
+                    ₹{totalConfsValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </div>
+                </div>
+              </div>
+              {(redeemedVal + reExportVal > 0 && redeemedVal + reExportVal < underOsValue - 1) && (
+                  <div className="mt-3 text-[10px] text-orange-600 flex items-center gap-1.5 font-medium bg-orange-50 p-2 rounded-lg border border-orange-100">
+                      <AlertCircle size={12} />
+                      Note: Some Under OS items have not been assigned a disposal category yet.
+                  </div>
+              )}
+            </div>
+
+            <h4 className="text-[11px] font-bold text-slate-500 uppercase mt-5 mb-3">Imposed Fines & Penalties</h4>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Redemption Fine (RF)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">₹</span>
+                  <input id="input-rf" type="number" min={0} placeholder="0"
+                    className="w-full pl-7 pr-3 py-2.5 border border-slate-300 rounded-lg bg-slate-50 focus:ring-2 focus:ring-amber-500 text-right font-bold text-slate-800 placeholder-slate-400"
+                    value={rfAmt || ''} onChange={e => setRfAmt(Number(e.target.value))} />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Re-Export Fine (REF)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">₹</span>
+                  <input id="input-ref" type="number" min={0} placeholder="0"
+                    className="w-full pl-7 pr-3 py-2.5 border border-slate-300 rounded-lg bg-slate-50 focus:ring-2 focus:ring-amber-500 text-right font-bold text-slate-800 placeholder-slate-400"
+                    value={refAmt || ''} onChange={e => setRefAmt(Number(e.target.value))} />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Personal Penalty (PP)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">₹</span>
+                  <input id="input-pp" type="number" min={0} placeholder="0"
+                    className="w-full pl-7 pr-3 py-2.5 border border-slate-300 rounded-lg bg-slate-50 focus:ring-2 focus:ring-amber-500 text-right font-bold text-slate-800 placeholder-slate-400"
+                    value={ppAmt || ''} onChange={e => setPpAmt(Number(e.target.value))} />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-red-700 mb-1.5 uppercase">Total to be Paid</label>
+                <div className="px-3 py-2.5 bg-red-50 border-2 border-red-300 rounded-lg text-right font-bold text-red-700 text-base flex flex-col items-end">
+                  <span>₹{totalDemand.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  <span className="text-[10px] text-red-500 font-medium">
+                    Incl. SDO Duty: ₹{totalDuty.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Gist / Remarks */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-bold text-amber-800 uppercase tracking-wider">
+                Gist / Remarks of Adjudicating Officer
+              </label>
+              <span className={`text-xs font-semibold ${remarksLen > REMARKS_MAX ? 'text-red-600' : remarksLen > REMARKS_MAX * 0.85 ? 'text-orange-500' : 'text-slate-400'}`}>
+                {remarksLen} / {REMARKS_MAX}
+              </span>
+            </div>
+            <textarea
+              id="input-gist"
+              className={`w-full px-4 py-3 border rounded-lg bg-amber-50 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-slate-800 text-sm leading-relaxed resize-none ${remarksLen > REMARKS_MAX ? 'border-red-400' : 'border-amber-300'}`}
+              rows={5}
+              placeholder="Enter the gist and remarks of the order-in-original (max 3000 characters)..."
+              value={remarks}
+              onChange={e => setRemarks(e.target.value.slice(0, REMARKS_MAX))}
+            />
+          </div>
+
+          {/* Close Case */}
+          {!isAlreadyAdjudicated && (
+            <div className="flex items-center gap-3 border-t border-amber-100 pt-4">
+              <input type="checkbox" id="chk-close-case"
+                className="w-4 h-4 accent-amber-600 rounded"
+                checked={closeCase}
+                onChange={e => setCloseCase(e.target.checked)} />
+              <label htmlFor="chk-close-case" className="text-sm font-semibold text-slate-700 cursor-pointer">
+                Mark this case as <strong className="text-amber-700">Closed / Adjudicated</strong> (sets Closure Indicator = Y)
+              </label>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-3 border-t border-amber-100 pt-4">
+            {!isAlreadyAdjudicated && (
+              <>
+                <button
+                  id="btn-save-adjn"
+                  onClick={handleSave}
+                  disabled={submitting || remarksLen > REMARKS_MAX}
+                  className="flex items-center gap-2 bg-amber-700 hover:bg-amber-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Save size={17} />
+                  {submitting ? 'Saving...' : 'Complete Adjudication'}
+                </button>
+                <button
+                  onClick={handleRejectOS}
+                  disabled={submitting}
+                  className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <XCircle size={17} /> Reject OS
+                </button>
+              </>
+            )}
+            {/* Print button — only visible after adjudication is complete */}
+            {isAlreadyAdjudicated && (
+              <button
+                onClick={handlePrint}
+                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Printer size={17} />
+                Preview & Print O.S.
+              </button>
+            )}
+            <button
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-6 py-3 rounded-lg font-semibold transition-colors"
+            >
+              <XCircle size={17} />
+              {isAlreadyAdjudicated ? 'Back' : 'Cancel'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

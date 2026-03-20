@@ -1,0 +1,39 @@
+CREATE TABLE margin_master (br_top_margin number,dr_top_margin number)
+CREATE TABLE shift_timing_master (day_shift_from_hrs number,day_shift_to_hrs number,night_shift_from_hrs number,night_shift_to_hrs number)
+insert into 
+insert into batch_with_many_dc(current_batch_date,current_batch_shift,marked_dc_codes,correct_dc_name) 
+insert into br_items(
+insert into br_master(
+insert into challan_master(batch_date,batch_shift,sdo_code,sdo_name,challan_no,challan_amount) 
+insert into cops_items(
+insert into cops_items_deleted Select * from 
+insert into cops_items_deleted select * from cops_items_temp where os_no='
+insert into cops_items_deleted select * from cops_items where os_date=
+insert into cops_master(
+insert into cops_master_deleted select * from 
+insert into cops_master_deleted select * from cops_master_temp where os_no='
+insert into cops_master_deleted select * from cops_master where os_no='
+insert into dr_items(
+insert into dr_master(
+insert into dr_update_from_br(sl_no,dr_no,dr_date,br_type,br_no,br_date,auto_update_remarks) values (
+insert into Dup_BRs_Deleted_in_Tfr (Batch_date,Batch_shift,BR_Nos) values (cdate('
+insert into fuel_master(
+insert into item_trans_deleted select * from item_trans where item_osdate=
+INSERT INTO margin_master VALUES (0.310,0.310)
+INSERT INTO margin_master VALUES (0.321,0.321)
+insert into mhb_items(
+insert into modified_item_br_nos(batch_date,batch_shift,br_no,br_date,br_type,items_sno,items_desc,
+insert into modified_master_br_nos(batch_date,batch_shift,br_no,br_date,br_type,pax_name,passport_no,
+insert into old_br_items(
+insert into old_br_items (br_no,br_date,br_shift,br_type,test_field) values (
+insert into old_br_master(
+insert into old_br_master (br_no,br_date,br_shift,br_type,test_field) values (
+insert into os_master_deleted select * from os_master where osdate=
+INSERT INTO shift_timing_master VALUES (10,22,22,10)
+insert into uos_items select * from cops_items where os_no='
+insert into uos_master select * from cops_master where os_no='
+insert into Users(user_Name,user_desig,User_ID,User_Pwd,created_by,created_on,user_status,user_role) values ('
+insert into valuation_items select * from dr_items where unique_no=
+insert into valuation_master select * from dr_master where dr_no=
+insert into wh_items(
+insert into wh_master(

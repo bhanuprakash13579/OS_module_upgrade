@@ -1,0 +1,67 @@
+update airport_master set airport_status='Closed' where airport_status='Active' 
+update appeal_items set items_desc='
+update appeal_master set 
+update appeal_master set online_adjn='N',adjudication_date=cdate('
+update appeal_master set online_adjn='Y',adjudication_date=cdate('
+update appeal_master set total_items=
+update batch_with_many_dc set sdo_code='
+update br_items set bkup_taken='Y' where br_date>=
+update br_items  set br_no=
+update br_items set entry_deleted='Y' where br_no=
+update br_master set bkup_taken='Y' 
+update br_master set bkup_taken='Y' where br_date>=
+update br_master set br_no=
+update br_master set dc_code=right('
+update br_master set entry_deleted='Y'  
+update br_master set ff_ind=null 
+update br_master set ff_ind='Y' where passport_no='
+update br_no_limits set br_series_from=
+update cops_items, item_cat_master SET items_duty_type = category_code 
+update cops_items, item_cat_master SET items_duty_type = category_code where 
+update cops_items set bkup_taken='Y' where os_date>=
+update cops_items set items_desc='
+update cops_items set items_release_category='
+update cops_items_temp set items_dr_no=0, items_dr_year=0 where location_code='
+update cops_master_deleted set adjn_offr_remarks1='ADJN. CANCELLED' where os_no='
+update cops_master set 
+update cops_master set bkup_taken='Y' where os_date>=
+update cops_master set online_adjn='N',adjudication_date=cdate('
+update cops_master set online_adjn='Y',adjudication_date=cdate('
+update cops_master set total_DRs=
+update cops_master set total_items=
+update cops_master_temp set dr_no='', dr_year='',total_drs=0 where location_code='
+update dr_items set 
+update dr_items set items_release_category='
+update dr_items set receipt_by_who='D',item_closure_Remarks='Duty Paid Vide 
+update dr_items set receipt_by_who='Y',item_closure_remarks='
+update dr_master set closure_ind=' ',closure_Remarks='
+update dr_master set closure_ind='Y',closure_remarks='
+update dr_master set closure_ind='Y',closure_Remarks='Duty Paid For 
+update dr_master set closure_ind='Y',closure_remarks='Handed Over to WHO ' 
+update dr_master set total_items_value=cdbl(
+update dr_master set warehouse_no=trim('
+update duty_rate_master set Active_ind='C',to_date=cdate('
+update from br_items set entry_deleted='Y' where br_no=
+update fuel_master set bank_shift='
+update fuel_master set br_printed='Y' where br_no=
+update fuel_master set challan_no='
+update fuel_master set entry_deleted='D' where 
+update fuel_master set entry_deleted='Y'  
+update fuel_master set fuel_charges_paid=br_amount where br_no>=
+update fuel_master set unique_no=
+update ip_addrs_table set status='Closed' where status='Active' 
+update item_cat_master set Active_ind='C' where category_desc='
+update item_cat_master set bcd_adv_rate=cdbl(
+update mahazar_items set receipt_by_who='Y', item_closure_remarks='
+update mahazar_master set closure_ind='Y',closure_remarks='Handed Over to WHO ', 
+update mahazar_master set warehouse_no=trim('
+update margin_master set br_top_margin=
+update mhb_items set receipt_by_who='Y' where dr_no=
+update mhb_master set closure_ind='Y',closure_remarks='Handed Over to WHO ',wh_no=
+update modified_item_br_nos set new_br_no=
+update modified_master_br_nos set new_br_no=
+update shift_timing_master set day_shift_from_hrs=
+update users list set user_pwd='
+update users set user_status='CLOSED',closed_on='
+update wh_items set released_qty=warehoused_qty,balance_qty=0 
+update wh_master set closure_remarks='Forwarded to Disposal Section Vide F.No.S.Misc.'+Trim(' 

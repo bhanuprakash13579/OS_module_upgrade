@@ -1,0 +1,42 @@
+ and br_type='Fuel' and login_id='
+  and login_id='
+ and login_id='
+' and login_id='
+Arrival Flight Details Not Found in Database.  Please Create them from Master Creation Option of Main Menu ! 
+<body oncontextmenu='return false;'>
+<body oncontextmenu=return false;>
+Check the Font Size.  If it is NOT IN NORMAL size, take B.R. Printout from Main Menu.  Otherwise Printouts will not be proper ! 
+Check the Font Size.  If it is NOT IN NORMAL size, take D.R. Printout from Main Menu.  Otherwise Printouts will not be proper ! 
+Click 'Add User' Button to Add New Login IDs ! 
+Data of Previous Batch Not Transferred To Server.  Please Transfer it using the Option in 'Main Menu' and then Start B/R Entries for Next Batch ! 
+ - DELETION MODULE FOR ALREADY GENERATED FUEL DUTY RECEIPTS ON 
+ D.R. Details NOT SAVED Due to Error in Data.  Please Check the Format of Date Type Data or Login Again and Re-Enter the Particulars ! 
+Duty Payable as per Master and Item Details Not Tallied.  Please use the option 'Print B/R' from Main Menu for taking this B/R Printout ! 
+Entered Flight No. Not Found in Database.  Please Add through 'Master Creation' option from Main Menu ! 
+Font Size has Changed.  Take B.R. Printout from Main Menu ! 
+FORM-15 : LOGIN FORM FOR ONLINE ADJUDICATION BY D.C. / A.C. (Server Version)
+FORM-55 : LOGIN FORM FOR ONLINE ADJUDICATION BY D.C. / A.C. 
+If You Type 'DOMESTIC' or 'UNCLAIMED',  then you cannot change passport number.  For changing the Passport No.,  Click 'Exit' and Select the Required Option From DR Module ! 
+Item Details Not Captured. Logout & Login fresh ! 
+items_qty,items_uqc,items_value,items_fa,items_duty,login_id) 
+items_qty,items_uqc,items_value,items_fa,items_duty,login_id from br_items where 
+Login
+login_id
+New IP Address Of Server Found !  Please Login Afresh ! 
+New Server Code Noted !  Please Login COPS_BR_SOFTWARE Afresh ! 
+ - OFFENCE CASES - QUERY MODULE 
+OFFENCE CASES QUERY MODULE 
+ - OFFENCE CASES - QUERY MODULE (Local Machine)
+OFFENCE CASES QUERY MODULE (Local Machine)
+.  Please Check the BR No. or Modify it using the Option 'Modify B/R No Only' in the B/R Module! 
+.  Please Check the BR No. or Modify it using the Option 'Modify B/R No Only' in the B/R Module!  
+Please Select DC Name on Duty or login afresh ! 
+Previous B/R Details Could not be retrieved from Database. Please Check from Combined Query on B.R & O.S. Data from B/R Module. Otherwise proceed with B/R Preparation by entering the Required Details !
+Previous D/R Details Could not be retrieved from Database. Please Check from Combined Query on B.R & O.S. Data from B/R Module. Otherwise proceed with B/R Preparation by entering the Required Details !
+Previous Fuel Duty Receipt(s) Details Could not be retrieved from Database. Please Check from Query on Fuel Data from B/R Module. Otherwise proceed with B/R Preparation by entering the Required Details !
+ref_amount,pp_amount,wh_amount,other_amount,br_amount,login_id) 
+ref_amount,pp_amount,wh_amount,other_amount,br_amount,login_id from br_master where 
+The Entered O.S.No. is Not an Online O.S.  The Appeal Module can be used for only online OS Cases ! 
+The Remarks of the Adjudicating Officer exceeds 700 Characters.  Please Use the Option of 'Print Adjn. Order On Legal Size Blank Paper' From the Print Menu For Printing all the Remarks of the Adjudicating Officer ! 
+<tr><td width=100% colspan=12 align=left><font face=Arial>The Superintendent of Customs (Appg. Main)
+<tr><td width=100% colspan=8 align=left><font face=Arial>The Superintendent of Customs (Appg. Main)

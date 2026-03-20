@@ -1,0 +1,39 @@
+# macOS
+.DS_Store
+
+# Node/Frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python/Backend
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.env
+db.sqlite3
+cops_br_database.db
+*.mdb
+machine.key
+
+# Tauri/Rust
+src-tauri/target/
+frontend_dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.orig
+
+# Build
+build/
+backend/build/
+backend/dist/
+*.spec

@@ -1,0 +1,273 @@
+ABSTRACT REPORT ON ADJUDICATIONS BY D.C. / A.D.C.(AIRPORT) FROM 
+ABSTRACT REPORT ON BAGGAGE DUTY COLLECTED FROM 
+ABSTRACT REPORT ON DEPUTY / ASST. COMMISSIONERWISE DUTY COLLECTED  FROM 
+ABSTRACT REPORT ON FREQUENT FLIERS WITH MORE THAN 
+ABSTRACT REPORT ON OFFENCE CASES REGISTERED FROM 
+ABSTRACT REPORT ON ONLINE DOCUMENTS (BRs, OS, DRs, FMs, Warehouse Receipts) GENERATED THROUGH COPS SOFTWARE FROM 
+ABSTRACT REPORT ON WAREHOUSE RECEIPTS FROM 
+ADJUDICATION DETAILS OF 
+ADJUDICATION DETAILS OF Addl. / Joint Commissioner (ALL CASES) DURING 
+ADJUDICATION DETAILS OF Addl. / Joint Commissioner DURING 
+ADJUDICATION DETAILS OF Addl. / Joint Commissioner FOR THE CASES BOOKED DURING 
+ADJUDICATION DETAILS OF Addl. / Joint Commissioner FOR THE CASES BOOKED PRIOR TO 
+ADJUDICATION DETAILS OF Commissioner (ALL CASES) DURING 
+ADJUDICATION DETAILS OF Commissioner DURING 
+ADJUDICATION DETAILS OF Commissioner FOR THE CASES BOOKED DURING 
+ADJUDICATION DETAILS OF Commissioner FOR THE CASES BOOKED PRIOR TO 
+ADJUDICATION DETAILS OF Deputy / Asst. Commissioner (ALL CASES) DURING 
+ADJUDICATION DETAILS OF Deputy / Asst. Commissioner DURING 
+ADJUDICATION DETAILS OF Deputy / Asst. Commissioner FOR THE CASES BOOKED DURING 
+ADJUDICATION DETAILS OF Deputy / Asst. Commissioner FOR THE CASES BOOKED PRIOR TO 
+Airport_Revenue_
+'.  Also enter the reasons for NOT registering the O/S on the date of arrival of the Pax  !
+APPEAL DETAILS OF O.S.No. 
+Are You Sure to Modify the Passenger Details of the Above D/R ? 
+Are You Sure to Modify the Passenger Details of the Above O/S ? 
+BAGGAGE RECEIPTS REGISTER ON 
+Baggage Revenue
+B.R. Data & Fuel Data Transferred To Reports Database !
+B.R.Details in the B.R.Register Not Verified With the B/R Documents.  Please verify and enter the verification details in the Shfit Report.  Then Generate SDO Cash Register ! 
+BR DETAILS OF CURRENT BATCH
+B.R. DETAILS OF ITEM DESCRIPTION 
+Break-up revenues of different types of duty do not tally with Total Revenue for Month 
+B.R. & FUEL DATA NOT TRANSFERRED TO REPORTS DATABASE.  DATA ERROR ! 
+B.R. / OFFENCE DETAILS OF PASSENGERS HAVING '
+Cigarattes Revenue 
+Click Enter to Display the Report File !
+     Click to View All the B/R Details of Current Batch
+     Click to View All the D/R Details of Current Batch
+     Click to View All the O/S Details of Current Month
+Commissioner of Customs & Central Excise, Central Revenue Buildings, B.B.Kulam, Madurai-625 002 
+CONSISTENCY REPORT ON OFFENCE CASES DATA FROM 
+CONSISTENCY REPORT ON VALUABLES RECEIPTS & DISPOSALS FROM 
+CONSISTENCY REPORT ON WAREHOUSE DATA (OTHER GOODS) FROM 
+CONSISTENCY REPORT ON WAREHOUSE DATA (VALUABLES) FROM 
+DATA VERIFICATION REPORT OF B.R.DETAILS WITH BACKUP ON 
+DATA VERIFICATION REPORT OF COPS DETAILS WITH BACKUP ON 
+DATA VERIFICATION REPORT OF COPS ITEM DETAILS WITH BACKUP ON 
+D:\data_export\revenue_abstract.mdb
+Ddetails Of Detained Packages Handed Over By Detention Officer
+DETAILS OF 
+DETAILS OF ALL GOODS BOOKED BY 
+DETAILS OF AOC Tag No. '
+DETAILS OF BAGGAGE RECEIPTS (PENDING RECONCILIATION WITH BANK STATEMENT) GENERATED ON 
+DETAILS OF B.R. No. '
+DETAILS OF CASES ADJUDICATED DURING 
+DETAILS OF CASES BOOKED AND ADJUDICATED DURING 
+DETAILS OF CASES BOOKED BEFORE 
+DETAILS OF CASES BOOKED DURING 
+DETAILS OF CLOSED D.Rs. WHICH WERE ISSUED DURING THE PERIOD FROM 
+Details Of Detained Packages Handed Over Through Forwarding Memo
+DETAILS OF D.R. No. '
+Details of Fuel Duty BRs with the Entered FDR No.
+DETAILS OF FUEL DUTY RECEIPT No. '
+ Details of Goods 
+DETAILS OF GOODS DETAINED 
+DETAILS OF GOODS SEIZED 
+Details of Items Detained Under F/M Imported to W.H.Database.  Please Note the Warehouse No. On the F/M For Future Reference ! 
+DETAILS OF MHB D.R. No. '
+DETAILS OF MHB No. '
+DETAILS OF OFFENCE CASES HAVING 
+DETAILS OF PASSENGERS WHO CLEARED GOLD ON MERIT DUTY DURING THE PERIOD FROM 
+DETAILS OF PREVIOUS B/Rs & OFFENCE CASES AGAINST THE PASSPORT NOs. IN FLIGHT 
+DETAILS OF SEIZURES OTHER THAN GOLD FROM SRILANKAN NATIONALS 
+Details of Short Collection B/Rs for Baggage Goods (Duty Rate 38.50%) 
+DETAILS OF W.H. No. '
+DETAILS OF W/H No. '
+ DETAILS ON QUANTITY AND REVENUE ON GOLD / SILVER 
+ DETAILS ON QUANTITY AND REVENUE ON GOLD / SILVER @ CONCESSIONAL RATE OF DUTY 
+ DETAILS ON QUANTITY AND REVENUE ON GOLD / SILVER @ MERIT RATE OF DUTY 
+DISCREPANCY IN GOLD / SILVER DETAILS OF BAGGAGE RECEIPTS FROM 
+Discrepancy in W/H Master by D/R  
+Discrepancy in W/H Master by F/M  
+Disposal Details of MHB Goods Updated in Database ! 
+Disposal Details of Warehoused Goods Updated in Database ! 
+D.R. DETAILS OF CURRENT BATCH
+D.R. Details Of MHB Goods Received by Warehouse
+D.R. DETAILS OF MHB PASSENGERS HAVING '
+D.R. DETAILS OF PASSENGERS HAVING '
+D:\reports
+D:\reports\adjprint.htm
+D:\reports\asp_vb_vfn.htm
+D:\reports\cops_item_vfn.htm
+D:\reports\cops_vfn.htm
+D:\Revenue
+D:\Revenue\
+D:\Revenue\airport*.*
+DRI CUS-7 REPORT FOR THE PERIOD FROM 
+DRI CUS-7 REPORT ON 
+D.R.REGISTER FOR THE PERIOD FROM 
+Duty Rate Charged For Gold Under O/S Category is less than Merit Rate i.e.35%.  Revenue Loss. Contact System Administrator ! 
+Duty Rate Charged For Silver Under O/S Category is less than Merit Rate i.e.35%.  Revenue Loss. Contact System Administrator ! 
+Duty Rate Charged is less than 100%.  Revenue Loss. Contact System Administrator ! 
+error in Report DB connection.
+F:\data\reports\br_disc.htm
+F:\data\reports\br_register.htm
+F:\data\reports\os_register.htm
+FLIGHTWISE REVENUE ABSTRACT FOR THE PERIOD 
+For the Current Date, 'Day' Shift Batch Cannot Register O.S. For 'Night' Shift.  Please Check ! 
+F:\reports
+F:\reports\database\reports_db.mdb
+F:\reports\prev_os_chk.htm
+FREQUENT FLIER REPORT FOR THE PERIOD FROM 
+FREQUENT FLIER REPORT ON 
+FUEL DUTY RECEIPT DETAILS OF AIRLINES HAVING '
+FUEL DUTY RECEIPTS RECEIPTS REGISTER ON 
+GIST OF OFFENCE CASES DETECTED BY A.I.U. DURING THE PERIOD FROM  
+Have you checked the O/S Data Consistency By Comparing With the Backup Databases? 
+If Required, gist of the adjudication may be entered.  Otherwise enter the O-in-O No. and Date ! 
+ (*) Includes Gold Revenue of Rs. 
+ (*) Includes Silver Revenue of Rs. 
+ITEM DETAILS OF THE B/R
+ITEM DETAILS OF THE D/R
+Item Details of the Entered O.S.No. & Date transferred from server ! 
+ITEM DETAILS OF THE MHB D/R
+ITEM DETAILS OF THE O/S
+ITEM DETAILS OF THE WAREHOUSE No.
+It is suggested that the Report be run on Server Database.  Do you want to run the report on the client database ? 
+List of Articles Detained / Seized : &nbsp;&nbsp;
+LIST OF OFFENCE CASES OVER 5 LAKHS FOR THE PERIOD  FROM  
+LIST OF OFFENCE CASES OVER 5 LAKHS FOR THE PERIOD FROM  
+Master Details of the Entered O.S.No. & Date transferred from server ! 
+MHB D.R. DETAILS OF PASSENGERS HAVING '
+MONTHWISE REVENUE REPORT FOR THE PERIOD FROM 
+More Than 1 Entry Exist for the Entered O.S.No. & Year.  Data Error.  Do you Want to Delete the details of the entered O/S No. ?  
+No B.R. Data Available for Transfer to Report Database.  Please Check !
+No Error Records for Inconsistency between the Master & Item Tables of GENERAL W/H GOODS regarding the Total Value ! 
+No Error Records for Inconsistency between the Master & Item Tables of VALUABLES regarding the Total Value ! 
+No Error Records for Inconsistency between the Master Table & Item Table regarding the Total / Confiscated / Redeemed / Re-Export Values and Amount Payable ! 
+No Error Records for Reconciliation Between General WH Items and DR Items ! 
+No Error Records for Reconciliation Between Valuables Items and DR Items ! 
+No Fuel Data Available for Transfer to Report Database.  Please Check !
+No Revenue Files in the Folder D:\Revenue ! 
+ Not updated.  Please Update the Challan Details before exporting data for statistical reports ! 
+O.S. DETAILS OF ITEM DESCRIPTION 
+O.S. REGISTER FOR THE O/S Nos. FROM  
+O.S. REGISTER FOR THE PERIOD FROM  
+PENDING TEM DETAILS OF THE D/R
+ PERSONAL DETAILS OF THE PERSONS INVOLVED IN THE CASE 
+<p><font face=Arial size=1><b>DETAILS OF FOREIGN CURRENCY</b></font></p>
+<p><font face=Arial size=1><b>DETAILS OF INDIAN / FOREIGN CURRENCY</b></font></p>
+Please Check the Details of D/R Before Converting them to O/S !
+Please Complete the Data Check Before Generating the Report ! 
+Please Generate This Report For a Month 
+Please Reconcile all the B.R. Details of the Current Batch before starting the B.R. Entries of Next Batch ! 
+Please Select The Required Report ! 
+Processing Enabled For Current Shift Without The Updation of Local Database With Previous Shift Details of BR / OS / DR.  ! 
+ - QUERY ON APPEAL DETAILS OF OFFENCE CASES 
+QUERY ON APPEAL DETAILS OF OFFENCE CASES 
+RECEIPTS &  DISPOSAL REGISTER OF M.H.B. GOODS FOR THE PERIOD FROM  
+RECONCILIATION BETWEEN DR & GENERAL WH TABLES FROM 
+RECONCILIATION BETWEEN DR & VALUABLES TABLES FROM 
+RECONCILIATION BETWEEN DR & VALUABLE TABLES FROM 
+RECONCILIATION BETWEEN ITEM TABLES OF GENERAL WH GOODS AND DETENTION RECEIPTS FROM 
+RECONCILIATION BETWEEN ITEM TABLES OF VALUABLE AND DETENTION RECEIPTS FROM 
+RECONCILIATION BETWEEN ITEM TABLES OF VALUABLES GOODS AND DETENTION RECEIPTS FROM 
+register_ref_no
+register_Ref_no
+Release Details of Item No.
+REPORT ON APPEAL ON OFFENCE CASES - 
+REPORT ON CONTINUITY IN USAGE OF DIFFERENT B/Rs FROM 
+REPORT ON CONTINUITY OF B.R.NOs. IN USAGE OF DIFFERENT TYPE OF B/Rs  
+REPORT ON ITEM DESCRIPTION Vis ITEM DUTY TYPE IN BAGGAGE RECEIPTS FROM 
+REPORT ON THE CONTINUITY OF D.R.NOs. USED 
+\reports
+\reports\abs_rpt.htm
+\reports\adjprint.htm
+\reports\brdatachk.htm
+\reports\brformat.htm
+\reports\br_gold_data_chk.htm
+\reports\br_no_cont.htm
+\reports\brpint.htm
+\reports\br_register.htm
+\reports\detl_rpt.htm
+\reports\dr_abs_rpt.htm
+\reports\drformat.htm
+\reports\DRI_CUS_7.htm
+\reports\drpint.htm
+\reports\dr_register.htm
+\reports\dutyabs.htm
+\reports\dutycat.htm
+\reports\fdprint.htm
+\reports\ff_detls.htm
+\reports\ffrpt.htm
+\reports\gold_szr.htm
+\reports\mf_chk.htm
+\reports\mhbwh.htm
+\reports\os_data_cons.htm
+\reports\osprint.htm
+\reports\os_register.htm
+\reports\osrpt.htm
+\reports\qry_rpt.htm
+\reports\revabs.htm
+\reports\revrpt.htm
+\reports\wh_data_cons.htm
+Revenue Abstract and Challan Details For Statistics Imported ! 
+REVENUE COLLECTION REPORT FOR THE PERIOD FROM 
+REVENUE COLLECTION REPORT ON 
+Revenue Data Exported ! 
+ Revenue Details  
+ Revenue Incl.Fuel Duty
+REVENUE ON GOLD DURING THE PERIOD FROM 
+REVENUE ON SILVER DURING THE PERIOD FROM 
+select * from revenue 
+select * from revenue where rev_date=
+select * from revenue where rev_date>=
+select max(rev_date) from revenue where rev_date>=
+ Silver Revenue of Rs. 
+ Sum (rf_amount), Sum(ref_amount), Sum(pp_amount), Sum(misc_amount), sum(total_duty) From revenue 
+<td  width=100% align=justify><p align=justify style=line-height: 150%><font face=Arial size=1>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2. An Appeal against this Order lies to the Commissioner (Appeals), Central Revenue Buildings, B.B.Kulam, Madurai-625 002
+<td width=100% colspan=8 align=left><strong><font face=Verdana><i><small>(*) - The Details of Arrests may be obtained from RSI Section&nbsp;</small></i></font></strong></td>
+<td width=10% align=center><font face=Arial size=1><b>No. of Registered Cases<font face=Arial size=1></b></font></td>
+<td width=10% align=center><font face=Arial size=1><b>Total Baggage Revenue<font face=Arial size=1></b></font></td>
+<td width=10% align=center><font face=Arial size=1><b>Total Revenue<font face=Arial size=1></b></font></td>
+<td width=750 colspan=5 align=center><font face=Arial size=1><b> ABSTRACT OF GOLD CASES CLEARED UNDER B/R 
+<td width=750 colspan=5 align=center><font face=Arial size=1><b> ABSTRACT OF SILVER CASES CLEARED UNDER B/R
+<td width=80% colspan=8 align=center><font face=Arial size=1><b>No Baggage Revenue <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>Bank & BR Date Discrepancy BRs - 
+<td width=96% align=left><font face=Arial size=1><b>Flight & BR Date Discrepancy BRs - 
+<td width=96% align=left><font face=Arial size=1><b>Flight & OS Date Discrepancy OS Nos - 
+<td width=96% align=left><font face=Arial size=1><b>Nationality Discrepancy B/Rs - 
+<td width=96% align=left><font face=Arial size=1><b>Nationality Discrepancy Detention Receipts (D/Rs) - 
+<td width=96% align=left><font face=Arial size=1><b>Nationality Discrepancy O/S - 
+<td width=96% align=left><font face=Arial size=1><b>No Discrepancy in BR & Bank Dates of B/R Data ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Discrepancy in BR & Flight Dates of B/R Data ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Discrepancy in DC Names of B/R Data ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Discrepancy in Nationality of B/R Data ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Discrepancy in Nationality of Detention Receipts (D/R) Data ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Discrepancy in Nationality of O/S Data ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Discrepancy in OS & Flight Dates of O/S Data ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Discrepancy in Port of Departure of D/R Data ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Discrepancy in Port of Departure of O/S Data ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Discrepancy in PP Nos. of B/R Data ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>No Discrepancy in PP Nos. of O/S Data ! <font face=Arial size=1></b></font></td>
+<td width=96% align=left><font face=Arial size=1><b>Port of Departure Discrepancy D/Rs - 
+<td width=96% align=left><font face=Arial size=1><b>Port of Departure Discrepancy O/S - 
+<td width=96% align=left><font face=Arial size=1><b>PP No. Discrepancy BRs - 
+<td width=96% align=left><font face=Arial size=1><b>PP No. Discrepancy O/S - 
+<td width=96% align=right><font face=Arial size=1><b>Report Date :
+The B.R.Details of All the Demand Amounts Have already been updated for the Entered OS No. & Year.  Cannot Modify its details ! 
+The Commissioner of Customs & Central Excise, Review Section, Central Revenue Buildings, B.B.Kulam, Madurai-625 002
+The Pax is a Frequent Traveller and has brought goods in Commerical Quantity. The Goods are  Non-Bonafide Baggage Goods and hence liable for confiscation under Customs Act 1962 r/w FT(D&R) 1992. Put up for Adjn. Please.
+The Revenue Details for Statistics Has Already been Updated Upto 
+(*) This Report is Not Valid Unless the above details are verified with the respective OS Register Or OS Form and certified by ACO / IO of Chennai Airport
+ Total Baggage Revenue 
+ Total Error Records regarding consistency of items / duty between Master & Items of B.Rs.  
+TOTAL RECORDS VERIFICATION REPORT OF COPS DATABASE WITH BACKUP ON 
+TOTAL REVENUE 
+Total Revenue Collected 
+ Total Revenue Collected From Offence Cases during the period 
+TOTAL REVENUE FOR THE MONTH 
+<tr><td colspan=10 align=center><font face=Arial><b>ABSTRACT OF ADJUDICATIONS DURING
+<tr><td colspan=10 align=center><font face=Arial><b>ABSTRACT OF OFFENCE CASES BOOKED AND ADJUDICATED AT 
+<tr><td colspan=17 align=center><font face=Arial><b>AGENCYWISE ABSTRACT OF OFFENCE CASES BOOKED AT 
+<tr><td colspan=8 align=center><font face=Arial><b>AGENCYWISE ABSTRACT OF OFFENCE CASES BOOKED AT 
+<tr><td width=100% colspan=12 align=center><font face=Arial><b>Abstract of Outright Smuggling And Commerical Fraud Cases For the Month of 
+Warehoused Details of MHB D/R No.
+WAREHOUSED DETAILS OF M.H.B. GOODS DETAINED VIDE D/R No. 
+WAREHOUSE REGISTER OF GENERAL GOODS FOR THE PERIOD FROM  
+WAREHOUSE REGISTER OF GENERAL GOODS RECEIVED FROM DRI FOR THE PERIOD FROM  
+WAREHOUSE REGISTER OF VALUABLES FOR THE PERIOD FROM  
+WAREHOUSE REGISTER OF VALUABLES RECEIVED FROM DRI FOR THE PERIOD FROM  
+W/H DETAILS OF PASSENGERS HAVING '
+ WITH THE CORRESPONDING DETAILS OF PREVIOUS YEAR 

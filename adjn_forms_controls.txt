@@ -1,0 +1,70 @@
+Check Flight Date !
+Check the Font Size.  If it is NOT IN NORMAL size, take B.R. Printout from Main Menu.  Otherwise Printouts will not be proper ! 
+Check the Font Size.  If it is NOT IN NORMAL size, take D.R. Printout from Main Menu.  Otherwise Printouts will not be proper ! 
+cmdfirst
+cmdlast
+cmdnext
+cmdprevious
+cmdsave
+Data added
+Data Already Available in Server for Item No.
+Database Connection Could not be Made. Cannot Proceed 
+Database could not be opened.
+database created
+Database Not Available. Please contact System Administrator !   
+Database Password Wrong !! 
+Database Password Wrong. Contact System Administrator ! 
+Data Displayed Not Found in Appeal Database for Importing into B.R Database.  Contact System Administartor ! 
+Data Displayed Not Found in D/R Database for Importing into B.R Database.  Contact System Administartor ! 
+Data Displayed Not Found in DR Database for Importing into W/H Database.  Contact System Administartor ! 
+Data Displayed Not Found in O/S Database for Importing into B.R Database.  Contact System Administartor ! 
+Data Displayed Not Found in OS Database for Importing into D/R Database.  Contact System Administartor ! 
+Data Displayed Not Found in O/S Database of Server for Importing into B.R Database.  Contact System Administartor ! 
+Data Error.  Contact System Administrator ! 
+Data Error. Contact System Administrator ! 
+Data Error.  No Item Details Found for the Entered D.R.No. & Year.  Please Check or Contact System Administrator ! 
+Data Error !  Rectify the Data Errors Before Generating Printout !
+Data Error.  Warehouse Release No. Not Found.  Contact System Administrator !
+Data for 
+Data for BR No.
+Data for Item No.
+Data for Item No. 
+Data for O.S. No. 
+Data Not Found in backup for Item No. 
+Data Not Found in backup for OS No   
+Data Not Found in OS Database for Importing into BR Database.  Contact System Administartor ! 
+Data Not Tallied For BR No.
+Data Not Tallied For OS No.
+Data of Backup Not Found in Current Items Table for BR No   
+Data of Previous Batch Not Transferred To Server.  Please Transfer it using the Option in 'Main Menu' and then Start B/R Entries for Next Batch ! 
+data source
+DATA VERIFICATION REPORT OF B.R.DETAILS WITH BACKUP ON 
+DATA VERIFICATION REPORT OF COPS DETAILS WITH BACKUP ON 
+DATA VERIFICATION REPORT OF COPS ITEM DETAILS WITH BACKUP ON 
+Date : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Date :&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Date Of Birth 
+Date_Of_Birth
+Date of Birth Should Not be Greater Than Current Batch Date. Current Batch Date is 
+Date of Birth Should Not be Greater Than Current Batch Date.  Please Check ! 
+date_of_departure
+date_of_departure='
+Date_of_departure
+Date_Of_Departure
+date_of_departure=cdate('
+date_of_departure=null,residence_at='
+date_of_departure=null,residence_at=null,seal_no='
+Date of  Departure Should Not be Greater Than Current Batch Date.  Please Check ! 
+Date of Departure Should Not be Greater Than Current Batch Date.  Please Check ! 
+Date of Detention : 
+FORM-15 : LOGIN FORM FOR ONLINE ADJUDICATION BY D.C. / A.C. (Server Version)
+FORM-55 : LOGIN FORM FOR ONLINE ADJUDICATION BY D.C. / A.C. 
+Img_File
+List of Articles Detained / Seized : &nbsp;&nbsp;
+LIST OF OFFENCE CASES OVER 5 LAKHS FOR THE PERIOD  FROM  
+LIST OF OFFENCE CASES OVER 5 LAKHS FOR THE PERIOD FROM  
+Table
+table_name
+Table_Name
+TableName
+Table Type 
