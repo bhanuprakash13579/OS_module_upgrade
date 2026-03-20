@@ -16,10 +16,17 @@ jobs:
             pyinstaller_args: "--clean python-server.spec"
             binary_src: "backend/dist/python-server.exe"
             binary_dest: "frontend/src-tauri/binaries/python-server-x86_64-pc-windows-msvc.exe"
+            tauri_args: ""
           - os: ubuntu-22.04
             pyinstaller_args: "--clean python-server.spec"
             binary_src: "backend/dist/python-server"
             binary_dest: "frontend/src-tauri/binaries/python-server-x86_64-unknown-linux-gnu"
+            tauri_args: "--bundles deb,appimage"
+          - os: macos-latest
+            pyinstaller_args: "--clean python-server.spec"
+            binary_src: "backend/dist/python-server"
+            binary_dest: "frontend/src-tauri/binaries/python-server-x86_64-apple-darwin"
+            tauri_args: "--bundles app,dmg"
 
     steps:
       - name: Checkout Code
@@ -56,6 +63,8 @@ jobs:
 
       - name: Build Python Sidecar (PyInstaller)
         working-directory: ./backend
+        env:
+          ADMIN_PWD_HASH: ${{ secrets.ADMIN_PWD_HASH }}
         run: pyinstaller ${{ matrix.pyinstaller_args }}
 
       - name: Move Sidecar Binary for Tauri
@@ -75,7 +84,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: "./frontend"
-          args: ${{ matrix.os == 'ubuntu-22.04' && '--bundles deb,appimage' || '' }}
+          args: ${{ matrix.tauri_args }}
 
       # ── Upload Artifacts ──
       - name: Upload Windows MSI/EXE
@@ -96,4 +105,13 @@ jobs:
           path: |
             frontend/src-tauri/target/release/bundle/deb/*.deb
             frontend/src-tauri/target/release/bundle/appimage/*.AppImage
+          retention-days: 7
+
+      - name: Upload macOS DMG/App
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cops-desktop-macos
+          path: |
+            frontend/src-tauri/target/release/bundle/dmg/*.dmg
           retention-days: 7

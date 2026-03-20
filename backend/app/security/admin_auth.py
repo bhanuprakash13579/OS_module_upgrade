@@ -16,7 +16,7 @@ To change the admin password before a release build:
   2. Replace _ADMIN_PWD_HASH below with the printed output.
   3. Rebuild the binary (pyinstaller python-server.spec --noconfirm).
 """
-
+import os
 from datetime import datetime, timedelta
 
 from fastapi import Depends, HTTPException, status
@@ -28,14 +28,11 @@ from app.config import settings
 
 _ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# ── Hardcoded admin credentials (only the bcrypt hash is stored) ─────────────
-# To change the password before a release build:
-#   python3 -c "from passlib.context import CryptContext; \
-#               c=CryptContext(schemes=['bcrypt'],deprecated='auto'); \
-#               print(c.hash('YourNewPassword'))"
-# Then replace _ADMIN_PWD_HASH below and rebuild.
+# ── Admin credentials (read from env or fallback to hardcoded hash) ─────────
+# In production builds via GitHub Actions, ADMIN_PWD_HASH is injected as an env var.
 _ADMIN_USERNAME = "sysadmin"
-_ADMIN_PWD_HASH = (
+_ADMIN_PWD_HASH = os.environ.get(
+    "ADMIN_PWD_HASH", 
     "$2b$12$juYWfH3asFtTC0gCwIMqRO/jLtXyPTb1DE/zid6wDHEXjCNP3NndS"
 )
 
