@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo, memo, startTransition } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Gavel, ArrowLeft, Save, XCircle, User, Package, FileText, AlertCircle, CheckCircle, RotateCcw, Edit, Printer } from 'lucide-react';
+import { Gavel, ArrowLeft, Save, XCircle, User, Package, FileText, AlertCircle, CheckCircle, Edit, Printer, Wand2 } from 'lucide-react';
 import DatePicker from '@/components/DatePicker';
 import api from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRemarksGenerator, detectContextualQuestions, ContextualAnswers, ContextualQuestion } from '@/hooks/useRemarksGenerator';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -42,6 +43,7 @@ interface OSCase {
   flight_no?: string;
   flight_date?: string;
   country_of_departure?: string;
+  port_of_dep_dest?: string;
   arrived_from?: string;
   date_of_departure?: string;
   stay_abroad_days?: number | string;
@@ -92,7 +94,7 @@ const fmtDate = (d: string | null | undefined): string => {
 
 const effFaRupees = (item: CopsItem): number => {
   const rc = item.items_release_category || '';
-  if (rc !== 'Under Duty' && rc !== 'Under OS') return 0;
+  if (!['Under Duty', 'Under OS', 'RF', 'REF'].includes(rc)) return 0;
   if ((item.items_fa_type || 'value') === 'qty') {
     const totalQty = item.items_qty || 0;
     const faQty = item.items_fa_qty || 0;
@@ -136,7 +138,7 @@ const AdjItemRow = memo(function AdjItemRow({ item }: { item: CopsItem; }) {
 
   const faRupees = effFaRupees(item);
   const faType = item.items_fa_type || 'value';
-  const faDisplay = (displayCat !== 'Under Duty' && displayCat !== 'Under OS') ? '—'
+  const faDisplay = (displayCat !== 'Under Duty' && displayCat !== 'Under OS' && displayCat !== 'RF' && displayCat !== 'REF') ? '—'
     : faType === 'qty'
       ? (item.items_fa_qty ? `${item.items_fa_qty} ${item.items_fa_uqc || ''}`.trim() : '—')
       : (faRupees > 0 ? `₹${faRupees.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—');
@@ -319,57 +321,7 @@ const ItemsPanel = memo(function ItemsPanel({ osCase }: { osCase: OSCase }) {
         </table>
       </div>
 
-      {/* Live category-wise Value Summary */}
-      <div className="px-5 py-3 border-t border-slate-200 bg-slate-50/50">
-        <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Disposal Value Breakdown (Live)</h4>
-        <div className="flex flex-wrap gap-3">
-          {underDutyVal >= 0 && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-              <div className="text-[10px] text-emerald-700 font-bold uppercase">Under Duty</div>
-              <div className="text-sm font-black text-emerald-800">₹{underDutyVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
-            </div>
-          )}
-          {rfVal >= 0 && (
-            <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-              <div className="text-[10px] text-green-700 font-bold uppercase">Redemption Fine (RF)</div>
-              <div className="text-sm font-black text-green-800">₹{rfVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
-            </div>
-          )}
-          {refVal >= 0 && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
-              <div className="text-[10px] text-blue-700 font-bold uppercase">Re-Export (REF)</div>
-              <div className="text-sm font-black text-blue-800">₹{refVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
-            </div>
-          )}
-          {confsVal >= 0 && (
-            <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-              <div className="text-[10px] text-red-600 font-bold uppercase">Abs. Confiscation</div>
-              <div className="text-sm font-black text-red-800">₹{confsVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
-            </div>
-          )}
-          {(totalFA > 0 || qtyFaItems.length > 0) && (
-            <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 max-w-[220px]">
-              <div className="text-[10px] text-indigo-700 font-bold uppercase">Free Allowance</div>
-              {totalFA > 0 && (
-                <div className="text-sm font-black text-indigo-800">
-                  ₹{totalFA.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </div>
-              )}
-              {qtyFaItems.length > 0 && (
-                <div className="text-[10px] text-indigo-600 font-bold leading-tight mt-1 truncate whitespace-normal">
-                  {totalFA > 0 ? 'along with ' : ''}{qtyFaItems.join(' & ')}
-                </div>
-              )}
-            </div>
-          )}
-          {unassignedVal > 0 && (
-            <div className="bg-orange-50 border border-orange-200 rounded-lg px-3 py-2">
-              <div className="text-[10px] text-orange-600 font-bold uppercase">⚠ Not Assigned</div>
-              <div className="text-sm font-black text-orange-800">₹{unassignedVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Live category-wise Value Summary moved to Order Details panel */}
     </div>
   );
 });
@@ -383,6 +335,40 @@ export default function AdjudicationForm() {
   const [osCase, setOsCase] = useState<OSCase | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const { generateRemark, loading: remarksLoading } = useRemarksGenerator();
+
+  // Contextual questions modal (same flow as OffenceForm SUPDT remarks)
+  const [showContextModal, setShowContextModal] = useState(false);
+  const [contextQuestions, setContextQuestions] = useState<ContextualQuestion[]>([]);
+  const [contextAnswers, setContextAnswers] = useState<ContextualAnswers>({});
+
+  const triggerGenerateOrder = () => {
+    const caseItems = osCase?.items || [];
+    const questions = detectContextualQuestions(caseItems);
+    if (questions.length > 0) {
+      setContextQuestions(questions);
+      setContextAnswers({});
+      setShowContextModal(true);
+    } else {
+      const text = generateRemark('ADJN', caseItems, {
+        pax_name: osCase?.pax_name, flight_no: osCase?.flight_no,
+        flight_date: osCase?.flight_date, port_of_dep_dest: osCase?.port_of_dep_dest,
+        os_date: osCase?.os_date,
+      }, {});
+      setRemarks(text);
+    }
+  };
+
+  const handleContextSubmit = () => {
+    const caseItems = osCase?.items || [];
+    const text = generateRemark('ADJN', caseItems, {
+      pax_name: osCase?.pax_name, flight_no: osCase?.flight_no,
+      flight_date: osCase?.flight_date, port_of_dep_dest: osCase?.port_of_dep_dest,
+      os_date: osCase?.os_date,
+    }, contextAnswers);
+    setRemarks(text);
+    setShowContextModal(false);
+  };
 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -399,22 +385,37 @@ export default function AdjudicationForm() {
 
   const REMARKS_MAX = 3000;
   const remarksLen  = remarks.length;
-  const { redeemedVal, reExportVal, totalConfsValue, underOsValue } = useMemo(() => {
-    if (!osCase) return { redeemedVal: 0, reExportVal: 0, totalConfsValue: 0, underOsValue: 0 };
-    let rf = 0, ref = 0, confs = 0, uos = 0;
+  const { redeemedVal, reExportVal, totalConfsValue, underOsValue, underDutyVal, totalFA, qtyFaItems, totalDutyLive } = useMemo(() => {
+    if (!osCase) return { redeemedVal: 0, reExportVal: 0, totalConfsValue: 0, underOsValue: 0, underDutyVal: 0, totalFA: 0, qtyFaItems: [] as string[], totalDutyLive: 0 };
+    let rf = 0, ref = 0, confs = 0, uos = 0, duty = 0, fa = 0, dutySum = 0;
+    const qFa: string[] = [];
+
+    const UQC_LABEL: Record<string, string> = { NOS: 'Nos.', STK: 'Sticks', KGS: 'Kgs.', GMS: 'Gms.', LTR: 'Ltrs.', MTR: 'Mtrs.', PRS: 'Pairs' };
+    const uqcLabel = (code: string) => UQC_LABEL[(code || '').toUpperCase()] ?? (code || 'Nos.');
+    const fmtQty = (q: number | string) => { const n = Number(q); return n % 1 === 0 ? Math.trunc(n).toString() : String(q); };
+
     for (const item of osCase.items) {
       const rc = item.items_release_category || 'Under OS';
       const valAfterFa = valueAfterFA(item);
+      dutySum += Number(item.items_duty || 0);
+
+      if ((item.items_fa_type || 'value') === 'value') {
+        const origVal = Number(item.items_value) || 0;
+        fa += Math.max(0, origVal - valAfterFa);
+      } else if (Number(item.items_fa_qty) > 0) {
+        qFa.push(`${fmtQty(item.items_fa_qty || 0)} ${uqcLabel(item.items_fa_uqc || '')} of ${item.items_desc}`);
+      }
 
       if (rc === 'CONFS') confs += valAfterFa;
       else if (rc === 'RF') rf += valAfterFa;
       else if (rc === 'REF') ref += valAfterFa;
+      else if (rc === 'Under Duty') duty += valAfterFa;
       else if (rc === 'Under OS' || !rc) uos += valAfterFa;
     }
-    return { redeemedVal: Math.round(rf), reExportVal: Math.round(ref), totalConfsValue: Math.round(confs), underOsValue: Math.round(uos) };
+    return { redeemedVal: Math.round(rf), reExportVal: Math.round(ref), totalConfsValue: Math.round(confs), underOsValue: Math.round(uos), underDutyVal: Math.round(duty), totalFA: Math.round(fa), qtyFaItems: qFa, totalDutyLive: Math.round(dutySum) };
   }, [osCase]);
 
-  const totalDuty   = osCase?.total_duty_amount || 0;
+  const totalDuty   = totalDutyLive;
   const totalDemand = totalDuty + rfAmt + refAmt + ppAmt;
 
   useEffect(() => {
@@ -424,8 +425,6 @@ export default function AdjudicationForm() {
       .then(res => {
         const data: OSCase = res.data;
         startTransition(() => {
-          setOsCase(data);
-          
           setOsCase(data);
 
           if (data.adj_offr_name) {
@@ -493,17 +492,37 @@ export default function AdjudicationForm() {
     }
   };
 
-  const handlePrint = () => {
-    navigate(`/query/os/print/${os_no}/${os_year}`);
-  };
-
-  const handleCancelAdjudication = async () => {
-    if (!confirm('Are you sure you want to CANCEL the adjudication for this case? This will reopen the case for re-adjudication.')) return;
+  const handlePrint = async () => {
+    setSubmitting(true);
     try {
-      await api.post(`/os/${os_no}/${os_year}/cancel-adjudication`);
-      navigate('/adjudication/pending');
+      const pdfData = await api.get(`/os/${os_no}/${os_year}/print-pdf`, { responseType: 'arraybuffer' }).then((r) => r.data);
+      
+      try {
+        const { save } = await import('@tauri-apps/plugin-dialog');
+        const { writeFile } = await import('@tauri-apps/plugin-fs');
+        const savePath = await save({
+          title: 'Save OS Print',
+          defaultPath: `OS_${os_no}_${os_year}.pdf`,
+          filters: [{ name: 'PDF', extensions: ['pdf'] }],
+        });
+        if (savePath) {
+          await writeFile(savePath, new Uint8Array(pdfData));
+        }
+      } catch {
+        const blob = new Blob([pdfData], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `OS_${os_no}_${os_year}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+      }
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to cancel adjudication.');
+      setError(err.response?.data?.detail || 'Failed to download OS PDF.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -591,20 +610,17 @@ export default function AdjudicationForm() {
               <span className="bg-green-500/20 border border-green-400/40 text-green-100 text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5">
                 <CheckCircle size={13} /> Adjudicated
               </span>
-              <button
-                onClick={handleCancelAdjudication}
-                className="flex items-center gap-1.5 bg-red-500/20 hover:bg-red-500/30 border border-red-400/40 text-red-200 text-xs px-3 py-1.5 rounded-lg transition-colors"
+              <div 
+                title={!canQuash ? 'Quash adjudication option is available only for 1 hour from the time of adjudication.' : 'Permanently revoke adjudication'}
               >
-                <RotateCcw size={12} /> Cancel Adjudication
-              </button>
-              <button
-                onClick={handleQuashOS}
-                disabled={submitting || !canQuash}
-                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors font-bold shadow-md ${!canQuash ? 'bg-slate-300 text-slate-500 border border-slate-300 cursor-not-allowed shadow-none' : 'bg-red-700 hover:bg-red-600 border border-red-500 text-white'}`}
-                title={!canQuash ? 'Quash period expired (1-hour limit).' : 'Permanently revoke adjudication'}
-              >
-                <AlertCircle size={12} /> Quash OS
-              </button>
+                <button
+                  onClick={handleQuashOS}
+                  disabled={submitting || !canQuash}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors font-bold shadow-md ${!canQuash ? 'bg-slate-300 text-slate-500 border border-slate-300 cursor-not-allowed shadow-none' : 'bg-red-700 hover:bg-red-600 border border-red-500 text-white'}`}
+                >
+                  <AlertCircle size={12} /> Quash OS
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -618,10 +634,17 @@ export default function AdjudicationForm() {
         </div>
       )}
       {success && (
-        <div className="bg-green-50 border border-green-200 text-green-700 p-4 rounded-lg flex items-center justify-between gap-3">
+        <div className="bg-green-50 border border-green-200 text-green-700 p-4 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-start gap-3">
             <CheckCircle size={18} className="shrink-0 mt-0.5" />
-            <p className="text-sm font-medium">{success}</p>
+            <div className="text-sm font-medium">
+              <p>{success}</p>
+              {success.includes('Case adjudicated successfully') && (
+                <p className="mt-1 text-xs text-green-800 font-bold">
+                  Note: You have exactly 1 hour from the time of adjudication to Quash this order if needed.
+                </p>
+              )}
+            </div>
           </div>
           <button
             onClick={() => navigate('/adjudication/pending')}
@@ -642,13 +665,13 @@ export default function AdjudicationForm() {
           <Gavel size={16} className="text-amber-200" />
           <h2 className="font-bold text-white text-sm uppercase tracking-wider">Adjudication Order Details</h2>
           {isAlreadyAdjudicated && (
-            <span className="ml-auto text-xs bg-green-500/20 text-green-200 border border-green-400/30 px-2 py-0.5 rounded-full">
-              Previously Adjudicated — can be modified
+            <span className="ml-auto text-xs bg-red-500/20 text-red-200 border border-red-400/30 px-2 py-0.5 rounded-full font-bold">
+              VIEW ONLY — Previously Adjudicated
             </span>
           )}
         </div>
 
-        <div className="p-6 space-y-6">
+        <fieldset disabled={isAlreadyAdjudicated} className="p-6 space-y-6">
           {/* Officer + Date */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
@@ -681,60 +704,77 @@ export default function AdjudicationForm() {
             
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
               <div className="flex items-center justify-between mb-4">
-                 <h4 className="text-[11px] font-bold text-slate-500 uppercase">Seized Goods Disposal Values (Auto-Calculated)</h4>
-                 <div className="text-[11px] font-semibold text-slate-500 bg-white px-3 py-1 border border-slate-200 rounded-full">
-                    Total Under OS: 
-                    <span className="ml-1 font-bold text-slate-800">
-                        ₹{underOsValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </span>
-                 </div>
+                 <h4 className="text-[11px] font-bold text-slate-500 uppercase">Goods Value Breakdown</h4>
+                 {underOsValue > 0 && (
+                   <div className="text-[10px] text-orange-600 flex items-center gap-1.5 font-bold bg-orange-50 px-3 py-1 rounded-full border border-orange-200">
+                       <AlertCircle size={12} />
+                       Under OS (Unassigned): ₹{underOsValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                   </div>
+                 )}
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-green-700 mb-1.5">Redeemed Value (RF Items)</label>
-                  <div className="px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-right font-bold text-green-800">
-                    ₹{redeemedVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              <div className="flex flex-wrap gap-3">
+                {underDutyVal > 0 && (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 flex-grow min-w-[120px]">
+                    <div className="text-[10px] text-emerald-700 font-bold uppercase">Under Duty</div>
+                    <div className="text-sm font-black text-emerald-800">₹{underDutyVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                   </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-blue-700 mb-1.5">Re-Export Value (REF Items)</label>
-                  <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-right font-bold text-blue-800">
-                    ₹{reExportVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                )}
+                {redeemedVal > 0 && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 flex-grow min-w-[120px]">
+                    <div className="text-[10px] text-green-700 font-bold uppercase">Redemption (RF)</div>
+                    <div className="text-sm font-black text-green-800">₹{redeemedVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                   </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-red-700 mb-1.5">Abs. Confiscation Value</label>
-                  <div className="px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-right font-bold text-red-800">
-                    ₹{totalConfsValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                )}
+                {reExportVal > 0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 flex-grow min-w-[120px]">
+                    <div className="text-[10px] text-blue-700 font-bold uppercase">Re-Export (REF)</div>
+                    <div className="text-sm font-black text-blue-800">₹{reExportVal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                   </div>
-                </div>
+                )}
+                {totalConfsValue > 0 && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex-grow min-w-[120px]">
+                    <div className="text-[10px] text-red-600 font-bold uppercase">Abs. Confiscation</div>
+                    <div className="text-sm font-black text-red-800">₹{totalConfsValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                  </div>
+                )}
+                {(totalFA > 0 || qtyFaItems.length > 0) && (
+                  <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 max-w-[280px]">
+                    <div className="text-[10px] text-indigo-700 font-bold uppercase">Free Allowance</div>
+                    {totalFA > 0 && (
+                      <div className="text-sm font-black text-indigo-800">
+                        ₹{totalFA.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </div>
+                    )}
+                    {qtyFaItems.length > 0 && (
+                      <div className="text-[10px] text-indigo-600 font-bold leading-tight mt-1 truncate whitespace-normal">
+                        {totalFA > 0 ? 'along with ' : ''}{qtyFaItems.join(' & ')}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              {(redeemedVal + reExportVal > 0 && redeemedVal + reExportVal < underOsValue - 1) && (
-                  <div className="mt-3 text-[10px] text-orange-600 flex items-center gap-1.5 font-medium bg-orange-50 p-2 rounded-lg border border-orange-100">
-                      <AlertCircle size={12} />
-                      Note: Some Under OS items have not been assigned a disposal category yet.
-                  </div>
-              )}
             </div>
 
             <h4 className="text-[11px] font-bold text-slate-500 uppercase mt-5 mb-3">Imposed Fines & Penalties</h4>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Redemption Fine (RF)</label>
+                <label className={`block text-xs font-semibold mb-1.5 ${redeemedVal > 0 ? 'text-slate-600' : 'text-slate-400'}`}>Redemption Fine (RF)</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">₹</span>
+                  <span className={`absolute left-3 top-1/2 -translate-y-1/2 ${redeemedVal > 0 ? 'text-slate-400' : 'text-slate-300'}`}>₹</span>
                   <input id="input-rf" type="number" min={0} placeholder="0"
-                    className="w-full pl-7 pr-3 py-2.5 border border-slate-300 rounded-lg bg-slate-50 focus:ring-2 focus:ring-amber-500 text-right font-bold text-slate-800 placeholder-slate-400"
+                    disabled={redeemedVal === 0}
+                    className="w-full pl-7 pr-3 py-2.5 border border-slate-300 rounded-lg bg-slate-50 focus:ring-2 focus:ring-amber-500 text-right font-bold text-slate-800 placeholder-slate-400 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 transition-colors"
                     value={rfAmt || ''} onChange={e => setRfAmt(Number(e.target.value))} />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Re-Export Fine (REF)</label>
+                <label className={`block text-xs font-semibold mb-1.5 ${reExportVal > 0 ? 'text-slate-600' : 'text-slate-400'}`}>Re-Export Fine (REF)</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">₹</span>
+                  <span className={`absolute left-3 top-1/2 -translate-y-1/2 ${reExportVal > 0 ? 'text-slate-400' : 'text-slate-300'}`}>₹</span>
                   <input id="input-ref" type="number" min={0} placeholder="0"
-                    className="w-full pl-7 pr-3 py-2.5 border border-slate-300 rounded-lg bg-slate-50 focus:ring-2 focus:ring-amber-500 text-right font-bold text-slate-800 placeholder-slate-400"
+                    disabled={reExportVal === 0}
+                    className="w-full pl-7 pr-3 py-2.5 border border-slate-300 rounded-lg bg-slate-50 focus:ring-2 focus:ring-amber-500 text-right font-bold text-slate-800 placeholder-slate-400 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 transition-colors"
                     value={refAmt || ''} onChange={e => setRefAmt(Number(e.target.value))} />
                 </div>
               </div>
@@ -760,23 +800,40 @@ export default function AdjudicationForm() {
           </div>
 
           {/* Gist / Remarks */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-xs font-bold text-amber-800 uppercase tracking-wider">
-                Gist / Remarks of Adjudicating Officer
-              </label>
-              <span className={`text-xs font-semibold ${remarksLen > REMARKS_MAX ? 'text-red-600' : remarksLen > REMARKS_MAX * 0.85 ? 'text-orange-500' : 'text-slate-400'}`}>
-                {remarksLen} / {REMARKS_MAX}
-              </span>
+          <div className="bg-white rounded-xl border border-amber-200 mt-6 shadow-sm overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-amber-200 bg-amber-50 flex justify-between items-center">
+              <h2 className="text-sm font-bold text-amber-800 uppercase tracking-wider flex items-center">
+                <FileText className="mr-2 text-amber-600" size={16} /> Gist / Remarks of Adjudicating Officer
+              </h2>
+              <button
+                type="button"
+                onClick={(e) => { e.preventDefault(); triggerGenerateOrder(); }}
+                disabled={remarksLoading || !osCase?.items?.length}
+                title={remarksLoading ? 'Loading legal statutes…' : 'Auto-generate order remarks from items'}
+                className="text-[11px] px-3 py-1.5 bg-white text-amber-700 hover:bg-amber-100 border border-amber-300 rounded font-bold flex items-center transition-colors shadow-sm disabled:opacity-60 uppercase tracking-wider"
+              >
+                <Wand2 size={13} className="mr-1.5" />
+                {remarksLoading ? 'Loading Statutes…' : 'Auto-Generate Order ✨'}
+              </button>
             </div>
-            <textarea
-              id="input-gist"
-              className={`w-full px-4 py-3 border rounded-lg bg-amber-50 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-slate-800 text-sm leading-relaxed resize-none ${remarksLen > REMARKS_MAX ? 'border-red-400' : 'border-amber-300'}`}
-              rows={5}
-              placeholder="Enter the gist and remarks of the order-in-original (max 3000 characters)..."
-              value={remarks}
-              onChange={e => setRemarks(e.target.value.slice(0, REMARKS_MAX))}
-            />
+            <div className="p-4 bg-white">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider">
+                  Order Findings
+                </label>
+                <span className={`text-xs font-semibold ${remarksLen > REMARKS_MAX ? 'text-red-600' : remarksLen > REMARKS_MAX * 0.85 ? 'text-orange-500' : 'text-slate-400'}`}>
+                  {remarksLen} / {REMARKS_MAX}
+                </span>
+              </div>
+              <textarea
+                id="input-gist"
+                className={`w-full px-4 py-3 border rounded-lg bg-amber-50 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-slate-800 text-sm leading-relaxed resize-none ${remarksLen > REMARKS_MAX ? 'border-red-400' : 'border-amber-300'}`}
+                rows={6}
+                placeholder="Click the Auto-Generate button to construct the order based on items, or type manually..."
+                value={remarks}
+                onChange={e => setRemarks(e.target.value.slice(0, REMARKS_MAX))}
+              />
+            </div>
           </div>
 
           {/* Close Case */}
@@ -791,7 +848,9 @@ export default function AdjudicationForm() {
               </label>
             </div>
           )}
+        </fieldset>
 
+        <div className="p-6 pt-0">
           {/* Action Buttons */}
           <div className="flex items-center gap-3 border-t border-amber-100 pt-4">
             {!isAlreadyAdjudicated && (
@@ -821,7 +880,7 @@ export default function AdjudicationForm() {
                 className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Printer size={17} />
-                Preview & Print O.S.
+                Download OS
               </button>
             )}
             <button
@@ -834,6 +893,47 @@ export default function AdjudicationForm() {
           </div>
         </div>
       </div>
+
+      {/* Contextual questions modal */}
+      {showContextModal && (
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-lg p-6 space-y-5">
+            <div>
+              <h3 className="text-base font-bold text-slate-800">Additional Information Required</h3>
+              <p className="text-xs text-slate-500 mt-1">Please answer the following to generate accurate order remarks.</p>
+            </div>
+            <div className="space-y-4">
+              {contextQuestions.map(q => (
+                <div key={q.key} className="border border-slate-200 rounded-lg p-4 bg-slate-50">
+                  <p className="text-sm font-medium text-slate-700 mb-3">{q.question}</p>
+                  <div className="flex gap-3">
+                    <button type="button"
+                      onClick={() => setContextAnswers(prev => ({ ...prev, [q.key]: true }))}
+                      className={`flex-1 py-2 px-3 rounded-lg border text-sm font-semibold transition-colors ${contextAnswers[q.key] === true ? 'bg-green-600 text-white border-green-600' : 'bg-white text-slate-700 border-slate-300 hover:border-green-400'}`}
+                    >{q.yesLabel || 'Yes'}</button>
+                    <button type="button"
+                      onClick={() => setContextAnswers(prev => ({ ...prev, [q.key]: false }))}
+                      className={`flex-1 py-2 px-3 rounded-lg border text-sm font-semibold transition-colors ${contextAnswers[q.key] === false ? 'bg-red-600 text-white border-red-600' : 'bg-white text-slate-700 border-slate-300 hover:border-red-400'}`}
+                    >{q.noLabel || 'No'}</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button type="button" onClick={() => setShowContextModal(false)}
+                className="flex-1 py-2 px-4 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50">
+                Cancel
+              </button>
+              <button type="button"
+                disabled={contextQuestions.some(q => contextAnswers[q.key] === undefined)}
+                onClick={handleContextSubmit}
+                className="flex-1 py-2 px-4 rounded-lg bg-amber-700 text-white text-sm font-bold hover:bg-amber-600 disabled:opacity-50 flex items-center justify-center gap-1.5">
+                <Wand2 size={14} /> Generate Order
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

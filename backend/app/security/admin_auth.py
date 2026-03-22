@@ -31,10 +31,10 @@ _ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # ── Admin credentials (read from env or fallback to hardcoded hash) ─────────
 # In production builds via GitHub Actions, ADMIN_PWD_HASH is injected as an env var.
 _ADMIN_USERNAME = "sysadmin"
-_ADMIN_PWD_HASH = os.environ.get(
-    "ADMIN_PWD_HASH", 
-    "$2b$12$juYWfH3asFtTC0gCwIMqRO/jLtXyPTb1DE/zid6wDHEXjCNP3NndS"
-)
+# ADMIN_PWD_HASH must be injected via environment variable at build time.
+# If not set, the fallback is a deliberately invalid string so admin login
+# is impossible in any build that was not produced by the secure CI pipeline.
+_ADMIN_PWD_HASH = os.environ.get("ADMIN_PWD_HASH", "__ADMIN_PWD_HASH_NOT_CONFIGURED__")
 
 _BEARER = HTTPBearer(auto_error=False)
 
@@ -43,7 +43,10 @@ def verify_admin_credentials(username: str, password: str) -> bool:
     """Return True only if username + password match the hardcoded admin."""
     if username != _ADMIN_USERNAME:
         return False
-    return _ctx.verify(password, _ADMIN_PWD_HASH)
+    try:
+        return _ctx.verify(password, _ADMIN_PWD_HASH)
+    except Exception:
+        return False
 
 
 def create_admin_token() -> str:

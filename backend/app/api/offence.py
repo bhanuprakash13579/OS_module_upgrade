@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from typing import List
 from sqlalchemy.orm import Session
-from sqlalchemy import func, or_, and_, cast, Integer as SAInteger, exists, not_
+from sqlalchemy import func, or_, and_, cast, Integer as SAInteger, exists, not_, text
 from collections import defaultdict
 
 from app.database import get_db
@@ -28,7 +28,7 @@ def _eff_fa(item_value: float, item) -> float:
     'Under OS' items (reduces the total seized value shown in the OS).
     """
     cat = (getattr(item, 'items_release_category', None) or '').upper()
-    if cat not in ('UNDER DUTY', 'UNDER OS', 'RF', 'REF', 'CONFS'):
+    if cat not in ('UNDER DUTY', 'UNDER OS', 'RF', 'REF'):
         return 0.0
     if (getattr(item, 'items_fa_type', None) or 'value') == 'qty':
         total_qty = float(getattr(item, 'items_qty', 0) or 0)
@@ -47,6 +47,53 @@ def classify_item(description: str):
     string and a suggested UQC. No auth required (read-only intelligence).
     """
     return _classify(description)
+
+
+# ── Item description autocomplete ─────────────────────────────────────────────
+import threading as _threading
+import time as _time
+_item_desc_cache: list[str] = []
+_item_desc_cache_ts: float = 0.0
+_item_desc_lock = _threading.Lock()
+
+@router.get("/item-descriptions")
+def get_item_descriptions(db: Session = Depends(get_db)):
+    """
+    Return a deduplicated, frequency-sorted list of item descriptions from the
+    database for use as autocomplete suggestions in the frontend.
+    Results are cached in-process for 5 minutes to avoid repeated DB hits.
+    No auth required (read-only, no sensitive data).
+    """
+    global _item_desc_cache, _item_desc_cache_ts
+    now = _time.time()
+    with _item_desc_lock:
+        if _item_desc_cache and (now - _item_desc_cache_ts) < 300:
+            return _item_desc_cache
+
+    rows = (
+        db.query(
+            CopsItems.items_desc,
+            func.count(CopsItems.items_desc).label("cnt")
+        )
+        .filter(CopsItems.items_desc.isnot(None), CopsItems.items_desc != '')
+        .group_by(func.upper(CopsItems.items_desc))
+        .order_by(func.count(CopsItems.items_desc).desc())
+        .limit(300)
+        .all()
+    )
+
+    seen: set[str] = set()
+    result: list[str] = []
+    for row in rows:
+        val = (row[0] or '').strip().upper()
+        if val and val not in seen:
+            seen.add(val)
+            result.append(val)
+
+    with _item_desc_lock:
+        _item_desc_cache = result
+        _item_desc_cache_ts = now
+    return result
 
 
 def _attach_items(records: list, db: Session) -> list:
@@ -285,9 +332,8 @@ def get_all_os(
         if sl == 'draft':
             q = q.filter(CopsMaster.is_draft == 'Y')
         elif sl == 'adjudicated':
-            # Adjudicated = any non-draft, non-quashed case that does NOT have items
-            # awaiting adjudication (Under OS / Under Duty). All MDB-imported legacy cases
-            # fall here since they have CONFS/RF/REF/DUTY/NULL categories — never Under OS.
+            # Adjudicated = any case that officially has an adjudication_date, 
+            # OR (for legacy MDB cases) has no items awaiting adjudication.
             pending_items_subq = exists().where(
                 and_(
                     CopsItems.os_no == CopsMaster.os_no,
@@ -299,12 +345,13 @@ def get_all_os(
                 CopsMaster.is_draft == 'N',
                 CopsMaster.quashed != 'Y',
                 CopsMaster.rejected != 'Y',
-                not_(pending_items_subq),
+                or_(
+                    CopsMaster.adjudication_date != None,
+                    not_(pending_items_subq)
+                )
             )
         elif sl == 'pending':
-            # A case is truly pending only if it has items with 'Under OS' or 'Under Duty'
-            # category — these are the new-system seizure categories. Old MDB cases have
-            # CONFS/RF/REF/DUTY/NULL items and are already adjudicated.
+            # Pending = NO adjudication date AND has items awaiting adjudication
             pending_items_subq = exists().where(
                 and_(
                     CopsItems.os_no == CopsMaster.os_no,
@@ -314,8 +361,7 @@ def get_all_os(
             )
             q = q.filter(
                 CopsMaster.is_draft == 'N',
-                CopsMaster.adjudication_date.is_(None),
-                CopsMaster.adj_offr_name.is_(None),
+                CopsMaster.adjudication_date == None,
                 CopsMaster.quashed != 'Y',
                 CopsMaster.rejected != 'Y',
                 pending_items_subq,
@@ -350,8 +396,7 @@ def get_pending_count(
     count = db.query(func.count(CopsMaster.id)).filter(
         CopsMaster.entry_deleted == "N",
         CopsMaster.is_draft == "N",
-        CopsMaster.adjudication_date == None,          # noqa: E711
-        CopsMaster.adj_offr_name == None,              # noqa: E711
+        CopsMaster.adjudication_date == None,
         CopsMaster.quashed != "Y",
         CopsMaster.rejected != "Y",
         pending_items_subq,
@@ -435,7 +480,7 @@ def get_os(
         CopsMaster.os_no == os_no,
         CopsMaster.os_year == os_year,
         CopsMaster.entry_deleted == "N"
-    ).first()
+    ).order_by(CopsMaster.id.desc()).first()
 
     if not os_obj:
         raise HTTPException(status_code=404, detail="O.S. record not found.")
@@ -732,7 +777,8 @@ def print_os_pdf(
     confs_slnos = [str(idx + 1) for idx, i in enumerate(items_db) if (i.items_release_category or "Under OS") == "CONFS"]
 
     # Use master values if they exist, else fallback to item summation (for old un-migrated data)
-    conf_value = master_redeemed if master_redeemed > 0 else rf_val_items
+    has_item_data = len(items_db) > 0
+    conf_value = master_redeemed if master_redeemed > 0 else (rf_val_items if has_item_data else 0)
     re_exp_value = master_re_export if master_re_export > 0 else ref_val_items
     abs_conf_value = master_confs if master_confs > 0 else confs_val_items
 
@@ -741,10 +787,16 @@ def print_os_pdf(
     ref_amount = float(os_obj.ref_amount or 0)
     pp_amount  = float(os_obj.pp_amount or 0)
 
-    # If goods were meant to be redeemed, but no fine was levied, they become absolutely confiscated.
+    # RF items with zero redemption fine → treat as absolute confiscation
     if rf_amount == 0 and conf_value > 0:
         abs_conf_value += conf_value
         conf_value = 0
+
+    # When RF items move to abs conf, merge their sl.nos
+    if rf_amount == 0 and rf_slnos:
+        all_abs_conf_slnos = sorted(confs_slnos + rf_slnos, key=lambda x: int(x))
+    else:
+        all_abs_conf_slnos = confs_slnos
 
     # ── Logo path (absolute file:// URL for WeasyPrint) ──────────────────────
     frontend_public = Path(__file__).parent.parent.parent.parent / "frontend" / "public"
@@ -765,23 +817,47 @@ def print_os_pdf(
         row = ptc.get(key)
         return row["field_value"] if row else fallback
 
-    # ── Prev. offence + other PP offences (mirror frontend logic) ────────────
-    import re as _re
-    other_pp_records = db.query(CopsMaster).filter(
+    class _SafeDict(dict):
+        def __missing__(self, key: str):
+            return "{" + key + "}"
+
+    def _render_para(tpl: str, **kw: object) -> str:
+        """Substitute {placeholder} values into an ORDER paragraph template."""
+        return tpl.format_map(_SafeDict(kw))
+
+    def _slnos_text(slnos: list) -> str:
+        return f" at Sl.No(s). {', '.join(str(s) for s in slnos)}" if slnos else ""
+
+    # ── Prev. offence + other PP offences (mirrors updated frontend logic) ────
+    all_other_records = db.query(CopsMaster).filter(
         func.lower(CopsMaster.pax_name) == func.lower(os_obj.pax_name or ""),
         CopsMaster.entry_deleted == "N",
         ~((CopsMaster.os_no == os_no) & (CopsMaster.os_year == os_year))
-    ).limit(20).all()
+    ).limit(50).all()
 
+    current_os_date = os_obj.os_date  # date object
+
+    # Same passport, before current OS date → "Prev. Offence in Above PP No(s)."
+    same_pp_prior = [
+        r for r in all_other_records
+        if r.passport_no == os_obj.passport_no
+        and r.os_date is not None
+        and r.os_date < current_os_date
+    ]
+    same_pp_prior.sort(key=lambda r: r.os_date, reverse=True)  # newest first
+
+    if same_pp_prior:
+        os_list = ", ".join(f"{r.os_no}/{r.os_year}" for r in same_pp_prior)
+        prev_offence_display = f"{len(same_pp_prior)} ({os_list})"
+    else:
+        # Fall back to legacy DB field
+        prev_offence_display = (os_obj.previous_visits or "NIL").strip()
+
+    # Different passport, same pax name → "Offences of Other PPs(if any)"
+    other_pp_records = [r for r in all_other_records if r.passport_no != os_obj.passport_no]
     other_pp_offences = ", ".join(
         f"{r.passport_no} (OS {r.os_no}/{r.os_year})" for r in other_pp_records
     ) if other_pp_records else "NIL"
-
-    prev_visits_raw = (os_obj.previous_visits or "NIL").strip()
-    if _re.fullmatch(r'\d+', prev_visits_raw):
-        prev_offence_display = prev_visits_raw
-    else:
-        prev_offence_display = str(len(other_pp_records)) if other_pp_records else prev_visits_raw
 
     pax_address = ", ".join(filter(None, [os_obj.pax_address1, os_obj.pax_address2, os_obj.pax_address3]))
     template_vars = dict(
@@ -832,7 +908,7 @@ def print_os_pdf(
         abs_conf_value=int(abs_conf_value),
         rf_slnos=", ".join(rf_slnos),
         ref_slnos=", ".join(ref_slnos),
-        confs_slnos=", ".join(confs_slnos),
+        confs_slnos=", ".join(all_abs_conf_slnos),
         rf_amount=int(rf_amount),
         ref_amount=int(ref_amount),
         pp_amount=int(pp_amount),
@@ -843,6 +919,81 @@ def print_os_pdf(
         fine_total_fmt=fmt_num(rf_amount + ref_amount),
         pp_amt_fmt=fmt_num(pp_amount),
         logo_path=logo_path,
+        # All other versioned static text fields
+        office_header_line1=_ptc("office_header_line1",
+            "Office of the Deputy / Asst. Commissioner of Customs"),
+        office_header_line2=_ptc("office_header_line2",
+            "(Airport), Anna International Airport, Chennai-600027"),
+        page1_title=_ptc("page1_title",
+            "Detention / Seizure of Passenger's Baggage"),
+        inventory_heading=_ptc("inventory_heading",
+            "INVENTORY OF THE GOODS IMPORTED"),
+        col_duty_heading=_ptc("col_duty_heading",
+            "Goods Passed On Duty"),
+        supdt_sig_title=_ptc("supdt_sig_title",
+            "Supdt. of Customs"),
+        p2_office_heading=_ptc("p2_office_heading",
+            "Office of the Deputy / Asst. Commissioner of Customs (Airport), Anna International airport, Chennai-600027."),
+        p2_waiver_heading=_ptc("p2_waiver_heading",
+            "WAIVER OF SHOW CAUSE NOTICE"),
+        waiver_text_1=_ptc("waiver_text_1",
+            "The Charges have been orally communicated to me in respect of the goods mentioned overleaf and imported by me. Orders in the case may please be passed without issue of Show Cause Notice. However I may kindly be given a Personal Hearing."),
+        waiver_text_2=_ptc("waiver_text_2",
+            "I was present during the personal hearing conducted by the Deputy / Asst. Commissioner and I was heard."),
+        nb1_text=_ptc("nb1_text",
+            "N.B: 1. This copy is granted free of charge for the private use of the person to whom it is issued."),
+        nb2_text=_ptc("nb2_text",
+            "2. An Appeal against this Order shall lie before the Commissioner of Customs (Appeals), Custom House, Chennai-600 001 on payment of 7.5% of the duty demanded where duty or duty and penalty are in dispute, or penalty, where penalty alone is in dispute. The Appeal shall be filed within 60 days provided under Section 128 of the Customs Act, 1962 from the date of receipt of this Order."),
+        note_scn_waived=_ptc("note_scn_waived",
+            "Note: The issue of Show Cause Notice was waived at the instance of the Passenger."),
+        legal_para_1=_ptc("legal_para_1",
+            "In terms of Foreign Trade Policy notified by the Government in pursuance to Section 3(1) & 3(2) of the Foreign Trade (Development & Regulation) Act, 1992 read with the Rules framed thereunder, also read with Section 11(2)(u) of Customs Act, 1962, import of 'goods in commercial quantity / goods in the nature of non-bonafide baggage' is not permitted without a valid import licence, though exemption exists under clause 3(h) of the Foreign Trade (Exemption from application of Rules in certain cases) order 1993 for import of goods by a passenger from abroad only to the extent admissible under the Baggage Rules framed under Section 79 of the Customs Act, 1962."),
+        legal_para_2=_ptc("legal_para_2",
+            "Import of goods non-declared / misdeclared / concealed / in trade and in commercial quantity / non-bonafide in excess of the baggage allowance is therefore liable for confiscation under Section 111(d), (i), (l), (m) & (o) of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992."),
+        record_heading=_ptc("record_heading",
+            "RECORD OF PERSONAL HEARING & FINDINGS"),
+        order_heading=_ptc("order_heading",
+            "ORDER"),
+        # Pre-rendered ORDER paragraphs (template substitution done in Python)
+        para_rf=_render_para(
+            _ptc("order_para_rf",
+                "I Order confiscation of the goods{rf_slnos_text} valued at Rs.{conf_value}/- under Section 111(d), (i), (l), (m) & (o) of the Customs Act, 1962 read with Section 3(3) of Foreign Trade (D&R) Act, 1992, but allow the passenger an option to redeem the goods valued at Rs.{conf_value}/- on a fine of Rs.{rf_amount}/- (Rupees {rf_words} Only) in lieu of confiscation under Section 125 of the Customs Act 1962 within 7 days from the date of receipt of this Order, Duty extra."),
+            rf_slnos_text=_slnos_text(rf_slnos),
+            conf_value=int(conf_value),
+            rf_amount=int(rf_amount),
+            rf_words=title_words(rf_amount),
+        ) if conf_value > 0 and int(rf_amount) > 0 else "",
+        para_ref=_render_para(
+            _ptc("order_para_ref",
+                "However, I give an option to reship the goods{ref_slnos_text} valued at Rs.{re_exp_value}/- on a fine of Rs.{ref_amount}/- (Rupees {ref_words} Only) under Section 125 of the Customs Act 1962 within 1 Month from the date of this Order."),
+            ref_slnos_text=_slnos_text(ref_slnos),
+            re_exp_value=int(re_exp_value),
+            ref_amount=int(ref_amount),
+            ref_words=title_words(ref_amount),
+        ) if re_exp_value > 0 and int(ref_amount) > 0 else "",
+        para_abs_conf=_render_para(
+            _ptc("order_para_abs_conf",
+                "I {also_text}order absolute confiscation of the goods{abs_conf_slnos_text} valued at Rs.{abs_conf_value}/- under Section 111(d), (i), (l), (m) & (o) of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (D&R) Act, 1992."),
+            also_text="also " if (conf_value > 0 or re_exp_value > 0) else "",
+            abs_conf_slnos_text=_slnos_text(all_abs_conf_slnos),
+            abs_conf_value=int(abs_conf_value),
+        ) if abs_conf_value > 0 else "",
+        para_pp=_render_para(
+            _ptc("order_para_pp",
+                "I further impose a Personal Penalty of Rs.{pp_amount}/- (Rupees {pp_words} Only) under Section 112(a) of the Customs Act, 1962."),
+            pp_amount=int(pp_amount),
+            pp_words=title_words(pp_amount),
+        ) if int(pp_amount) > 0 else "",
+        deputy_sig_title=_ptc("deputy_sig_title",
+            "Deputy / Asst. Commissioner of Customs (Airport)"),
+        bottom_nb1=_ptc("bottom_nb1",
+            "N.B: 1. Perishables will be disposed off within seven days from the date of detention."),
+        bottom_nb2=_ptc("bottom_nb2",
+            "2. Where re-export is permitted, the passenger is advised to intimate the date of departure of flight atleast 48 hours in advance."),
+        bottom_nb3=_ptc("bottom_nb3",
+            "3. Warehouse rent and Handling Charges are chargeable for the goods detained."),
+        received_order_text=_ptc("received_order_text",
+            "Received the Order-in-Original"),
     )
 
     # ── Generate PDF ───────────────────────────────────────────────────────────

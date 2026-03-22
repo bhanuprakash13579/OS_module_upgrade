@@ -4,10 +4,11 @@ import {
   ArrowLeft, ShieldCheck, ShieldAlert, Lock, LogIn,
   UserPlus, Users, Pencil, X, KeyRound, Download,
   Upload, FileUp, Eye, EyeOff, RefreshCw, Database, ToggleLeft, ToggleRight, ScanLine,
-  Wifi, Plus, AlertTriangle, Monitor, Settings,
+  Wifi, Plus, AlertTriangle, Monitor, Settings, Scale
 } from 'lucide-react';
 import api from '@/lib/api';
-import DatePicker from '@/components/DatePicker';
+import StatutesAdmin from './StatutesAdmin';
+import OSTemplateEditor from './OSTemplateEditor';
 
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -46,6 +47,7 @@ const ALL_ROLES = ['SDO', 'DC', 'AC'];
 function adminHeaders(token: string) {
   return { Authorization: `Bearer ${token}` };
 }
+
 
 // ── Main component ────────────────────────────────────────────────────────────
 
@@ -115,8 +117,8 @@ export default function RestoreBackup() {
   const [legacyItemsResult, setLegacyItemsResult] = useState('');
   const [legacyItemsErr, setLegacyItemsErr] = useState('');
 
-  // MDB direct import (server-side file path)
-  const [mdbPath, setMdbPath] = useState('');
+  // MDB direct import (file upload)
+  const [mdbFile, setMdbFile] = useState<File | null>(null);
   const [mdbLoading, setMdbLoading] = useState(false);
   const [mdbResult, setMdbResult] = useState('');
   const [mdbErr, setMdbErr] = useState('');
@@ -128,19 +130,18 @@ export default function RestoreBackup() {
   const [restoreResult, setRestoreResult] = useState('');
   const [restoreErr, setRestoreErr] = useState('');
 
-  // Tab navigation
-  const [activeTab, setActiveTab] = useState<'security' | 'users' | 'settings' | 'backup' | 'osconfig'>('security');
+  // Full SQLite DB backup / restore
+  const [fullDbLoading, setFullDbLoading] = useState(false);
+  const [fullDbMsg, setFullDbMsg] = useState('');
+  const fullDbRestoreRef = useRef<HTMLInputElement>(null);
+  const [fullDbRestoreFile, setFullDbRestoreFile] = useState<File | null>(null);
+  const [fullDbRestoreLoading, setFullDbRestoreLoading] = useState(false);
+  const [fullDbRestoreResult, setFullDbRestoreResult] = useState('');
+  const [fullDbRestoreErr, setFullDbRestoreErr] = useState('');
 
-  // OS Config state
-  const [ptcRows, setPtcRows] = useState<any[]>([]);
-  // Print template form
-  const [ptcFieldKey, setPtcFieldKey] = useState('col_fa_heading');
-  const [ptcFieldValue, setPtcFieldValue] = useState('');
-  const [ptcEffective, setPtcEffective] = useState('');
-  const [ptcSaving, setPtcSaving] = useState(false);
-  const [ptcMsg, setPtcMsg] = useState('');
-  // Edit mode state — null = add mode, number = editing that row id
-  const [ptcEditId, setPtcEditId] = useState<number | null>(null);
+  // Tab navigation
+  const [activeTab, setActiveTab] = useState<'security' | 'users' | 'settings' | 'backup' | 'osconfig' | 'statutes'>('security');
+
 
   // ── Load on login ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -154,15 +155,7 @@ export default function RestoreBackup() {
       .then(r => { setProdMode(!!r.data.prod_mode); })
       .catch(() => {});
     loadDevices();
-    loadOsConfig();
   }, [adminToken]);
-
-  // ── OS Config loaders ─────────────────────────────────────────────────────
-  function loadOsConfig() {
-    if (!adminToken) return;
-    const h = adminHeaders(adminToken);
-    api.get('/admin/config/print-template', { headers: h }).then(r => setPtcRows(r.data)).catch(() => {});
-  }
 
   // ── Allowed Devices ───────────────────────────────────────────────────────
   function loadDevices() {
@@ -334,6 +327,56 @@ export default function RestoreBackup() {
     }
   };
 
+  // ── Full DB export ────────────────────────────────────────────────────────
+  const downloadFullDb = async () => {
+    setFullDbLoading(true);
+    setFullDbMsg('');
+    try {
+      const res = await api.get('/admin/backup/export-fulldb', {
+        headers: adminHeaders(adminToken),
+        responseType: 'blob',
+      });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `cops_fulldb_${new Date().toISOString().slice(0, 10)}.db`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setFullDbMsg('Full database backup downloaded.');
+    } catch {
+      setFullDbMsg('Download failed. Try again.');
+    } finally {
+      setFullDbLoading(false);
+    }
+  };
+
+  // ── Full DB restore ───────────────────────────────────────────────────────
+  const uploadFullDbRestore = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fullDbRestoreFile) return;
+    if (!window.confirm(
+      'WARNING: This will completely replace ALL data in the database with the backup file.\n\n' +
+      'Every table will be overwritten. This cannot be undone.\n\nProceed?'
+    )) return;
+    setFullDbRestoreErr('');
+    setFullDbRestoreResult('');
+    setFullDbRestoreLoading(true);
+    const fd = new FormData();
+    fd.append('file', fullDbRestoreFile);
+    try {
+      const res = await api.post('/admin/backup/restore-fulldb', fd, {
+        headers: { ...adminHeaders(adminToken), 'Content-Type': 'multipart/form-data' },
+      });
+      setFullDbRestoreResult(res.data.message);
+      setFullDbRestoreFile(null);
+      if (fullDbRestoreRef.current) fullDbRestoreRef.current.value = '';
+    } catch (err: any) {
+      setFullDbRestoreErr(err?.response?.data?.detail || 'Restore failed.');
+    } finally {
+      setFullDbRestoreLoading(false);
+    }
+  };
+
   // ── Legacy CSV upload — cops_master ──────────────────────────────────────
   const uploadLegacy = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -385,12 +428,12 @@ export default function RestoreBackup() {
   // ── MDB direct import ─────────────────────────────────────────────────────
   const importMdb = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!mdbPath.trim()) return;
+    if (!mdbFile) return;
     setMdbErr('');
     setMdbResult('');
     setMdbLoading(true);
     const fd = new FormData();
-    fd.append('mdb_path', mdbPath.trim());
+    fd.append('file', mdbFile);
     try {
       const res = await api.post('/admin/backup/import-mdb', fd, {
         headers: { ...adminHeaders(adminToken), 'Content-Type': 'multipart/form-data' },
@@ -402,7 +445,7 @@ export default function RestoreBackup() {
         `Items: ${items_inserted} inserted, ${items_skipped} skipped, ${items_invalid} invalid.`
       );
     } catch (err: any) {
-      setMdbErr(err.response?.data?.detail || 'Import failed. Check the file path and try again.');
+      setMdbErr(err.response?.data?.detail || 'Import failed. Check the file and try again.');
     } finally {
       setMdbLoading(false);
     }
@@ -497,6 +540,7 @@ export default function RestoreBackup() {
     { id: 'settings' as const, label: 'Settings', icon: <ScanLine size={14} /> },
     { id: 'backup'   as const, label: 'Backup & Restore', icon: <Database size={14} /> },
     { id: 'osconfig' as const, label: 'OS Config', icon: <Settings size={14} /> },
+    { id: 'statutes' as const, label: 'Legal Statutes', icon: <Scale size={14} /> },
   ];
 
   return (
@@ -918,18 +962,59 @@ export default function RestoreBackup() {
       {activeTab === 'backup' && (
         <div className="space-y-5">
 
-          {/* Download full backup */}
+          {/* ── Full SQLite DB backup (recommended) ── */}
+          <section className="bg-white rounded-xl border border-emerald-200 shadow-sm p-5 space-y-3">
+            <div className="flex items-center gap-2">
+              <Database size={18} className="text-emerald-600" />
+              <div>
+                <h2 className="text-sm font-semibold text-slate-700">Full Database Backup <span className="ml-1 text-xs font-normal text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">Recommended</span></h2>
+                <p className="text-xs text-slate-500 mt-0.5">Complete snapshot of every table — OS cases, BR register, detention, warehouse, users, settings, template history, statutes, all masters. One file restores everything exactly.</p>
+              </div>
+            </div>
+            <button onClick={downloadFullDb} disabled={fullDbLoading}
+              className="flex items-center gap-2 px-4 py-2 text-xs rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60">
+              <Download size={13} />
+              {fullDbLoading ? 'Preparing…' : 'Download Full DB Backup (.db)'}
+            </button>
+            {fullDbMsg && <p className={`text-xs ${fullDbMsg.includes('failed') ? 'text-red-600' : 'text-emerald-700'}`}>{fullDbMsg}</p>}
+          </section>
+
+          {/* ── Restore full SQLite DB ── */}
+          <section className="bg-white rounded-xl border border-red-200 shadow-sm p-5 space-y-3">
+            <div className="flex items-center gap-2">
+              <Upload size={18} className="text-red-500" />
+              <div>
+                <h2 className="text-sm font-semibold text-slate-700">Restore Full Database Backup</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Upload a <code className="bg-slate-100 px-1 rounded">.db</code> file from a Full DB Backup above. <strong className="text-red-600">Replaces all data</strong> — use only to recover from data loss.</p>
+              </div>
+            </div>
+            <form onSubmit={uploadFullDbRestore} className="space-y-3">
+              <div className="flex items-center gap-3 flex-wrap">
+                <input ref={fullDbRestoreRef} type="file" accept=".db"
+                  onChange={e => { setFullDbRestoreFile(e.target.files?.[0] || null); setFullDbRestoreResult(''); setFullDbRestoreErr(''); }}
+                  className="text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200" />
+                <button type="submit" disabled={!fullDbRestoreFile || fullDbRestoreLoading}
+                  className="flex items-center gap-2 px-4 py-1.5 text-xs rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
+                  <Upload size={13} />
+                  {fullDbRestoreLoading ? 'Restoring…' : 'Restore Full DB'}
+                </button>
+              </div>
+              {fullDbRestoreErr    && <p className="text-xs text-red-600">{fullDbRestoreErr}</p>}
+              {fullDbRestoreResult && <p className="text-xs text-emerald-700 font-medium">{fullDbRestoreResult}</p>}
+            </form>
+          </section>
+
+          {/* ── ZIP backup (selective / migration) ── */}
           <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-3">
             <div className="flex items-center gap-2">
               <Download size={18} className="text-slate-600" />
-              <h2 className="text-sm font-semibold text-slate-700">Download Full Backup</h2>
+              <div>
+                <h2 className="text-sm font-semibold text-slate-700">Download Settings + Cases Backup (ZIP)</h2>
+                <p className="text-xs text-slate-500 mt-0.5">ZIP with CSV files for OS cases, settings, template history, statutes, users. Use for merging data between machines.</p>
+              </div>
             </div>
-            <p className="text-xs text-slate-500">
-              Downloads all OS cases and items as a ZIP (cops_master.csv + cops_items.csv).
-              Keep this file safe — it can restore data after a crash.
-            </p>
             <button onClick={downloadBackup} disabled={backupLoading}
-              className="flex items-center gap-2 px-4 py-2 text-xs rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60">
+              className="flex items-center gap-2 px-4 py-2 text-xs rounded-lg bg-slate-700 text-white hover:bg-slate-800 disabled:opacity-60">
               <Download size={13} />
               {backupLoading ? 'Preparing…' : 'Download Backup ZIP'}
             </button>
@@ -943,7 +1028,7 @@ export default function RestoreBackup() {
               <h2 className="text-sm font-semibold text-slate-700">Restore from Backup ZIP</h2>
             </div>
             <p className="text-xs text-slate-500">
-              Upload a backup ZIP from this admin panel. Existing records are kept — only missing cases and items are inserted.
+              Upload a ZIP backup. Existing records are never overwritten — only missing rows are inserted.
             </p>
             <form onSubmit={uploadRestore} className="space-y-3">
               <div className="flex items-center gap-3">
@@ -1010,17 +1095,20 @@ export default function RestoreBackup() {
               <Database size={18} className="text-slate-600" />
               <div>
                 <h2 className="text-sm font-semibold text-slate-700">Import Directly from .mdb File</h2>
-                <p className="text-xs text-slate-500 mt-0.5">If the .mdb file is on this computer, enter its full path. No conversion needed.</p>
+                <p className="text-xs text-slate-500 mt-0.5">Select the .mdb file from this computer. Both tables are imported in one pass — no conversion needed.</p>
               </div>
             </div>
             <form onSubmit={importMdb} className="space-y-3">
-              <input type="text" value={mdbPath} onChange={e => setMdbPath(e.target.value)}
-                placeholder="/home/user/Documents/cops_br_database.mdb"
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-slate-400" />
+              <input type="file" accept=".mdb"
+                onChange={e => { setMdbFile(e.target.files?.[0] || null); setMdbResult(''); setMdbErr(''); }}
+                className="block w-full text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer" />
+              {mdbFile && (
+                <p className="text-xs text-slate-500">Selected: <span className="font-mono">{mdbFile.name}</span> ({(mdbFile.size / 1024 / 1024).toFixed(1)} MB)</p>
+              )}
               <div className="bg-amber-50 border border-amber-200 rounded p-2 text-xs text-amber-700">
                 Reads both <strong>cops_master</strong> and <strong>cops_items</strong> in one pass. Large files may take several minutes.
               </div>
-              <button type="submit" disabled={!mdbPath.trim() || mdbLoading}
+              <button type="submit" disabled={!mdbFile || mdbLoading}
                 className="flex items-center gap-2 px-4 py-2 text-xs rounded-lg bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50">
                 <Database size={13} /> {mdbLoading ? 'Importing — please wait…' : 'Start MDB Import'}
               </button>
@@ -1028,182 +1116,32 @@ export default function RestoreBackup() {
               {mdbResult && <p className="text-xs text-emerald-700 font-medium">{mdbResult}</p>}
             </form>
           </section>
+
         </div>
       )}
 
       {/* ══ TAB: OS CONFIG ═══════════════════════════════════════════════════ */}
       {activeTab === 'osconfig' && (
         <div className="space-y-6">
-
-          {/* ── Print Template Config ─────────────────────────────────────── */}
-          <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
-            <h2 className="font-bold text-slate-700 text-sm flex items-center gap-2">
-              <Settings size={15} className="text-slate-500" />
-              OS Print — Versioned Headings
-            </h2>
-            <p className="text-xs text-slate-500">
-              Legacy / uploaded cases automatically use the <strong>hardcoded fallback headings</strong> (Baggage Rules, 1994 era) — no entry needed for them.
-              Add an entry here <strong>only when the Baggage Rules change</strong> (e.g. add a "2016" version or a "2026" version).
-              The app picks the version whose <strong>Effective From</strong> date is closest to but not after the OS date.
-            </p>
-            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
-              ⚠️ Headings are <strong>permanent once added</strong> — they cannot be deleted. Edit carefully.
+          <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+            <div className="flex items-center gap-2 mb-4">
+              <Settings size={16} className="text-slate-600" />
+              <div>
+                <h2 className="text-sm font-semibold text-slate-700">OS Print Template Editor</h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Click any highlighted section in the OS layout below to edit it.
+                  Changes are versioned — older OS cases always display the text that was in effect when they were created.
+                </p>
+              </div>
             </div>
-
-            {/* Field definitions reference card */}
-            <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-800 space-y-1">
-              <p className="font-semibold text-blue-700 mb-1.5">Where each field appears on the OS print form:</p>
-              <p><span className="font-semibold">Under FA text</span> — Column heading above the "Free Allowance" column in the inventory table</p>
-              <p><span className="font-semibold">Under OS text</span> — Column heading above the "Goods Liable to Action" column in the inventory table</p>
-              <p><span className="font-semibold">Under Duty summary text</span> — Row label for the "Charged to Duty" row in the summary table (bottom of page 1)</p>
-              <p><span className="font-semibold">Under OS summary text</span> — Row label for the "Liable to Action" row in the summary table (bottom of page 1)</p>
-            </div>
-
-            {/* Add / Edit form */}
-            {(() => {
-              const isEdit = ptcEditId !== null;
-              const latestForKey = [...ptcRows]
-                .filter(r => r.field_key === ptcFieldKey)
-                .sort((a, b) => b.effective_from.localeCompare(a.effective_from))[0];
-              return (
-                <div className={`rounded-lg p-4 space-y-3 border ${isEdit ? 'bg-blue-50 border-blue-200' : 'bg-slate-50 border-slate-200'}`}>
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                      {isEdit ? '✏️ Edit Version' : 'Add New Version'}
-                    </p>
-                    {isEdit && (
-                      <button onClick={() => { setPtcEditId(null); setPtcFieldValue(''); setPtcEffective(''); setPtcMsg(''); }}
-                        className="text-xs text-slate-500 hover:text-slate-700 underline">Cancel</button>
-                    )}
-                  </div>
-                  {!isEdit && (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs text-slate-600 mb-1">Field to update</label>
-                        <select value={ptcFieldKey}
-                          onChange={e => { setPtcFieldKey(e.target.value); setPtcFieldValue(''); }}
-                          className="w-full px-2 py-1.5 border border-slate-300 rounded text-xs bg-white">
-                          <option value="col_fa_heading">Under FA text</option>
-                          <option value="col_liable_heading">Under OS text</option>
-                          <option value="summary_duty_text">Under Duty summary text</option>
-                          <option value="summary_liable_text">Under OS summary text</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs text-slate-600 mb-1">Effective From</label>
-                        <DatePicker value={ptcEffective} onChange={setPtcEffective}
-                          inputClassName="w-full px-2 py-1.5 border border-slate-300 rounded text-xs"
-                          minDate={new Date().toISOString().split('T')[0]} />
-                      </div>
-                    </div>
-                  )}
-                  {isEdit && (
-                    <div>
-                      <label className="block text-xs text-slate-600 mb-1">Effective From</label>
-                      <DatePicker value={ptcEffective} onChange={setPtcEffective}
-                        inputClassName="w-full px-2 py-1.5 border border-slate-300 rounded text-xs"
-                        minDate={new Date().toISOString().split('T')[0]} />
-                    </div>
-                  )}
-                  {!isEdit && latestForKey && (
-                    <div className="bg-amber-50 border border-amber-200 rounded px-3 py-2 text-xs text-amber-800">
-                      <span className="font-semibold">Current text</span> (from {latestForKey.effective_from === '1900-01-01' ? 'original' : latestForKey.effective_from}):{' '}
-                      <span className="italic">{latestForKey.field_value}</span>
-                    </div>
-                  )}
-                  <div>
-                    <label className="block text-xs text-slate-600 mb-1">Heading text</label>
-                    <textarea rows={2} value={ptcFieldValue} onChange={e => setPtcFieldValue(e.target.value)}
-                      className="w-full px-2 py-1.5 border border-slate-300 rounded text-xs resize-none"
-                      placeholder="Enter the heading text…" />
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <button disabled={ptcSaving || !ptcFieldValue.trim() || !ptcEffective.match(/^\d{4}-\d{2}-\d{2}$/)}
-                      onClick={async () => {
-                        setPtcSaving(true); setPtcMsg('');
-                        try {
-                          if (isEdit) {
-                            await api.put(`/admin/config/print-template/${ptcEditId}`,
-                              { field_key: ptcFieldKey, field_label: ptcFieldKey, field_value: ptcFieldValue.trim(), effective_from: ptcEffective },
-                              { headers: adminHeaders(adminToken) });
-                            setPtcEditId(null);
-                          } else {
-                            await api.post('/admin/config/print-template',
-                              { field_key: ptcFieldKey, field_label: ptcFieldKey, field_value: ptcFieldValue.trim(), effective_from: ptcEffective },
-                              { headers: adminHeaders(adminToken) });
-                          }
-                          setPtcFieldValue(''); setPtcEffective(''); setPtcMsg('Saved ✓');
-                          loadOsConfig();
-                        } catch { setPtcMsg('Error saving'); }
-                        finally { setPtcSaving(false); }
-                      }}
-                      className="px-3 py-1.5 text-xs rounded-lg bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50">
-                      {ptcSaving ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Version'}
-                    </button>
-                    {ptcMsg && <span className="text-xs text-emerald-700 font-medium">{ptcMsg}</span>}
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* History table — grouped by field key with friendly names */}
-            {(() => {
-              const FIELD_LABELS: Record<string, string> = {
-                col_fa_heading:     'Under FA text',
-                col_liable_heading: 'Under OS text',
-                summary_duty_text:  'Under Duty summary text',
-                summary_liable_text:'Under OS summary text',
-              };
-              const grouped: Record<string, any[]> = {};
-              ptcRows.forEach(row => {
-                if (!grouped[row.field_key]) grouped[row.field_key] = [];
-                grouped[row.field_key].push(row);
-              });
-              return Object.entries(grouped).map(([key, rows]) => (
-                <div key={key} className="border border-slate-200 rounded-lg overflow-hidden">
-                  <div className="bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700">
-                    {FIELD_LABELS[key] || key}
-                  </div>
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="bg-slate-50 text-left border-b border-slate-200">
-                        <th className="px-3 py-1.5 font-semibold text-slate-500 w-28">Effective From</th>
-                        <th className="px-3 py-1.5 font-semibold text-slate-500">Text</th>
-                        <th className="px-3 py-1.5 font-semibold text-slate-500 w-16">By</th>
-                        <th className="w-10"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[...rows].sort((a, b) => b.effective_from.localeCompare(a.effective_from)).map((row, i) => (
-                        <tr key={row.id} className={`border-t border-slate-100 ${ptcEditId === row.id ? 'bg-blue-50' : i === 0 ? 'bg-emerald-50' : 'hover:bg-slate-50'}`}>
-                          <td className="px-3 py-1.5 font-medium text-slate-700">
-                            {row.effective_from === '1900-01-01' ? 'Original' : row.effective_from}
-                            {i === 0 && <span className="ml-1.5 text-[10px] bg-emerald-600 text-white px-1 rounded">current</span>}
-                          </td>
-                          <td className="px-3 py-1.5 text-slate-600">{row.field_value}</td>
-                          <td className="px-3 py-1.5 text-slate-400">{row.created_by || '—'}</td>
-                          <td className="px-2 py-1.5">
-                            <button onClick={() => {
-                              setPtcEditId(row.id);
-                              setPtcFieldKey(row.field_key);
-                              setPtcFieldValue(row.field_value);
-                              setPtcEffective(row.effective_from);
-                              setPtcMsg('');
-                            }} className="text-blue-400 hover:text-blue-600" title="Edit">
-                              <Pencil size={12} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ));
-            })()}
+            <OSTemplateEditor adminToken={adminToken} />
           </section>
-
-
         </div>
+      )}
+
+      {/* ══ TAB: STATUTES ════════════════════════════════════════════════════════ */}
+      {activeTab === 'statutes' && (
+        <StatutesAdmin adminToken={adminToken} />
       )}
 
     </div>

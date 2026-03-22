@@ -5,20 +5,42 @@ The login endpoint itself is always open (verified against the hardcoded hash).
 """
 import csv
 import io
+import os
+import shutil
+import tempfile
+import threading
+import time
 import zipfile
 from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from app.database import get_db
+from app.config import settings
 from app.models.auth import User
 from app.models.offence import CopsMaster, CopsItems
-from app.models.config import FeatureFlags
+from app.models.config import (
+    FeatureFlags, PrintTemplateConfig, BaggageRulesConfig,
+    SpecialItemAllowance, ShiftTimingMaster, MarginMaster,
+)
+from app.models.statutes import LegalStatute
 from app.models.security import AllowedDevice
+from app.models.masters import (
+    DcMaster, AirlinesMast, ArrivalFlightMaster, AirportMaster,
+    NationalityMaster, PortMaster, ItemCatMaster, DutyRateMaster, BrNoLimits,
+)
+from app.models.baggage import BrMaster, BrItems
+from app.models.detention import DrMaster, DrItems
+from app.models.fuel import FuelMaster
+from app.models.offence import OsMaster, ItemTrans
+from app.models.warehouse import WhMaster, WhItems, WhRelease, WhLocationChange, ValuablesMaster, ValuablesItems
+from app.models.mhb import MahazarMaster, MahazarItems, MhbMaster, MhbItems
+from app.models.appeal import AppealMaster, AppealItems
+from app.models.revenue import Revenue, RevChallans, ChallanMaster
 import app.state as state
 from app.api.backup import (
     _MASTER_COLS, _ITEMS_COLS, _val, _parse_date, _flt,
@@ -37,6 +59,98 @@ from app.security.device import (
     get_device_info,
 )
 from app.security.passwords import pwd_context
+
+# ── Generic table registry ────────────────────────────────────────────────────
+# Each entry: (csv_name, model, unique_cols_tuple, order_cols_tuple)
+_TABLE_REGISTRY = [
+    # Master tables
+    ("dc_master.csv",              DcMaster,            ("dc_code",),                              ("dc_code",)),
+    ("airlines_mast.csv",          AirlinesMast,        ("airline_code",),                         ("airline_code",)),
+    ("arrival_flight_master.csv",  ArrivalFlightMaster, ("flight_no", "airline_code"),             ("flight_no", "airline_code")),
+    ("airport_master.csv",         AirportMaster,       ("airport_name",),                         ("airport_name",)),
+    ("nationality_master.csv",     NationalityMaster,   ("nationality",),                          ("nationality",)),
+    ("port_master.csv",            PortMaster,          ("port_of_departure",),                    ("port_of_departure",)),
+    ("item_cat_master.csv",        ItemCatMaster,       ("category_code",),                        ("category_code",)),
+    ("duty_rate_master.csv",       DutyRateMaster,      ("duty_category", "from_date"),            ("duty_category", "from_date")),
+    ("br_no_limits.csv",           BrNoLimits,          ("br_type",),                              ("br_type",)),
+    # Baggage
+    ("br_master.csv",              BrMaster,            ("br_no", "br_date", "br_type"),           ("br_date", "br_no")),
+    ("br_items.csv",               BrItems,             ("br_no", "br_date", "items_sno"),         ("br_date", "br_no", "items_sno")),
+    # Detention
+    ("dr_master.csv",              DrMaster,            ("dr_no", "dr_date"),                      ("dr_date", "dr_no")),
+    ("dr_items.csv",               DrItems,             ("dr_no", "items_sno"),                    ("dr_no", "items_sno")),
+    # Fuel
+    ("fuel_master.csv",            FuelMaster,          ("br_no", "br_date"),                      ("br_date", "br_no")),
+    # OS (offence)
+    ("os_master.csv",              OsMaster,            ("osnumber", "osdate", "location_code"),   ("osdate", "osnumber")),
+    ("item_trans.csv",             ItemTrans,           ("item_os_no", "item_osdate", "item_no"),  ("item_osdate", "item_os_no")),
+    # Warehouse
+    ("wh_master.csv",              WhMaster,            ("wh_no", "wh_date"),                      ("wh_date", "wh_no")),
+    ("wh_items.csv",               WhItems,             ("wh_no", "items_sno"),                    ("wh_no", "items_sno")),
+    ("wh_release.csv",             WhRelease,           ("wh_no", "wh_release_no"),                ("wh_no", "wh_release_no")),
+    ("wh_location_change.csv",     WhLocationChange,    ("wh_no", "change_date", "old_location"),  ("wh_no", "change_date")),
+    ("valuables_master.csv",       ValuablesMaster,     ("wh_no", "wh_date"),                      ("wh_date", "wh_no")),
+    ("valuables_items.csv",        ValuablesItems,      ("wh_no", "items_sno"),                    ("wh_no", "items_sno")),
+    # MHB
+    ("mahazar_master.csv",         MahazarMaster,       ("os_no", "system_reference_no"),          ("os_no",)),
+    ("mahazar_items.csv",          MahazarItems,        ("os_no", "system_reference_no", "items_sno"), ("os_no", "system_reference_no")),
+    ("mhb_master.csv",             MhbMaster,           ("mhb_no", "mhb_year"),                    ("mhb_no", "mhb_year")),
+    ("mhb_items.csv",              MhbItems,            ("mhb_no", "items_sno"),                   ("mhb_no", "items_sno")),
+    # Appeal
+    ("appeal_master.csv",          AppealMaster,        ("os_no", "os_date"),                      ("os_date", "os_no")),
+    ("appeal_items.csv",           AppealItems,         ("os_no", "items_sno"),                    ("os_no", "items_sno")),
+    # Revenue
+    ("revenue.csv",                Revenue,             ("rev_date",),                             ("rev_date",)),
+    ("rev_challans.csv",           RevChallans,         ("rev_date", "challan_no"),                ("rev_date",)),
+    ("challan_master.csv",         ChallanMaster,       ("batch_date", "batch_shift", "sdo_code", "challan_no"), ("batch_date", "sdo_code")),
+]
+
+
+def _model_cols(model) -> list:
+    """All column names for a model, excluding 'id'."""
+    return [c.name for c in model.__table__.columns if c.name != "id"]
+
+
+def _col_type_generic(model, col_name: str) -> str:
+    import sqlalchemy
+    try:
+        col = model.__table__.columns[col_name]
+        t = col.type
+        if isinstance(t, (sqlalchemy.Float, sqlalchemy.Numeric, sqlalchemy.REAL)):
+            return "float"
+        if isinstance(t, sqlalchemy.Integer):
+            return "int"
+        if isinstance(t, (sqlalchemy.Date, sqlalchemy.DateTime)):
+            return "date"
+    except Exception:
+        pass
+    return "str"
+
+
+def _coerce_val(val: str, kind: str):
+    v = val.strip()
+    if not v:
+        return None
+    if kind == "float":
+        try:
+            return float(v)
+        except ValueError:
+            return None
+    if kind == "int":
+        try:
+            return int(float(v))
+        except ValueError:
+            return None
+    if kind == "date":
+        from datetime import datetime as _dt
+        for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+            try:
+                return _dt.strptime(v, fmt).date()
+            except ValueError:
+                continue
+        return None
+    return v
+
 
 router = APIRouter()
 
@@ -351,10 +465,110 @@ def admin_export_full(db: Session = Depends(get_db), _=Depends(require_admin)):
     for it in items:
         iw.writerow([_val(getattr(it, col, None)) for col in _ITEMS_COLS])
 
+    _STATUTE_COLS = ["keyword", "display_name", "is_prohibited",
+                     "supdt_goods_clause", "adjn_goods_clause", "legal_reference"]
+    statutes = db.query(LegalStatute).order_by(LegalStatute.id).all()
+    statutes_buf = io.StringIO()
+    sw = csv.writer(statutes_buf)
+    sw.writerow(_STATUTE_COLS)
+    for s in statutes:
+        sw.writerow([_val(getattr(s, col, None)) for col in _STATUTE_COLS])
+
+    # ── print_template_config (versioned OS headings/paragraphs) ─────────────
+    _PTC_COLS = ["field_key", "field_label", "field_value", "effective_from", "created_by", "created_at"]
+    ptc_rows = db.query(PrintTemplateConfig).order_by(
+        PrintTemplateConfig.field_key, PrintTemplateConfig.effective_from
+    ).all()
+    ptc_buf = io.StringIO()
+    ptcw = csv.writer(ptc_buf)
+    ptcw.writerow(_PTC_COLS)
+    for r in ptc_rows:
+        ptcw.writerow([_val(getattr(r, col, None)) for col in _PTC_COLS])
+
+    # ── baggage_rules_config (versioned numeric rules) ────────────────────────
+    _BRC_COLS = ["rule_key", "rule_label", "rule_value", "rule_uqc", "effective_from", "created_by", "created_at"]
+    brc_rows = db.query(BaggageRulesConfig).order_by(
+        BaggageRulesConfig.rule_key, BaggageRulesConfig.effective_from
+    ).all()
+    brc_buf = io.StringIO()
+    brcw = csv.writer(brc_buf)
+    brcw.writerow(_BRC_COLS)
+    for r in brc_rows:
+        brcw.writerow([_val(getattr(r, col, None)) for col in _BRC_COLS])
+
+    # ── special_item_allowances ───────────────────────────────────────────────
+    _SIA_COLS = ["item_name", "keywords", "allowance_qty", "allowance_uqc",
+                 "effective_from", "active", "created_by", "created_at"]
+    sia_rows = db.query(SpecialItemAllowance).order_by(
+        SpecialItemAllowance.item_name, SpecialItemAllowance.effective_from
+    ).all()
+    sia_buf = io.StringIO()
+    siaw = csv.writer(sia_buf)
+    siaw.writerow(_SIA_COLS)
+    for r in sia_rows:
+        siaw.writerow([_val(getattr(r, col, None)) for col in _SIA_COLS])
+
+    # ── feature_flags (single-row settings) ───────────────────────────────────
+    _FF_COLS = ["apis_enabled", "session_timeout_minutes"]
+    ff_row = db.query(FeatureFlags).filter(FeatureFlags.id == 1).first()
+    ff_buf = io.StringIO()
+    ffw = csv.writer(ff_buf)
+    ffw.writerow(_FF_COLS)
+    if ff_row:
+        ffw.writerow([_val(getattr(ff_row, col, None)) for col in _FF_COLS])
+
+    # ── shift_timing_master ───────────────────────────────────────────────────
+    _STM_COLS = ["day_shift_from_hrs", "day_shift_to_hrs",
+                 "night_shift_from_hrs", "night_shift_to_hrs"]
+    stm_row = db.query(ShiftTimingMaster).filter(ShiftTimingMaster.id == 1).first()
+    stm_buf = io.StringIO()
+    stmw = csv.writer(stm_buf)
+    stmw.writerow(_STM_COLS)
+    if stm_row:
+        stmw.writerow([_val(getattr(stm_row, col, None)) for col in _STM_COLS])
+
+    # ── margin_master ─────────────────────────────────────────────────────────
+    _MM_COLS = ["br_top_margin", "dr_top_margin"]
+    mm_row = db.query(MarginMaster).filter(MarginMaster.id == 1).first()
+    mm_buf = io.StringIO()
+    mmw = csv.writer(mm_buf)
+    mmw.writerow(_MM_COLS)
+    if mm_row:
+        mmw.writerow([_val(getattr(mm_row, col, None)) for col in _MM_COLS])
+
+    # ── users (hashed passwords only — system-admin password NOT stored in DB) ─
+    _USER_COLS = ["user_name", "user_desig", "user_id", "user_pwd",
+                  "created_by", "created_on", "user_status", "user_role", "closed_on"]
+    users = db.query(User).order_by(User.id).all()
+    users_buf = io.StringIO()
+    uw = csv.writer(users_buf)
+    uw.writerow(_USER_COLS)
+    for u in users:
+        uw.writerow([_val(getattr(u, col, None)) for col in _USER_COLS])
+
     zip_buf = io.BytesIO()
     with zipfile.ZipFile(zip_buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("cops_master.csv", master_buf.getvalue())
         zf.writestr("cops_items.csv", items_buf.getvalue())
+        zf.writestr("legal_statutes.csv", statutes_buf.getvalue())
+        zf.writestr("print_template_config.csv", ptc_buf.getvalue())
+        zf.writestr("baggage_rules_config.csv", brc_buf.getvalue())
+        zf.writestr("special_item_allowances.csv", sia_buf.getvalue())
+        zf.writestr("feature_flags.csv", ff_buf.getvalue())
+        zf.writestr("shift_timing_master.csv", stm_buf.getvalue())
+        zf.writestr("margin_master.csv", mm_buf.getvalue())
+        zf.writestr("users.csv", users_buf.getvalue())
+        # Export all registered tables
+        for csv_name, model, _unique_cols, order_cols in _TABLE_REGISTRY:
+            cols = _model_cols(model)
+            order_attrs = [getattr(model, c) for c in order_cols]
+            rows = db.query(model).order_by(*order_attrs).all()
+            buf = io.StringIO()
+            w = csv.writer(buf)
+            w.writerow(cols)
+            for r in rows:
+                w.writerow([_val(getattr(r, col, None)) for col in cols])
+            zf.writestr(csv_name, buf.getvalue())
     zip_buf.seek(0)
 
     filename = f"cops_full_backup_{date.today().isoformat()}.zip"
@@ -378,17 +592,34 @@ def admin_restore_backup(
     """
     import sqlalchemy
 
+    _zip_tmp = None
     try:
-        raw_bytes = file.file.read()
+        tmp_fd, _zip_tmp = tempfile.mkstemp(suffix=".zip")
+        os.close(tmp_fd)
+        with open(_zip_tmp, "wb") as _f:
+            shutil.copyfileobj(file.file, _f)
     except Exception:
+        if _zip_tmp:
+            try:
+                os.unlink(_zip_tmp)
+            except OSError:
+                pass
         raise HTTPException(status_code=400, detail="Cannot read uploaded file.")
 
     try:
-        zf = zipfile.ZipFile(io.BytesIO(raw_bytes))
+        zf = zipfile.ZipFile(_zip_tmp)
     except zipfile.BadZipFile:
+        try:
+            os.unlink(_zip_tmp)
+        except OSError:
+            pass
         raise HTTPException(status_code=400, detail="File is not a valid ZIP archive.")
 
     if "cops_master.csv" not in zf.namelist():
+        try:
+            os.unlink(_zip_tmp)
+        except OSError:
+            pass
         raise HTTPException(status_code=400, detail="ZIP must contain cops_master.csv")
 
     # Build type map so we can safely convert CSV strings to Python types
@@ -505,13 +736,261 @@ def admin_restore_backup(
             existing_items.add(item_key)
             items_inserted += 1
 
+    # ── Restore legal_statutes ───────────────────────────────────────────────
+    statutes_inserted = statutes_skipped = 0
+    if "legal_statutes.csv" in zf.namelist():
+        existing_keywords = {
+            row[0]
+            for row in db.query(LegalStatute.keyword).all()
+        }
+        statutes_text = zf.read("legal_statutes.csv").decode("utf-8-sig")
+        for row in csv.DictReader(io.StringIO(statutes_text)):
+            keyword = (row.get("keyword") or "").strip()
+            if not keyword or keyword in existing_keywords:
+                statutes_skipped += 1
+                continue
+            is_prohibited_raw = (row.get("is_prohibited") or "").strip().lower()
+            is_prohibited = is_prohibited_raw in ("true", "1", "yes")
+            db.add(LegalStatute(
+                keyword=keyword,
+                display_name=(row.get("display_name") or "").strip(),
+                is_prohibited=is_prohibited,
+                supdt_goods_clause=(row.get("supdt_goods_clause") or "").strip(),
+                adjn_goods_clause=(row.get("adjn_goods_clause") or "").strip(),
+                legal_reference=(row.get("legal_reference") or "").strip(),
+            ))
+            existing_keywords.add(keyword)
+            statutes_inserted += 1
+
+    # ── Restore print_template_config ────────────────────────────────────────
+    ptc_inserted = ptc_skipped = 0
+    if "print_template_config.csv" in zf.namelist():
+        existing_ptc = {
+            (r[0], r[1])
+            for r in db.query(
+                PrintTemplateConfig.field_key, PrintTemplateConfig.effective_from
+            ).all()
+        }
+        ptc_text = zf.read("print_template_config.csv").decode("utf-8-sig")
+        for row in csv.DictReader(io.StringIO(ptc_text)):
+            key = (row.get("field_key") or "").strip()
+            eff_raw = (row.get("effective_from") or "").strip()
+            if not key or not eff_raw:
+                continue
+            eff = _coerce(eff_raw, "date")
+            if eff is None:
+                continue
+            if (key, eff) in existing_ptc:
+                ptc_skipped += 1
+                continue
+            db.add(PrintTemplateConfig(
+                field_key=key,
+                field_label=(row.get("field_label") or "").strip() or None,
+                field_value=(row.get("field_value") or ""),
+                effective_from=eff,
+                created_by=(row.get("created_by") or "").strip() or None,
+                created_at=_coerce((row.get("created_at") or "").strip(), "date"),
+            ))
+            existing_ptc.add((key, eff))
+            ptc_inserted += 1
+
+    # ── Restore baggage_rules_config ──────────────────────────────────────────
+    brc_inserted = brc_skipped = 0
+    if "baggage_rules_config.csv" in zf.namelist():
+        existing_brc = {
+            (r[0], r[1])
+            for r in db.query(
+                BaggageRulesConfig.rule_key, BaggageRulesConfig.effective_from
+            ).all()
+        }
+        brc_text = zf.read("baggage_rules_config.csv").decode("utf-8-sig")
+        for row in csv.DictReader(io.StringIO(brc_text)):
+            key = (row.get("rule_key") or "").strip()
+            eff_raw = (row.get("effective_from") or "").strip()
+            if not key or not eff_raw:
+                continue
+            eff = _coerce(eff_raw, "date")
+            if eff is None:
+                continue
+            if (key, eff) in existing_brc:
+                brc_skipped += 1
+                continue
+            val_raw = (row.get("rule_value") or "").strip()
+            rule_val = _coerce(val_raw, "float")
+            if rule_val is None:
+                continue
+            db.add(BaggageRulesConfig(
+                rule_key=key,
+                rule_label=(row.get("rule_label") or "").strip() or None,
+                rule_value=rule_val,
+                rule_uqc=(row.get("rule_uqc") or "").strip() or None,
+                effective_from=eff,
+                created_by=(row.get("created_by") or "").strip() or None,
+                created_at=_coerce((row.get("created_at") or "").strip(), "date"),
+            ))
+            existing_brc.add((key, eff))
+            brc_inserted += 1
+
+    # ── Restore special_item_allowances ───────────────────────────────────────
+    sia_inserted = sia_skipped = 0
+    if "special_item_allowances.csv" in zf.namelist():
+        existing_sia = {
+            (r[0], r[1])
+            for r in db.query(
+                SpecialItemAllowance.item_name, SpecialItemAllowance.effective_from
+            ).all()
+        }
+        sia_text = zf.read("special_item_allowances.csv").decode("utf-8-sig")
+        for row in csv.DictReader(io.StringIO(sia_text)):
+            item_name = (row.get("item_name") or "").strip()
+            eff_raw = (row.get("effective_from") or "").strip()
+            if not item_name or not eff_raw:
+                continue
+            eff = _coerce(eff_raw, "date")
+            if eff is None:
+                continue
+            if (item_name, eff) in existing_sia:
+                sia_skipped += 1
+                continue
+            qty_raw = (row.get("allowance_qty") or "").strip()
+            qty = _coerce(qty_raw, "float")
+            if qty is None:
+                continue
+            db.add(SpecialItemAllowance(
+                item_name=item_name,
+                keywords=(row.get("keywords") or "").strip() or None,
+                allowance_qty=qty,
+                allowance_uqc=(row.get("allowance_uqc") or "").strip() or None,
+                effective_from=eff,
+                active=(row.get("active") or "Y").strip() or "Y",
+                created_by=(row.get("created_by") or "").strip() or None,
+                created_at=_coerce((row.get("created_at") or "").strip(), "date"),
+            ))
+            existing_sia.add((item_name, eff))
+            sia_inserted += 1
+
+    # ── Restore feature_flags (single row — overwrite id=1 if present) ────────
+    if "feature_flags.csv" in zf.namelist():
+        ff_text = zf.read("feature_flags.csv").decode("utf-8-sig")
+        for row in csv.DictReader(io.StringIO(ff_text)):
+            apis_raw = (row.get("apis_enabled") or "").strip().lower()
+            apis_val = apis_raw in ("true", "1", "yes")
+            timeout_raw = (row.get("session_timeout_minutes") or "480").strip()
+            timeout_val = _coerce(timeout_raw, "int") or 480
+            ff = db.query(FeatureFlags).filter(FeatureFlags.id == 1).first()
+            if ff is None:
+                db.add(FeatureFlags(id=1, apis_enabled=apis_val, session_timeout_minutes=timeout_val))
+            # If exists, leave as-is (don't overwrite active settings)
+            break  # single-row table
+
+    # ── Restore shift_timing_master ───────────────────────────────────────────
+    if "shift_timing_master.csv" in zf.namelist():
+        stm_text = zf.read("shift_timing_master.csv").decode("utf-8-sig")
+        for row in csv.DictReader(io.StringIO(stm_text)):
+            stm = db.query(ShiftTimingMaster).filter(ShiftTimingMaster.id == 1).first()
+            if stm is None:
+                db.add(ShiftTimingMaster(
+                    id=1,
+                    day_shift_from_hrs=_coerce(row.get("day_shift_from_hrs", "7"), "int") or 7,
+                    day_shift_to_hrs=_coerce(row.get("day_shift_to_hrs", "19"), "int") or 19,
+                    night_shift_from_hrs=_coerce(row.get("night_shift_from_hrs", "19"), "int") or 19,
+                    night_shift_to_hrs=_coerce(row.get("night_shift_to_hrs", "7"), "int") or 7,
+                ))
+            break  # single-row table
+
+    # ── Restore margin_master ─────────────────────────────────────────────────
+    if "margin_master.csv" in zf.namelist():
+        mm_text = zf.read("margin_master.csv").decode("utf-8-sig")
+        for row in csv.DictReader(io.StringIO(mm_text)):
+            mm = db.query(MarginMaster).filter(MarginMaster.id == 1).first()
+            if mm is None:
+                db.add(MarginMaster(
+                    id=1,
+                    br_top_margin=_coerce(row.get("br_top_margin", "0.31"), "float") or 0.31,
+                    dr_top_margin=_coerce(row.get("dr_top_margin", "0.31"), "float") or 0.31,
+                ))
+            break  # single-row table
+
+    # ── Restore users (hashed passwords — system-admin password NOT in DB) ────
+    users_inserted = users_skipped = 0
+    if "users.csv" in zf.namelist():
+        existing_user_ids = {
+            r[0] for r in db.query(User.user_id).all()
+        }
+        users_text = zf.read("users.csv").decode("utf-8-sig")
+        for row in csv.DictReader(io.StringIO(users_text)):
+            uid = (row.get("user_id") or "").strip()
+            if not uid or uid in existing_user_ids:
+                users_skipped += 1
+                continue
+            db.add(User(
+                user_name=(row.get("user_name") or "").strip(),
+                user_desig=(row.get("user_desig") or "").strip() or None,
+                user_id=uid,
+                user_pwd=(row.get("user_pwd") or "").strip(),
+                created_by=(row.get("created_by") or "").strip() or None,
+                created_on=_coerce((row.get("created_on") or "").strip(), "date"),
+                user_status=(row.get("user_status") or "ACTIVE").strip(),
+                user_role=(row.get("user_role") or "SDO").strip(),
+                closed_on=_coerce((row.get("closed_on") or "").strip(), "date"),
+            ))
+            existing_user_ids.add(uid)
+            users_inserted += 1
+
+    # ── Restore all registered tables (additive only — never overwrites existing) ─
+    registry_counts: dict = {}
+    for csv_name, model, unique_cols, _order_cols in _TABLE_REGISTRY:
+        if csv_name not in zf.namelist():
+            continue
+        cols = _model_cols(model)
+        # Build existing key set from unique columns
+        existing = {
+            tuple(str(v) if v is not None else "" for v in row)
+            for row in db.query(*[getattr(model, c) for c in unique_cols]).all()
+        }
+        text = zf.read(csv_name).decode("utf-8-sig")
+        ins = skp = 0
+        for row in csv.DictReader(io.StringIO(text)):
+            key = tuple((row.get(c) or "").strip() for c in unique_cols)
+            if any(not k for k in key) or key in existing:
+                skp += 1
+                continue
+            kwargs: dict = {}
+            for col in cols:
+                raw = (row.get(col) or "").strip()
+                if not raw:
+                    continue
+                kind = _col_type_generic(model, col)
+                coerced = _coerce_val(raw, kind)
+                if coerced is not None:
+                    kwargs[col] = coerced
+            db.add(model(**kwargs))
+            existing.add(key)
+            ins += 1
+        registry_counts[csv_name] = {"inserted": ins, "skipped": skp}
+
     db.commit()
     post_import_optimise(db)
+    try:
+        os.unlink(_zip_tmp)
+    except OSError:
+        pass
     return {
         "master_inserted": master_inserted,
         "master_skipped": master_skipped,
         "items_inserted": items_inserted,
         "items_skipped": items_skipped,
+        "statutes_inserted": statutes_inserted,
+        "statutes_skipped": statutes_skipped,
+        "ptc_inserted": ptc_inserted,
+        "ptc_skipped": ptc_skipped,
+        "brc_inserted": brc_inserted,
+        "brc_skipped": brc_skipped,
+        "sia_inserted": sia_inserted,
+        "sia_skipped": sia_skipped,
+        "users_inserted": users_inserted,
+        "users_skipped": users_skipped,
+        "tables": registry_counts,
     }
 
 
@@ -719,28 +1198,39 @@ def admin_upload_legacy_items(
 
 @router.post("/backup/import-mdb")
 def admin_import_mdb(
-    mdb_path: str = Form(...),
+    file: UploadFile = File(...),
     db: Session = Depends(get_db),
     _=Depends(require_admin),
 ):
     """
-    Import directly from an MS-Access .mdb file on the server.
-    Reads cops_master and cops_items via mdbtools (mdb-export).
+    Import directly from an uploaded MS-Access .mdb file.
+    Works on Windows (via pyodbc + Microsoft Access ODBC driver) and
+    Linux/macOS (via mdbtools mdb-export).
     Only inserts missing records — never overwrites existing data.
-    mdb_path must be an absolute path accessible by the backend process.
     """
-    import os
+    import os, shutil, tempfile
     from app.services.mdb_import import import_from_mdb
 
-    if not os.path.isfile(mdb_path):
-        raise HTTPException(status_code=400, detail=f"File not found: {mdb_path}")
-    if not mdb_path.lower().endswith(".mdb"):
+    if not (file.filename or "").lower().endswith(".mdb"):
         raise HTTPException(status_code=400, detail="File must be an .mdb file.")
 
+    # Write the uploaded bytes to a temp file so mdb_import can open it by path.
     try:
-        result = import_from_mdb(mdb_path, db)
+        with tempfile.NamedTemporaryFile(suffix=".mdb", delete=False) as tmp:
+            shutil.copyfileobj(file.file, tmp)
+            tmp_path = tmp.name
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not save uploaded file: {e}")
+
+    try:
+        result = import_from_mdb(tmp_path, db)
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
 
     return result
 
@@ -1005,3 +1495,120 @@ def delete_special_allowance(row_id: int, admin=Depends(require_admin), db: Sess
     db.delete(row)
     db.commit()
     return {"message": "Deleted"}
+
+
+# ── Full SQLite database backup / restore ─────────────────────────────────────
+
+def _get_sqlite_path() -> str:
+    """
+    Resolve the absolute filesystem path of the SQLite .db file.
+    Raises HTTPException if the database is not SQLite.
+    """
+    import os
+    from sqlalchemy.engine import make_url
+    url = make_url(settings.DATABASE_URL)
+    if url.drivername not in ("sqlite", "sqlite+pysqlite"):
+        raise HTTPException(
+            status_code=400,
+            detail="Full-database backup/restore is only supported for SQLite deployments.",
+        )
+    db_path = url.database  # e.g. "/abs/path/to/cops_br_database.db" or "./cops_br_database.db"
+    if db_path.startswith("./") or not os.path.isabs(db_path):
+        db_path = os.path.abspath(db_path)
+    return db_path
+
+
+@router.get("/backup/export-fulldb")
+def admin_export_fulldb(_=Depends(require_admin)):
+    """
+    Download a complete binary copy of the SQLite database.
+    Uses sqlite3.backup() to create a consistent, WAL-flushed snapshot —
+    safe to download while the server is running.
+    Every table, every row, every setting is included.
+    """
+    import os
+    import sqlite3
+    import tempfile
+
+    db_path = _get_sqlite_path()
+    if not os.path.exists(db_path):
+        raise HTTPException(status_code=404, detail="Database file not found on disk.")
+
+    # Create a clean, defragmented snapshot in a temp file.
+    # PRAGMA wal_checkpoint(TRUNCATE) flushes the WAL so the backup file is
+    # self-contained — no companion -wal/-shm files needed for restoration.
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".db")
+    os.close(tmp_fd)
+    try:
+        src = sqlite3.connect(db_path)
+        src.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        dst = sqlite3.connect(tmp_path)
+        src.backup(dst)
+        src.close()
+        dst.close()
+        with open(tmp_path, "rb") as f:
+            data = f.read()
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+
+    filename = f"cops_fulldb_{date.today().isoformat()}.db"
+    return Response(
+        content=data,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post("/backup/restore-fulldb")
+def admin_restore_fulldb(file: UploadFile = File(...), _=Depends(require_admin)):
+    """
+    Restore the complete database from a full-DB backup (.db file).
+    Overwrites ALL tables — use with care.
+    The server remains operational; connections are recycled automatically
+    after the restore completes.
+    """
+    import sqlite3
+    from app.database import engine
+
+    db_path = _get_sqlite_path()
+
+    # Peek at magic bytes without loading the whole file into RAM
+    header = file.file.read(16)
+    if not header.startswith(b"SQLite format 3"):
+        raise HTTPException(
+            status_code=400,
+            detail="Uploaded file is not a valid SQLite database.",
+        )
+
+    # Stream the rest of the upload to a temp file (header already read above)
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".db")
+    os.close(tmp_fd)
+    try:
+        with open(tmp_path, "wb") as f:
+            f.write(header)                    # write the 16 bytes already read
+            shutil.copyfileobj(file.file, f)   # stream the remainder
+
+        # Close all pooled connections before overwriting
+        engine.dispose()
+
+        src = sqlite3.connect(tmp_path)
+        dst = sqlite3.connect(db_path)
+        src.backup(dst)
+        src.close()
+        dst.close()
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+
+    return {
+        "message": (
+            "Database fully restored. "
+            "All data has been replaced with the backup. "
+            "Refresh your browser to continue."
+        )
+    }

@@ -18,4 +18,15 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
   },
+  build: {
+    // Split vendor libs from app code so the browser can cache them independently
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          icons: ['lucide-react'],
+        },
+      },
+    },
+  },
 })

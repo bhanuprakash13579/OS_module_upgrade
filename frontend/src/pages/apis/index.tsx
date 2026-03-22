@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, Component, ReactNode } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo, Component, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ScanLine, LogOut, Upload, FileSpreadsheet, Download,
@@ -519,19 +519,20 @@ function ApisModuleInner() {
     }
   }, [currentFile, token]);
 
-  // Filtered results
-  const filtered = result
-    ? filterText.trim()
-      ? result.results.filter(p =>
-          p.apis_name.toLowerCase().includes(filterText.toLowerCase()) ||
-          p.apis_passport.toLowerCase().includes(filterText.toLowerCase()) ||
-          p.cops_matches.some(m =>
-            m.cops_name.toLowerCase().includes(filterText.toLowerCase()) ||
-            m.os_no.toLowerCase().includes(filterText.toLowerCase())
-          )
-        )
-      : result.results
-    : [];
+  // Filtered results — memoized so the filter only re-runs when result or filterText changes
+  const filtered = useMemo(() => {
+    if (!result) return [];
+    if (!filterText.trim()) return result.results;
+    const needle = filterText.toLowerCase();
+    return result.results.filter(p =>
+      p.apis_name.toLowerCase().includes(needle) ||
+      p.apis_passport.toLowerCase().includes(needle) ||
+      p.cops_matches.some(m =>
+        m.cops_name.toLowerCase().includes(needle) ||
+        m.os_no.toLowerCase().includes(needle)
+      )
+    );
+  }, [result, filterText]);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">

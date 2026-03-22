@@ -21,6 +21,7 @@ Column name differences between MDB and new schema:
 import csv
 import io
 import subprocess
+import sys
 from datetime import datetime, date as _date
 from typing import Optional
 
@@ -84,8 +85,21 @@ def _str_safe(val) -> Optional[str]:
     return v if v else None
 
 
-def _export_table(mdb_path: str, table: str) -> csv.DictReader:
-    """Run mdb-export and return a DictReader over the output."""
+def _export_table(mdb_path: str, table: str):
+    """
+    Read a table from the MDB file and return an iterable of row dicts.
+    - Windows: uses pyodbc with the Microsoft Access ODBC driver.
+    - Linux/macOS: uses mdb-export (mdbtools).
+    All values are returned as strings to keep the rest of the parsing code
+    unchanged regardless of platform.
+    """
+    if sys.platform == "win32":
+        return _export_table_pyodbc(mdb_path, table)
+    return _export_table_mdbtools(mdb_path, table)
+
+
+def _export_table_mdbtools(mdb_path: str, table: str) -> csv.DictReader:
+    """Linux/macOS: run mdb-export and return a DictReader over the output."""
     result = subprocess.run(
         ["mdb-export", mdb_path, table],
         capture_output=True,
@@ -95,6 +109,66 @@ def _export_table(mdb_path: str, table: str) -> csv.DictReader:
     if result.returncode != 0:
         raise RuntimeError(f"mdb-export failed for {table}: {result.stderr}")
     return csv.DictReader(io.StringIO(result.stdout))
+
+
+def _export_table_pyodbc(mdb_path: str, table: str) -> list:
+    """
+    Windows: read via pyodbc with the Microsoft Access ODBC driver.
+    Returns a list of dicts with lowercased column names and string values,
+    matching the output shape of csv.DictReader so the rest of the code is
+    completely unchanged.
+
+    Requires one of:
+      • "Microsoft Access Driver (*.mdb, *.accdb)" — comes with the free
+        Microsoft Access Database Engine 2016 Redistributable (64-bit).
+        Download: https://www.microsoft.com/en-us/download/details.aspx?id=54920
+      • "Microsoft Access Driver (*.mdb)" — the older JET driver,
+        pre-installed on 32-bit Windows XP/7/8.
+    If Microsoft Office (any version) is installed the driver is already present.
+    """
+    try:
+        import pyodbc
+    except ImportError:
+        raise RuntimeError(
+            "pyodbc is not installed. "
+            "Run: pip install pyodbc"
+        )
+
+    available = set(pyodbc.drivers())
+    driver = None
+    for candidate in [
+        "Microsoft Access Driver (*.mdb, *.accdb)",
+        "Microsoft Access Driver (*.mdb)",
+    ]:
+        if candidate in available:
+            driver = candidate
+            break
+
+    if driver is None:
+        raise RuntimeError(
+            "Microsoft Access ODBC driver not found on this Windows machine.\n"
+            "Please download and install the free 'Microsoft Access Database Engine "
+            "2016 Redistributable' from:\n"
+            "  https://www.microsoft.com/en-us/download/details.aspx?id=54920\n"
+            "Then restart the application and try again.\n"
+            "(If Microsoft Office is already installed, try the 32-bit vs 64-bit "
+            "version of the redistributable that matches your Office installation.)"
+        )
+
+    conn_str = f"Driver={{{driver}}};Dbq={mdb_path};Exclusive=No;ReadOnly=True;"
+    conn = pyodbc.connect(conn_str)
+    try:
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT * FROM [{table}]")
+        columns = [col[0].lower() for col in cursor.description]
+        rows = []
+        for row in cursor.fetchall():
+            # Convert every value to str so _str_safe / _flt_safe / _parse_date
+            # work identically to the mdbtools CSV path.
+            rows.append(dict(zip(columns, [str(v) if v is not None else "" for v in row])))
+        return rows
+    finally:
+        conn.close()
 
 
 def _existing_deleted_keys(db: Session) -> set:

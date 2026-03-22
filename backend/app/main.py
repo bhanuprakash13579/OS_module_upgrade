@@ -288,58 +288,6 @@ def seed_initial_data():
             PrintTemplateConfig, BaggageRulesConfig, SpecialItemAllowance,
         )
 
-        # ── User seeding disabled for bootstrap testing ──
-        # existing = db.query(User).filter(User.user_id == "bhanu@gmail.com").first()
-        # if not existing:
-        #     db.add(User(
-        #         user_name="Bhanu Prakash",
-        #         user_desig="Inspector",
-        #         user_id="bhanu@gmail.com",
-        #         user_pwd=pwd_context.hash("bhanu"),
-        #         created_by="system",
-        #         created_on=date.today(),
-        #         user_status="ACTIVE",
-        #         user_role="SDO_Admin"
-        #     ))
-
-        # existing = db.query(User).filter(User.user_id == "harish@gmail.com").first()
-        # if not existing:
-        #     db.add(User(
-        #         user_name="Harish",
-        #         user_desig="Officer",
-        #         user_id="harish@gmail.com",
-        #         user_pwd=pwd_context.hash("harish"),
-        #         created_by="system",
-        #         created_on=date.today(),
-        #         user_status="ACTIVE",
-        #         user_role="SDO"
-        #     ))
-
-        # existing = db.query(User).filter(User.user_id == "sdo1").first()
-        # if not existing:
-        #     db.add(User(
-        #         user_name="SDO Officer",
-        #         user_desig="Superintendent",
-        #         user_id="sdo1",
-        #         user_pwd=pwd_context.hash("sdo123"),
-        #         created_by="system",
-        #         created_on=date.today(),
-        #         user_status="ACTIVE",
-        #         user_role="SDO"
-        #     ))
-
-        # existing = db.query(User).filter(User.user_id == "dc1").first()
-        # if not existing:
-        #     db.add(User(
-        #         user_name="DC Officer",
-        #         user_desig="Deputy Commissioner",
-        #         user_id="dc1",
-        #         user_pwd=pwd_context.hash("dc123"),
-        #         created_by="system",
-        #         created_on=date.today(),
-        #         user_status="ACTIVE",
-        #         user_role="DC"
-        #     ))
 
         # ── Seed Default Shift Timing ──
         if db.query(ShiftTimingMaster).count() == 0:
@@ -446,6 +394,135 @@ def seed_initial_data():
     except Exception as e:
         db.rollback()
         print(f"Seed error: {e}")
+    finally:
+        db.close()
+
+    # ── Seed legal statutes (idempotent: skip if keyword already exists) ──────
+    _seed_legal_statutes()
+    _seed_print_template_config()
+
+
+def _seed_legal_statutes():
+    """
+    Auto-seeds the default legal statutes used for remarks autogeneration.
+    Safe to call on every startup — only inserts rows whose keyword is absent.
+    Admin customisations (edits / additions via StatutesAdmin) are never overwritten.
+    """
+    from app.models.statutes import LegalStatute
+    from app.scripts.statutes_data import DEFAULT_STATUTES
+
+    db = SessionLocal()
+    try:
+        count = 0
+        for entry in DEFAULT_STATUTES:
+            if not db.query(LegalStatute).filter(LegalStatute.keyword == entry["keyword"]).first():
+                db.add(LegalStatute(**entry))
+                count += 1
+        if count:
+            db.commit()
+            print(f"✅ Seeded {count} legal statutes")
+    except Exception as e:
+        db.rollback()
+        print(f"Legal statutes seed error: {e}")
+    finally:
+        db.close()
+
+
+def _seed_print_template_config():
+    """
+    Auto-seeds the 30 canonical static-text fields for the OS print template.
+    Safe to call on every startup — only inserts rows whose field_key is absent.
+    Admin updates via OSTemplateEditor are never overwritten.
+    """
+    from app.models.config import PrintTemplateConfig
+    from datetime import date as _date
+
+    _DEFAULTS = [
+        # Page 1
+        ("office_header_line1", "Office Header — Line 1",
+         "Office of the Deputy / Asst. Commissioner of Customs"),
+        ("office_header_line2", "Office Header — Line 2",
+         "(Airport), Anna International Airport, Chennai-600027"),
+        ("page1_title", "Page 1 — Main Title",
+         "Detention / Seizure of Passenger's Baggage"),
+        ("inventory_heading", "Page 1 — Inventory Table Heading",
+         "INVENTORY OF THE GOODS IMPORTED"),
+        ("col_fa_heading", "Page 1 — Free Allowance Column Heading",
+         "Goods Allowed Free Under Rule 5 / Rule 13 of Baggage Rules, 1994"),
+        ("col_duty_heading", "Page 1 — Goods on Duty Column Heading",
+         "Goods Passed On Duty"),
+        ("col_liable_heading", "Page 1 — Liable Goods Column Heading",
+         "Goods Liable to Action Under FEMA / Foreign Trade Act, 1992 & Customs Act, 1962"),
+        ("summary_duty_text", "Page 1 — Summary: Duty Row Label",
+         "Value of Goods Charged to Duty Under Foreign Trade (D&R) Act, 1992 & Customs Act, 1962"),
+        ("summary_liable_text", "Page 1 — Summary: Liable Goods Row Label",
+         "Value of Goods Liable to Action under FEMA / Foreign Trade (D&R) Act, 1992 & Customs Act 1962"),
+        ("supdt_sig_title", "Page 1 — Superintendent Signature Title",
+         "Supdt. of Customs"),
+        # Page 2
+        ("p2_office_heading", "Page 2 — Office Heading",
+         "Office of the Deputy / Asst. Commissioner of Customs (Airport), Anna International airport, Chennai-600027."),
+        ("p2_waiver_heading", "Page 2 — Waiver Section Heading",
+         "WAIVER OF SHOW CAUSE NOTICE"),
+        ("waiver_text_1", "Page 2 — Waiver Paragraph 1",
+         "The Charges have been orally communicated to me in respect of the goods mentioned overleaf and imported by me. Orders in the case may please be passed without issue of Show Cause Notice. However I may kindly be given a Personal Hearing."),
+        ("waiver_text_2", "Page 2 — 'I was present' Paragraph",
+         "I was present during the personal hearing conducted by the Deputy / Asst. Commissioner and I was heard."),
+        ("nb1_text", "Page 2 — N.B. Clause 1 (Free Copy)",
+         "N.B: 1. This copy is granted free of charge for the private use of the person to whom it is issued."),
+        ("nb2_text", "Page 2 — N.B. Clause 2 (Appeal)",
+         "2. An Appeal against this Order shall lie before the Commissioner of Customs (Appeals), Custom House, Chennai-600 001 on payment of 7.5% of the duty demanded where duty or duty and penalty are in dispute, or penalty, where penalty alone is in dispute. The Appeal shall be filed within 60 days provided under Section 128 of the Customs Act, 1962 from the date of receipt of this Order."),
+        ("note_scn_waived", "Page 2 — SCN Waiver Note",
+         "Note: The issue of Show Cause Notice was waived at the instance of the Passenger."),
+        ("legal_para_1", "Page 2 — Legal Para 1 (FTP / FTDR Act)",
+         "In terms of Foreign Trade Policy notified by the Government in pursuance to Section 3(1) & 3(2) of the Foreign Trade (Development & Regulation) Act, 1992 read with the Rules framed thereunder, also read with Section 11(2)(u) of Customs Act, 1962, import of 'goods in commercial quantity / goods in the nature of non-bonafide baggage' is not permitted without a valid import licence, though exemption exists under clause 3(h) of the Foreign Trade (Exemption from application of Rules in certain cases) order 1993 for import of goods by a passenger from abroad only to the extent admissible under the Baggage Rules framed under Section 79 of the Customs Act, 1962."),
+        ("legal_para_2", "Page 2 — Legal Para 2 (Confiscation Sections)",
+         "Import of goods non-declared / misdeclared / concealed / in trade and in commercial quantity / non-bonafide in excess of the baggage allowance is therefore liable for confiscation under Section 111(d), (i), (l), (m) & (o) of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992."),
+        ("record_heading", "Page 2 — Personal Hearing Record Heading",
+         "RECORD OF PERSONAL HEARING & FINDINGS"),
+        ("order_heading", "Page 2 — ORDER Heading",
+         "ORDER"),
+        ("order_para_rf", "Page 2 — Order Para: Redemption Fine",
+         "I Order confiscation of the goods{rf_slnos_text} valued at Rs.{conf_value}/- under Section 111(d), (i), (l), (m) & (o) of the Customs Act, 1962 read with Section 3(3) of Foreign Trade (D&R) Act, 1992, but allow the passenger an option to redeem the goods valued at Rs.{conf_value}/- on a fine of Rs.{rf_amount}/- (Rupees {rf_words} Only) in lieu of confiscation under Section 125 of the Customs Act 1962 within 7 days from the date of receipt of this Order, Duty extra."),
+        ("order_para_ref", "Page 2 — Order Para: Re-Export Fine",
+         "However, I give an option to reship the goods{ref_slnos_text} valued at Rs.{re_exp_value}/- on a fine of Rs.{ref_amount}/- (Rupees {ref_words} Only) under Section 125 of the Customs Act 1962 within 1 Month from the date of this Order."),
+        ("order_para_abs_conf", "Page 2 — Order Para: Absolute Confiscation",
+         "I {also_text}order absolute confiscation of the goods{abs_conf_slnos_text} valued at Rs.{abs_conf_value}/- under Section 111(d), (i), (l), (m) & (o) of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (D&R) Act, 1992."),
+        ("order_para_pp", "Page 2 — Order Para: Personal Penalty",
+         "I further impose a Personal Penalty of Rs.{pp_amount}/- (Rupees {pp_words} Only) under Section 112(a) of the Customs Act, 1962."),
+        ("deputy_sig_title", "Page 2 — Deputy / AC Signature Title",
+         "Deputy / Asst. Commissioner of Customs (Airport)"),
+        ("bottom_nb1", "Page 2 — Bottom N.B. Clause 1",
+         "N.B: 1. Perishables will be disposed off within seven days from the date of detention."),
+        ("bottom_nb2", "Page 2 — Bottom N.B. Clause 2",
+         "2. Where re-export is permitted, the passenger is advised to intimate the date of departure of flight atleast 48 hours in advance."),
+        ("bottom_nb3", "Page 2 — Bottom N.B. Clause 3",
+         "3. Warehouse rent and Handling Charges are chargeable for the goods detained."),
+        ("received_order_text", "Page 2 — 'Received the Order' Text",
+         "Received the Order-in-Original"),
+    ]
+
+    db = SessionLocal()
+    try:
+        count = 0
+        for key, label, value in _DEFAULTS:
+            if not db.query(PrintTemplateConfig).filter(
+                PrintTemplateConfig.field_key == key
+            ).first():
+                db.add(PrintTemplateConfig(
+                    field_key=key,
+                    field_label=label,
+                    field_value=value,
+                    effective_from=_date(1900, 1, 1),
+                    created_by="seed",
+                ))
+                count += 1
+        if count:
+            db.commit()
+            print(f"✅ Seeded {count} print template fields")
+    except Exception as e:
+        db.rollback()
+        print(f"Print template seed error: {e}")
     finally:
         db.close()
 
@@ -636,6 +713,8 @@ from app.api import apis
 
 app.include_router(admin_api.router, prefix="/api/admin", tags=["System Admin"])
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+from app.api import statutes
+app.include_router(statutes.router, prefix="/api", tags=["Settings"])
 app.include_router(masters.router, prefix="/api/masters", tags=["Masters"])
 app.include_router(baggage.router, prefix="/api/br", tags=["Baggage Receipts"])
 app.include_router(offence.router, prefix="/api/os", tags=["Offence Cases"])

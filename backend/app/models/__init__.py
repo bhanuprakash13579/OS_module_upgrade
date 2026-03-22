@@ -8,7 +8,9 @@ from app.models.config import (
     ShiftTimingMaster, MarginMaster, DataMaster,
     BatchMaster, BatchWithManyDc, FeatureFlags
 )
+# Security & Settings (2 tables)
 from app.models.security import AllowedDevice
+from app.models.statutes import LegalStatute
 
 # Masters (9 tables)
 from app.models.masters import (
@@ -69,8 +71,8 @@ __all__ = [
     # Config
     "ShiftTimingMaster", "MarginMaster", "DataMaster",
     "BatchMaster", "BatchWithManyDc", "FeatureFlags",
-    # Security
-    "AllowedDevice",
+    # Security & Settings
+    "AllowedDevice", "LegalStatute",
     # Masters
     "DcMaster", "AirlinesMast", "ArrivalFlightMaster",
     "AirportMaster", "NationalityMaster", "PortMaster",

@@ -1,11 +1,32 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { Save, ArrowLeft, Plus, Trash2, FileText, User, Plane, AlertCircle, FileDigit, CheckCircle } from 'lucide-react';
+import { Save, ArrowLeft, Plus, Trash2, FileText, User, Plane, AlertCircle, FileDigit, CheckCircle, Wand2 } from 'lucide-react';
 import DatePicker from '@/components/DatePicker';
 import { useAuth } from '@/contexts/AuthContext';
 import PassportScanner from '@/components/PassportScanner';
 import api from '@/lib/api';
+import { useRemarksGenerator, detectContextualQuestions, ContextualAnswers, ContextualQuestion } from '@/hooks/useRemarksGenerator';
+
+// ── Static seed list for item-description autocomplete ───────────────────────
+// Merged at runtime with DB-fetched suggestions (most-frequent first).
+const STATIC_ITEM_SUGGESTIONS = [
+  'CIGARETTES','E-CIGARETTES','CIGARS','BIDI','GUTKHA','PAN MASALA','TOBACCO',
+  'WHISKY','BRANDY','WINE','BEER','VODKA','RUM','GIN','SCOTCH','CHAMPAGNE','TEQUILA','LIQUOR',
+  'GOLD (JEWELLERY)','GOLD (PRIMARY)','GOLD BAR','GOLD BISCUIT','GOLD CHAIN','GOLD RING',
+  'SILVER (JEWELLERY)','SILVER BAR',
+  'CURRENCY (FOREIGN)','CURRENCY (INDIAN)',
+  'MOBILE PHONE','CELL PHONE','IPHONE','LAPTOP','TABLET','SMART WATCH',
+  'CAMERA','VIDEO CAMERA','DRONE','ELECTRONIC GOODS',
+  'NARCOTICS (CANNABIS/GANJA)','NARCOTICS (HEROIN)','NARCOTICS (COCAINE)',
+  'ARMS','AMMUNITION','EXPLOSIVES',
+  'ANTIQUES','TOYS','TEXTILES','FABRICS','COSMETICS','PERFUMES','SUNGLASSES','WATCHES',
+  'RED SANDERS','POPPY SEEDS','POPPY HUSK',
+  'REFURBISHED LAPTOP','REFURBISHED MOBILE PHONE',
+  'MARLBORO CIGARETTES','DUNHILL CIGARETTES','GUDANG GARAM CIGARETTES',
+  'CHIVAS REGAL WHISKY','JOHNNIE WALKER WHISKY','BARDINET BRANDY','JACK DANIELS WHISKY',
+  'MEDICINES','FOOD ITEMS','DRY FRUITS','SPICES','LEATHER GOODS','GARMENTS',
+];
 
 
 const DUTY_TYPES = [
@@ -34,6 +55,51 @@ const DUTY_TYPES = [
 const DUTY_TYPE_OPTIONS = DUTY_TYPES.map(type => (
   <option key={type} value={type}>{type}</option>
 ));
+
+// Module-level constants — defined once, never reallocated per render
+const NATIONALITY_MAP: Record<string, string> = {
+  'IND': 'INDIAN', 'USA': 'AMERICAN', 'GBR': 'BRITISH', 'CAN': 'CANADIAN', 'AUS': 'AUSTRALIAN',
+  'FRA': 'FRENCH', 'DEU': 'GERMAN', 'ITA': 'ITALIAN', 'JPN': 'JAPANESE', 'KOR': 'KOREAN',
+  'CHN': 'CHINESE', 'RUS': 'RUSSIAN', 'ZAF': 'SOUTH AFRICAN', 'NGA': 'NIGERIAN', 'KEN': 'KENYAN',
+  'ARE': 'UAE', 'SAU': 'SAUDI ARABIAN', 'IRN': 'IRANIAN', 'IRQ': 'IRAQI', 'TUR': 'TURKISH',
+  'PAK': 'PAKISTANI', 'BGD': 'BANGLADESHI', 'LKA': 'SRI LANKAN', 'NPL': 'NEPALESE', 'AFG': 'AFGHAN',
+  'SGP': 'SINGAPOREAN', 'MYS': 'MALAYSIAN', 'VNM': 'VIETNAMESE', 'THA': 'THAI', 'CHE': 'SWISS',
+  'NZL': 'NEW ZEALANDER'
+};
+
+const PORT_MAP: Record<string, string> = {
+  // India
+  'DEL': 'DELHI', 'BOM': 'MUMBAI', 'MAA': 'CHENNAI', 'CCU': 'KOLKATA', 'BLR': 'BENGALURU',
+  'HYD': 'HYDERABAD', 'COK': 'KOCHI', 'AMD': 'AHMEDABAD', 'GOI': 'GOA', 'PNQ': 'PUNE',
+  'JAI': 'JAIPUR', 'LKO': 'LUCKNOW', 'TRV': 'TRIVANDRUM', 'IXC': 'CHANDIGARH', 'ATQ': 'AMRITSAR',
+  'GAU': 'GUWAHATI', 'PAT': 'PATNA', 'IXR': 'RANCHI', 'VNS': 'VARANASI', 'CCJ': 'CALICUT',
+  'SXR': 'SRINAGAR', 'IXM': 'MADURAI', 'TRZ': 'TIRUCHIRAPPALLI', 'IXB': 'BAGDOGRA',
+  'VTZ': 'VISAKHAPATNAM', 'NAG': 'NAGPUR', 'IDR': 'INDORE', 'BBI': 'BHUBANESWAR',
+  'RPR': 'RAIPUR', 'IXE': 'MANGALORE', 'CJB': 'COIMBATORE', 'UDR': 'UDAIPUR',
+  // Middle East
+  'DXB': 'DUBAI', 'AUH': 'ABU DHABI', 'SHJ': 'SHARJAH', 'DOH': 'DOHA', 'KWI': 'KUWAIT',
+  'JED': 'JEDDAH', 'RUH': 'RIYADH', 'MCT': 'MUSCAT', 'BAH': 'BAHRAIN', 'DMM': 'DAMMAM',
+  // Southeast Asia
+  'SIN': 'SINGAPORE', 'KUL': 'KUALA LUMPUR', 'BKK': 'BANGKOK', 'DMK': 'BANGKOK (DON MUEANG)',
+  'MNL': 'MANILA', 'SGN': 'HO CHI MINH', 'HAN': 'HANOI', 'RGN': 'YANGON', 'PNH': 'PHNOM PENH',
+  'CGK': 'JAKARTA', 'DPS': 'BALI', 'MFM': 'MACAU', 'HKG': 'HONG KONG',
+  // East Asia
+  'NRT': 'TOKYO (NARITA)', 'HND': 'TOKYO (HANEDA)', 'KIX': 'OSAKA', 'ICN': 'SEOUL (INCHEON)',
+  'PVG': 'SHANGHAI', 'PEK': 'BEIJING', 'CAN': 'GUANGZHOU', 'TPE': 'TAIPEI',
+  // Europe
+  'LHR': 'LONDON (HEATHROW)', 'LGW': 'LONDON (GATWICK)', 'CDG': 'PARIS', 'FRA': 'FRANKFURT',
+  'AMS': 'AMSTERDAM', 'FCO': 'ROME', 'MXP': 'MILAN', 'MAD': 'MADRID', 'BCN': 'BARCELONA',
+  'ZRH': 'ZURICH', 'MUC': 'MUNICH', 'VIE': 'VIENNA', 'IST': 'ISTANBUL',
+  // Americas
+  'JFK': 'NEW YORK (JFK)', 'EWR': 'NEWARK', 'LAX': 'LOS ANGELES', 'SFO': 'SAN FRANCISCO',
+  'ORD': 'CHICAGO', 'YYZ': 'TORONTO', 'GRU': 'SAO PAULO',
+  // Africa & Oceania
+  'ADD': 'ADDIS ABABA', 'NBO': 'NAIROBI', 'JNB': 'JOHANNESBURG', 'SYD': 'SYDNEY',
+  'MEL': 'MELBOURNE', 'AKL': 'AUCKLAND',
+  // South Asia
+  'DAC': 'DHAKA', 'KTM': 'KATHMANDU', 'CMB': 'COLOMBO', 'MLE': 'MALE', 'MRU': 'MAURITIUS',
+  'KHI': 'KARACHI', 'ISB': 'ISLAMABAD', 'LHE': 'LAHORE'
+};
 
 
 const sanitizeInteger = (raw: string) => raw.replace(/[^\d]/g, '');
@@ -65,9 +131,10 @@ interface ItemRowProps {
   onSetFieldError: (idx: number, field: string, message: string) => void;
   onClearFieldError: (idx: number, field: string) => void;
   onDescBlur: (idx: number, desc: string) => void;
+  descDatalistId: string;
 }
 
-const ItemRow = memo(function ItemRow({ itm, idx, rowErrors, updateItem, onRemove, onSetFieldError, onClearFieldError, onDescBlur }: ItemRowProps) {
+const ItemRow = memo(function ItemRow({ itm, idx, rowErrors, updateItem, onRemove, onSetFieldError, onClearFieldError, onDescBlur, descDatalistId }: ItemRowProps) {
   const [faOpen, setFaOpen] = useState(false);
   const faRef = useRef<HTMLDivElement>(null);
 
@@ -91,6 +158,8 @@ const ItemRow = memo(function ItemRow({ itm, idx, rowErrors, updateItem, onRemov
       <td className="px-2 py-1.5">
         <input
           type="text"
+          list={descDatalistId}
+          autoComplete="off"
           className={`w-full px-2 py-1 border ${rowErrors?.items_desc ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-300'} rounded text-xs uppercase`}
           value={itm.items_desc}
           onChange={e => updateItem(idx, 'items_desc', e.target.value.toUpperCase())}
@@ -313,8 +382,68 @@ export default function OffenceForm() {
   const navigate = useNavigate();
   const location = useLocation();
   const { token } = useAuth();
+  const { generateRemark, loading: remarksLoading } = useRemarksGenerator();
+
+  // ── Item-description autocomplete suggestions ────────────────────────────
+  const [descSuggestions, setDescSuggestions] = useState<string[]>(STATIC_ITEM_SUGGESTIONS);
+  useEffect(() => {
+    api.get('/os/item-descriptions')
+      .then(res => {
+        if (!Array.isArray(res.data)) return;
+        const dbItems: string[] = res.data.map((s: string) => (s || '').toUpperCase()).filter(Boolean);
+        setDescSuggestions(prev => {
+          const merged = [...dbItems];
+          const existing = new Set(dbItems);
+          for (const s of prev) { if (!existing.has(s)) { merged.push(s); existing.add(s); } }
+          return merged;
+        });
+      })
+      .catch(() => { /* keep static list on error */ });
+  }, []);
+  // Memoize the datalist so 300 <option> elements don't re-render on every formData keystroke
+  const descDatalist = useMemo(() => (
+    <datalist id="item-desc-datalist">
+      {descSuggestions.map(s => <option key={s} value={s} />)}
+    </datalist>
+  ), [descSuggestions]);
+
+  // ── Contextual questions modal ────────────────────────────────────────────
+  const [showContextModal, setShowContextModal] = useState(false);
+  const [contextQuestions, setContextQuestions] = useState<ContextualQuestion[]>([]);
+  const [contextAnswers, setContextAnswers] = useState<ContextualAnswers>({});
+  const [pendingRole, setPendingRole] = useState<'SUPDT' | 'ADJN'>('SUPDT');
+
+  const triggerGenerateRemarks = (role: 'SUPDT' | 'ADJN') => {
+    const questions = detectContextualQuestions(items);
+    if (questions.length > 0) {
+      setPendingRole(role);
+      setContextQuestions(questions);
+      setContextAnswers({});
+      setShowContextModal(true);
+    } else {
+      const text = generateRemark(role, items, {
+        pax_name: formData.pax_name, flight_no: formData.flight_no,
+        flight_date: formData.flight_date, port_of_dep_dest: formData.port_of_dep_dest,
+        os_date: formData.os_date, passport_no: formData.passport_no,
+        passport_date: formData.passport_date,
+      }, {});
+      setSupdtsRemarks(text);
+    }
+  };
+
+  const handleContextSubmit = () => {
+    const text = generateRemark(pendingRole, items, {
+      pax_name: formData.pax_name, flight_no: formData.flight_no,
+      flight_date: formData.flight_date, port_of_dep_dest: formData.port_of_dep_dest,
+      os_date: formData.os_date, passport_no: formData.passport_no,
+      passport_date: formData.passport_date,
+    }, contextAnswers);
+    setSupdtsRemarks(text);
+    setShowContextModal(false);
+  };
 
   const isEditing = !!osNo;
+  const isViewOnly = location.pathname.endsWith('/view');
   // When the form is opened from inside the adjudication module (edit-sdo route),
   // navigate back to the adjudication case form instead of the SDO list.
   const isInAdjModule = location.pathname.startsWith('/adjudication');
@@ -353,8 +482,7 @@ export default function OffenceForm() {
     
     previous_os_details: '',
     previous_visits: '',
-    adjn_offr_remarks: '', // stored in adjn remarks or we can use another field. Backend doesn't have supdt remarks, wait I added it. Actually backend doesn't have supdt_remarks. Let me just use previous_os_details if needed. No, I will add it to the backend or use pax_status. Actually, I didn't add supdts_remarks to the backend schema. Let's use `pax_status` for remarks temporarily, or we can just send it. Let's send it as `pax_status` for now. Wait I'll add `supdts_remarks` to backend next step, keep it in state.
-    supdts_remarks: '',
+    adjn_offr_remarks: '',
     pax_status: '',
 
     is_draft: 'Y',
@@ -383,6 +511,10 @@ export default function OffenceForm() {
       items_duty_type: 'Miscellaneous-22'
   }]);
   
+  // Separate state for supdts_remarks — keeps it isolated so typing in the
+  // remarks textarea doesn't trigger a full re-render of the entire form.
+  const [supdtsRemarks, setSupdtsRemarks] = useState('');
+
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [oldPassportsSuggestion, setOldPassportsSuggestion] = useState<string[]>([]);
@@ -443,6 +575,7 @@ export default function OffenceForm() {
         if (data.country_of_departure) safeData.arrived_from = data.country_of_departure;
         
         setFormData(safeData);
+        setSupdtsRemarks(data.supdts_remarks || '');
         if (data.items && data.items.length > 0) setItems(data.items);
       })
       .catch(err => setErrorMsg(err.message));
@@ -702,10 +835,8 @@ export default function OffenceForm() {
 
       // History / remarks
       requireField('previous_visits', 'Previous Visits');
-      requireField('supdts_remarks', "Supdt's Remarks");
-      if (!errors.supdts_remarks && String(formData.supdts_remarks).length > 1500) {
-        errors.supdts_remarks = "Supdt's Remarks exceeds maximum limit of 1500 characters.";
-      }
+      if (!supdtsRemarks.trim()) errors['supdts_remarks'] = "Supdt's Remarks is required.";
+      if (supdtsRemarks.length > 1500) errors['supdts_remarks'] = "Supdt's Remarks exceeds maximum limit of 1500 characters.";
 
       // O.S. No format
       if (!errors.os_no) {
@@ -791,6 +922,7 @@ export default function OffenceForm() {
     try {
         const payload = {
             ...formData,
+            supdts_remarks: supdtsRemarks,
             shift: formData.shift || 'Day',
             booked_by: formData.booked_by || 'Batch A',
             case_type: formData.case_type || 'Mis-Declaration',
@@ -853,55 +985,11 @@ export default function OffenceForm() {
     }
   };
 
-  const nationalityMap: Record<string, string> = {
-    'IND': 'INDIAN', 'USA': 'AMERICAN', 'GBR': 'BRITISH', 'CAN': 'CANADIAN', 'AUS': 'AUSTRALIAN',
-    'FRA': 'FRENCH', 'DEU': 'GERMAN', 'ITA': 'ITALIAN', 'JPN': 'JAPANESE', 'KOR': 'KOREAN',
-    'CHN': 'CHINESE', 'RUS': 'RUSSIAN', 'ZAF': 'SOUTH AFRICAN', 'NGA': 'NIGERIAN', 'KEN': 'KENYAN',
-    'ARE': 'UAE', 'SAU': 'SAUDI ARABIAN', 'IRN': 'IRANIAN', 'IRQ': 'IRAQI', 'TUR': 'TURKISH',
-    'PAK': 'PAKISTANI', 'BGD': 'BANGLADESHI', 'LKA': 'SRI LANKAN', 'NPL': 'NEPALESE', 'AFG': 'AFGHAN',
-    'SGP': 'SINGAPOREAN', 'MYS': 'MALAYSIAN', 'VNM': 'VIETNAMESE', 'THA': 'THAI', 'CHE': 'SWISS',
-    'NZL': 'NEW ZEALANDER'
-  };
-
-  const portMap: Record<string, string> = {
-    // India
-    'DEL': 'DELHI', 'BOM': 'MUMBAI', 'MAA': 'CHENNAI', 'CCU': 'KOLKATA', 'BLR': 'BENGALURU',
-    'HYD': 'HYDERABAD', 'COK': 'KOCHI', 'AMD': 'AHMEDABAD', 'GOI': 'GOA', 'PNQ': 'PUNE',
-    'JAI': 'JAIPUR', 'LKO': 'LUCKNOW', 'TRV': 'TRIVANDRUM', 'IXC': 'CHANDIGARH', 'ATQ': 'AMRITSAR',
-    'GAU': 'GUWAHATI', 'PAT': 'PATNA', 'IXR': 'RANCHI', 'VNS': 'VARANASI', 'CCJ': 'CALICUT',
-    'SXR': 'SRINAGAR', 'IXM': 'MADURAI', 'TRZ': 'TIRUCHIRAPPALLI', 'IXB': 'BAGDOGRA',
-    'VTZ': 'VISAKHAPATNAM', 'NAG': 'NAGPUR', 'IDR': 'INDORE', 'BBI': 'BHUBANESWAR',
-    'RPR': 'RAIPUR', 'IXE': 'MANGALORE', 'CJB': 'COIMBATORE', 'UDR': 'UDAIPUR',
-    // Middle East
-    'DXB': 'DUBAI', 'AUH': 'ABU DHABI', 'SHJ': 'SHARJAH', 'DOH': 'DOHA', 'KWI': 'KUWAIT',
-    'JED': 'JEDDAH', 'RUH': 'RIYADH', 'MCT': 'MUSCAT', 'BAH': 'BAHRAIN', 'DMM': 'DAMMAM',
-    // Southeast Asia
-    'SIN': 'SINGAPORE', 'KUL': 'KUALA LUMPUR', 'BKK': 'BANGKOK', 'DMK': 'BANGKOK (DON MUEANG)',
-    'MNL': 'MANILA', 'SGN': 'HO CHI MINH', 'HAN': 'HANOI', 'RGN': 'YANGON', 'PNH': 'PHNOM PENH',
-    'CGK': 'JAKARTA', 'DPS': 'BALI', 'MFM': 'MACAU', 'HKG': 'HONG KONG',
-    // East Asia
-    'NRT': 'TOKYO (NARITA)', 'HND': 'TOKYO (HANEDA)', 'KIX': 'OSAKA', 'ICN': 'SEOUL (INCHEON)',
-    'PVG': 'SHANGHAI', 'PEK': 'BEIJING', 'CAN': 'GUANGZHOU', 'TPE': 'TAIPEI',
-    // Europe
-    'LHR': 'LONDON (HEATHROW)', 'LGW': 'LONDON (GATWICK)', 'CDG': 'PARIS', 'FRA': 'FRANKFURT',
-    'AMS': 'AMSTERDAM', 'FCO': 'ROME', 'MXP': 'MILAN', 'MAD': 'MADRID', 'BCN': 'BARCELONA',
-    'ZRH': 'ZURICH', 'MUC': 'MUNICH', 'VIE': 'VIENNA', 'IST': 'ISTANBUL',
-    // Americas
-    'JFK': 'NEW YORK (JFK)', 'EWR': 'NEWARK', 'LAX': 'LOS ANGELES', 'SFO': 'SAN FRANCISCO',
-    'ORD': 'CHICAGO', 'YYZ': 'TORONTO', 'GRU': 'SAO PAULO',
-    // Africa & Oceania
-    'ADD': 'ADDIS ABABA', 'NBO': 'NAIROBI', 'JNB': 'JOHANNESBURG', 'SYD': 'SYDNEY',
-    'MEL': 'MELBOURNE', 'AKL': 'AUCKLAND',
-    // South Asia
-    'DAC': 'DHAKA', 'KTM': 'KATHMANDU', 'CMB': 'COLOMBO', 'MLE': 'MALE', 'MRU': 'MAURITIUS',
-    'KHI': 'KARACHI', 'ISB': 'ISLAMABAD', 'LHE': 'LAHORE'
-  };
-
-  const handleScan = (scanData: any) => {
+  const handleScan = useCallback((scanData: any) => {
     if (scanData.type === 'PASSPORT') {
         let mappedNationality = scanData.nationality?.toUpperCase();
-        if (mappedNationality && nationalityMap[mappedNationality]) {
-            mappedNationality = nationalityMap[mappedNationality];
+        if (mappedNationality && NATIONALITY_MAP[mappedNationality]) {
+            mappedNationality = NATIONALITY_MAP[mappedNationality];
         }
 
         const fatherPrefix = scanData.gender === 'M' ? 'S/O ' : scanData.gender === 'F' ? 'D/O W/O ' : 'S/O D/O W/O ';
@@ -918,8 +1006,8 @@ export default function OffenceForm() {
     } else if (scanData.type === 'BOARDING_PASS') {
         const originCode = scanData.origin?.toUpperCase()?.trim();
         const destCode = scanData.destination?.toUpperCase()?.trim();
-        const mappedOrigin = (originCode && portMap[originCode]) ? portMap[originCode] : originCode;
-        const mappedDest = (destCode && portMap[destCode]) ? portMap[destCode] : destCode;
+        const mappedOrigin = (originCode && PORT_MAP[originCode]) ? PORT_MAP[originCode] : originCode;
+        const mappedDest = (destCode && PORT_MAP[destCode]) ? PORT_MAP[destCode] : destCode;
 
         // Combine origin and destination as "ORIGIN / DESTINATION"
         let portDisplay = '';
@@ -937,7 +1025,7 @@ export default function OffenceForm() {
             flight_date: scanData.flightDate ? scanData.flightDate : prev.flight_date
         }));
     }
-  };
+  }, []);
 
   return (
     <div className="space-y-4 pt-2 w-full px-2 pb-20">
@@ -949,7 +1037,7 @@ export default function OffenceForm() {
           </button>
           <div>
             <h1 className="text-2xl font-bold text-slate-800 tracking-tight flex items-center">
-              {isEditing ? `Modify O.S. No: ${osNo}/${osYear}` : 'Register New O.S. Case'}
+              {isViewOnly ? `View O.S. No: ${osNo}/${osYear}` : isEditing ? `Modify O.S. No: ${osNo}/${osYear}` : 'Register New O.S. Case'}
               <span className="ml-3 text-sm font-medium px-2 py-0.5 bg-brand-100 text-brand-700 rounded border border-brand-200">
                   {formData.os_date}
               </span>
@@ -958,7 +1046,11 @@ export default function OffenceForm() {
         </div>
         
         <div className="flex items-center space-x-3">
-            {formData.is_draft === 'N' ? (
+            {isViewOnly ? (
+                <span className="bg-blue-100 text-blue-800 border border-blue-300 px-3 py-1.5 rounded-lg text-sm font-bold flex items-center shadow-sm">
+                    <FileText className="mr-1.5" size={16} /> VIEW ONLY — ADJUDICATED
+                </span>
+            ) : formData.is_draft === 'N' ? (
                 <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 px-3 py-1.5 rounded-lg text-sm font-bold flex items-center">
                     <CheckCircle className="mr-1.5" size={16} /> Submitted
                 </span>
@@ -1014,7 +1106,7 @@ export default function OffenceForm() {
       )}
 
       <div className="space-y-6 mt-2">
-        
+        <fieldset disabled={isViewOnly} className="space-y-6">
         {/* Top Details Grid */}
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
             <div className="bg-white p-5 rounded-xl border border-slate-200 xl:col-span-2 flex flex-col h-full">
@@ -1222,6 +1314,27 @@ export default function OffenceForm() {
                             Old P.P. Nos. <span className="text-[10px] lowercase normal-case font-normal text-slate-400 -mt-0.5">(Separate with ;)</span>
                         </label>
                         <input type="text" className="w-full px-3 py-1.5 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-blue-500 uppercase" placeholder="Leave blank if not avail" value={formData.old_passport_no} onChange={e => setFormData({...formData, old_passport_no: e.target.value.toUpperCase()})} />
+                        {oldPassportsSuggestion.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-1.5">
+                            <span className="text-[10px] text-indigo-600 font-semibold self-center">Found in COPS:</span>
+                            {oldPassportsSuggestion.map(pp => (
+                              <button
+                                key={pp}
+                                type="button"
+                                onClick={() => {
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    old_passport_no: prev.old_passport_no ? `${prev.old_passport_no}; ${pp}` : pp,
+                                  }));
+                                  setOldPassportsSuggestion(prev => prev.filter(p => p !== pp));
+                                }}
+                                className="text-[11px] bg-indigo-50 border border-indigo-300 text-indigo-700 px-2 py-0.5 rounded-full font-semibold hover:bg-indigo-100 transition-colors"
+                              >
+                                + {pp}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -1283,22 +1396,7 @@ export default function OffenceForm() {
                     <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Previous Visits</label>
                     <input id="field-previous_visits" type="text" className={`w-full px-3 py-1.5 bg-slate-50 border ${fieldErrors.previous_visits ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-300 focus:ring-emerald-500'} rounded text-sm focus:ring-2 uppercase`} value={formData.previous_visits} onChange={e => setFormData({...formData, previous_visits: e.target.value.toUpperCase()})} />
                 </div>
-                <div className="col-span-4 mt-2">
-                    <div className="flex justify-between items-center mb-1">
-                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">Supdt's Remarks</label>
-                        <span className={`text-xs font-semibold ${formData.supdts_remarks.length > 1500 ? 'text-red-600' : formData.supdts_remarks.length > 1275 ? 'text-orange-500' : 'text-slate-400'}`}>
-                            {formData.supdts_remarks.length} / 1500
-                        </span>
-                    </div>
-                    <textarea 
-                        id="field-supdts_remarks"
-                        rows={5}
-                        className={`w-full px-3 py-2 bg-slate-50 border rounded text-sm focus:ring-2 focus:ring-emerald-500 resize-none ${formData.supdts_remarks.length > 1500 || fieldErrors.supdts_remarks ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-300'}`}
-                        value={formData.supdts_remarks}
-                        onChange={e => setFormData({...formData, supdts_remarks: e.target.value.slice(0, 1500)})}
-                    />
-                    {fieldErrors.supdts_remarks && <p className="mt-1 text-xs font-semibold text-red-600">{fieldErrors.supdts_remarks}</p>}
-                </div>
+
             </div>
         </div>
 
@@ -1350,6 +1448,7 @@ export default function OffenceForm() {
                                     onSetFieldError={setItemFieldError}
                                     onClearFieldError={clearItemFieldError}
                                     onDescBlur={onDescBlur}
+                                    descDatalistId="item-desc-datalist"
                                 />
                             ))
                         )}
@@ -1374,8 +1473,49 @@ export default function OffenceForm() {
             </div>
         </div>
 
+        {/* Item-description autocomplete datalist — memoized: only re-renders when DB data loads, not on every formData keystroke */}
+        {descDatalist}
+
+        {/* Superintendent Remarks */}
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden flex flex-col mt-6 shadow-sm">
+            <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                <h2 className="text-sm font-bold text-slate-800 uppercase flex items-center tracking-wider">
+                    <FileText className="mr-2 text-indigo-500" size={16} /> Superintendent's Remarks & Findings
+                </h2>
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); triggerGenerateRemarks('SUPDT'); }}
+                  disabled={remarksLoading}
+                  title={remarksLoading ? 'Loading legal statutes…' : 'Auto-generate remarks from seized items'}
+                  className="text-[11px] px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 rounded font-bold flex items-center transition-colors shadow-sm disabled:opacity-60 uppercase tracking-wider"
+                >
+                  <Wand2 size={13} className="mr-1.5" />
+                  {remarksLoading ? 'Loading Statutes…' : 'Auto-Generate From Items ✨'}
+                </button>
+            </div>
+            <div className="p-4 bg-white">
+                <div className="flex justify-between items-center mb-1">
+                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">Case Remarks</label>
+                    <span className={`text-xs font-semibold ${supdtsRemarks.length > 1500 ? 'text-red-600' : supdtsRemarks.length > 1275 ? 'text-orange-500' : 'text-slate-400'}`}>
+                        {supdtsRemarks.length} / 1500
+                    </span>
+                </div>
+                <textarea
+                    id="field-supdts_remarks"
+                    rows={6}
+                    className={`w-full px-3 py-2 bg-slate-50 border rounded text-sm focus:ring-2 focus:ring-emerald-500 resize-none ${supdtsRemarks.length > 1500 || fieldErrors.supdts_remarks ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-300'}`}
+                    value={supdtsRemarks}
+                    onChange={e => setSupdtsRemarks(e.target.value.slice(0, 1500))}
+                    placeholder="Click the Auto-Generate button to construct remarks based on items, or type manually..."
+                />
+                {fieldErrors.supdts_remarks && <p className="mt-1 text-xs font-semibold text-red-600">{fieldErrors.supdts_remarks}</p>}
+            </div>
+        </div>
+        </fieldset>
+
       {/* Warning Note about Default Values */}
-      <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mt-6 rounded-r-lg">
+      {!isViewOnly && (
+        <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mt-6 rounded-r-lg">
         <div className="flex items-start">
           <div className="flex-shrink-0 mt-0.5">
             <AlertCircle className="h-5 w-5 text-amber-600" aria-hidden="true" />
@@ -1402,8 +1542,10 @@ export default function OffenceForm() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Form Action Buttons at Bottom */}
+      {!isViewOnly && (
       <div className="flex space-x-4 justify-end bg-white p-4 rounded-xl border border-slate-200 mt-4 mb-8">
         <button
           onClick={() => setShowExitModal(true)}
@@ -1429,8 +1571,63 @@ export default function OffenceForm() {
           {formData.is_draft === 'N' ? 'Update O.S. Details' : 'Submit O.S. For Adjudication'}
         </button>
       </div>
+      )}
 
       </div>
+
+      {/* Contextual questions modal — appears before auto-generating remarks */}
+      {showContextModal && (
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-lg p-6 space-y-5">
+            <div>
+              <h3 className="text-base font-bold text-slate-800">Additional Information Required</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Please answer the following questions to generate accurate remarks.
+              </p>
+            </div>
+            <div className="space-y-4">
+              {contextQuestions.map(q => (
+                <div key={q.key} className="border border-slate-200 rounded-lg p-4 bg-slate-50">
+                  <p className="text-sm font-medium text-slate-700 mb-3">{q.question}</p>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setContextAnswers(prev => ({ ...prev, [q.key]: true }))}
+                      className={`flex-1 py-2 px-3 rounded-lg border text-sm font-semibold transition-colors ${contextAnswers[q.key] === true ? 'bg-green-600 text-white border-green-600' : 'bg-white text-slate-700 border-slate-300 hover:border-green-400'}`}
+                    >
+                      {q.yesLabel || 'Yes'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setContextAnswers(prev => ({ ...prev, [q.key]: false }))}
+                      className={`flex-1 py-2 px-3 rounded-lg border text-sm font-semibold transition-colors ${contextAnswers[q.key] === false ? 'bg-red-600 text-white border-red-600' : 'bg-white text-slate-700 border-slate-300 hover:border-red-400'}`}
+                    >
+                      {q.noLabel || 'No'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowContextModal(false)}
+                className="flex-1 py-2 px-4 rounded-lg border border-slate-300 text-slate-700 text-sm font-medium hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={contextQuestions.some(q => contextAnswers[q.key] === undefined)}
+                onClick={handleContextSubmit}
+                className="flex-1 py-2 px-4 rounded-lg bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                <Wand2 size={14} /> Generate Remarks
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showExitModal && (
         <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center z-50">

@@ -7,6 +7,7 @@ export default function OSPrintView() {
   const { os_no, os_year } = useParams();
   const navigate = useNavigate();
   const [data, setData] = useState<any>(null);
+  const [prevSamePpOffences, setPrevSamePpOffences] = useState<string>('NIL');
   const [otherPpOffences, setOtherPpOffences] = useState<string>('NIL');
   const [loading, setLoading] = useState(true);
   // Versioned config for the OS date
@@ -48,23 +49,47 @@ export default function OSPrintView() {
             setPitConfig(pitRes.data);
           } catch { setPitConfig(null); }
 
-          // Fetch other PP offences for same passenger
+          // Fetch offences for same passenger (by name) to populate both fields
           try {
             const ppRes = await api.post('/os-query/search', {
               pax_name: fetchedData.pax_name,
-              page: 1, limit: 20
+              page: 1, limit: 50
             });
-            // Filter out the current OS record
-            const otherOffences = ppRes.data.items.filter((item: any) => 
-               item.os_no !== fetchedData.os_no || item.os_year !== fetchedData.os_year
+            // Exclude the current OS record itself
+            const allOther = ppRes.data.items.filter((item: any) =>
+              item.os_no !== fetchedData.os_no || item.os_year !== fetchedData.os_year
             );
-            if (otherOffences.length > 0) {
-               setOtherPpOffences(otherOffences.map((o: any) => `${o.passport_no} (OS ${o.os_no}/${o.os_year})`).join(', '));
+
+            // Same passport + strictly before current OS date → "Prev. Offence in Above PP No(s)."
+            const currentOsDate = new Date(fetchedData.os_date);
+            const samePassportPrior = allOther.filter((o: any) =>
+              o.passport_no === fetchedData.passport_no &&
+              new Date(o.os_date) < currentOsDate
+            );
+            if (samePassportPrior.length > 0) {
+              const osList = samePassportPrior
+                .sort((a: any, b: any) => new Date(b.os_date).getTime() - new Date(a.os_date).getTime())
+                .map((o: any) => `${o.os_no}/${o.os_year}`)
+                .join(', ');
+              setPrevSamePpOffences(`${samePassportPrior.length} (${osList})`);
             } else {
-               setOtherPpOffences('NIL');
+              setPrevSamePpOffences('NIL');
+            }
+
+            // Different passport, same pax name → "Offences of Other PPs(if any)"
+            const otherPassport = allOther.filter((o: any) =>
+              o.passport_no !== fetchedData.passport_no
+            );
+            if (otherPassport.length > 0) {
+              setOtherPpOffences(
+                otherPassport.map((o: any) => `${o.passport_no} (OS ${o.os_no}/${o.os_year})`).join(', ')
+              );
+            } else {
+              setOtherPpOffences('NIL');
             }
           } catch(e) {
-             setOtherPpOffences('NIL');
+            setPrevSamePpOffences('NIL');
+            setOtherPpOffences('NIL');
           }
         }
       } catch (err) {
@@ -95,8 +120,39 @@ export default function OSPrintView() {
 
   const colFaHeading     = pitText('col_fa_heading',     "Goods Allowed Free Under Rule 5 / Rule 13 of Baggage Rules, 1994");
   const colLiableHeading = pitText('col_liable_heading', "Goods Liable to Action Under FEMA / Foreign Trade Act, 1992 & Customs Act, 1962");
-  const summaryDutyText  = pitText('summary_duty_text',   "Value of Goods Charged to Duty Under Foreign Trade (D&R) Act, 1992 & Customs Act, 1962");
-  const summaryLiableText = pitText('summary_liable_text', "Value of Goods Liable to Action under FEMA / Foreign Trade (D&R) Act, 1992 & Customs Act 1962");
+
+  const page1Title      = pitText('page1_title',      "Detention / Seizure of Passenger's Baggage");
+  const inventoryHeading = pitText('inventory_heading', "INVENTORY OF THE GOODS IMPORTED");
+  const colDutyHeading  = pitText('col_duty_heading',  "Goods Passed On Duty");
+  const supdtSigTitle   = pitText('supdt_sig_title',   "Supdt. of Customs");
+  const officeHeader1   = pitText('office_header_line1', "Office of the Deputy / Asst. Commissioner of Customs");
+  const officeHeader2   = pitText('office_header_line2', "(Airport), Anna International Airport, Chennai-600027");
+  const p2OfficeHeading = pitText('p2_office_heading', "Office of the Deputy / Asst. Commissioner of Customs (Airport), Anna International airport, Chennai-600027.");
+  const p2WaiverHeading = pitText('p2_waiver_heading', "WAIVER OF SHOW CAUSE NOTICE");
+  const waiverText1     = pitText('waiver_text_1',     "The Charges have been orally communicated to me in respect of the goods mentioned overleaf and imported by me. Orders in the case may please be passed without issue of Show Cause Notice. However I may kindly be given a Personal Hearing.");
+  const waiverText2     = pitText('waiver_text_2',     "I was present during the personal hearing conducted by the Deputy / Asst. Commissioner and I was heard.");
+  const nb1Text         = pitText('nb1_text',          "N.B: 1. This copy is granted free of charge for the private use of the person to whom it is issued.");
+  const nb2Text         = pitText('nb2_text',          "2. An Appeal against this Order shall lie before the Commissioner of Customs (Appeals), Custom House, Chennai-600 001 on payment of 7.5% of the duty demanded where duty or duty and penalty are in dispute, or penalty, where penalty alone is in dispute. The Appeal shall be filed within 60 days provided under Section 128 of the Customs Act, 1962 from the date of receipt of this Order.");
+  const noteScnWaived   = pitText('note_scn_waived',   "Note: The issue of Show Cause Notice was waived at the instance of the Passenger.");
+  const legalPara1      = pitText('legal_para_1',      "In terms of Foreign Trade Policy notified by the Government in pursuance to Section 3(1) & 3(2) of the Foreign Trade (Development & Regulation) Act, 1992 read with the Rules framed thereunder, also read with Section 11(2)(u) of Customs Act, 1962, import of 'goods in commercial quantity / goods in the nature of non-bonafide baggage' is not permitted without a valid import licence, though exemption exists under clause 3(h) of the Foreign Trade (Exemption from application of Rules in certain cases) order 1993 for import of goods by a passenger from abroad only to the extent admissible under the Baggage Rules framed under Section 79 of the Customs Act, 1962.");
+  const legalPara2      = pitText('legal_para_2',      "Import of goods non-declared / misdeclared / concealed / in trade and in commercial quantity / non-bonafide in excess of the baggage allowance is therefore liable for confiscation under Section 111(d), (i), (l), (m) & (o) of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992.");
+  const recordHeading   = pitText('record_heading',    "RECORD OF PERSONAL HEARING & FINDINGS");
+  const orderHeading    = pitText('order_heading',     "ORDER");
+  const orderParaRfTpl      = pitText('order_para_rf',       "I Order confiscation of the goods{rf_slnos_text} valued at Rs.{conf_value}/- under Section 111(d), (i), (l), (m) & (o) of the Customs Act, 1962 read with Section 3(3) of Foreign Trade (D&R) Act, 1992, but allow the passenger an option to redeem the goods valued at Rs.{conf_value}/- on a fine of Rs.{rf_amount}/- (Rupees {rf_words} Only) in lieu of confiscation under Section 125 of the Customs Act 1962 within 7 days from the date of receipt of this Order, Duty extra.");
+  const orderParaRefTpl     = pitText('order_para_ref',      "However, I give an option to reship the goods{ref_slnos_text} valued at Rs.{re_exp_value}/- on a fine of Rs.{ref_amount}/- (Rupees {ref_words} Only) under Section 125 of the Customs Act 1962 within 1 Month from the date of this Order.");
+  const orderParaAbsConfTpl = pitText('order_para_abs_conf', "I {also_text}order absolute confiscation of the goods{abs_conf_slnos_text} valued at Rs.{abs_conf_value}/- under Section 111(d), (i), (l), (m) & (o) of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (D&R) Act, 1992.");
+  const orderParaPpTpl      = pitText('order_para_pp',       "I further impose a Personal Penalty of Rs.{pp_amount}/- (Rupees {pp_words} Only) under Section 112(a) of the Customs Act, 1962.");
+  const deputySigTitle  = pitText('deputy_sig_title',  "Deputy / Asst. Commissioner of Customs (Airport)");
+  const bottomNb1       = pitText('bottom_nb1',        "N.B: 1. Perishables will be disposed off within seven days from the date of detention.");
+  const bottomNb2       = pitText('bottom_nb2',        "2. Where re-export is permitted, the passenger is advised to intimate the date of departure of flight atleast 48 hours in advance.");
+  const bottomNb3       = pitText('bottom_nb3',        "3. Warehouse rent and Handling Charges are chargeable for the goods detained.");
+  const receivedOrderText = pitText('received_order_text', "Received the Order-in-Original");
+
+  // Template substitution for ORDER paragraphs (replaces {placeholder} with actual values)
+  const fillTpl = (tpl: string, vars: Record<string, string | number>): string =>
+    tpl.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? `{${k}}`));
+
+  const slnosText = (nos: number[]) => nos.length > 0 ? ` at Sl.No(s). ${nos.join(', ')}` : '';
 
   const handlePrint = async () => {
     // Use the pre-generated PDF (started when page loaded); fall back to a fresh request
@@ -165,7 +221,7 @@ export default function OSPrintView() {
   const effFa = (item: any): number => {
     const val = Number(item.items_value) || 0;
     const rc = (item.items_release_category || '').toUpperCase();
-    if (!['UNDER DUTY', 'UNDER OS', 'RF', 'REF', 'CONFS'].includes(rc)) return 0;
+    if (!['UNDER DUTY', 'UNDER OS', 'RF', 'REF'].includes(rc)) return 0;
     if ((item.items_fa_type || 'value') === 'qty') {
       const totalQty = Number(item.items_qty) || 0;
       const faQty = Number(item.items_fa_qty) || 0;
@@ -179,30 +235,11 @@ export default function OSPrintView() {
   // Add a 1-based index (displaySno) to align the ORDER paragraph serials with the table rows
   const items = (data.items || []).map((itm: any, idx: number) => ({ ...itm, displaySno: idx + 1 }));
 
-  // Sum effective FA across all items that have FA (Under Duty + Under OS)
-  const totalFAValueMonetary = items
-    .filter((i: any) => {
-      const rc = (i.items_release_category || 'Under OS').toUpperCase();
-      return (rc === 'UNDER DUTY' || rc === 'UNDER OS' || rc === 'RF' || rc === 'REF') && (i.items_fa_type || 'value') === 'value';
-    })
-    .reduce((sum: number, i: any) => sum + effFa(i), 0);
   // Format qty without trailing decimal zeros
   const fmtQty = (q: number | string) => {
     const n = Number(q);
     return n % 1 === 0 ? Math.trunc(n).toString() : String(q);
   };
-  // Qty-based FA items for the summary label
-  const qtyFaList = items
-    .filter((i: any) => {
-      const rc = (i.items_release_category || 'Under OS').toUpperCase();
-      return (rc === 'UNDER DUTY' || rc === 'UNDER OS' || rc === 'RF' || rc === 'REF') && (i.items_fa_type || 'value') === 'qty' && i.items_fa_qty;
-    })
-    .map((i: any) => `${fmtQty(i.items_fa_qty)} ${uqcLabel(i.items_fa_uqc || '')} of ${i.items_desc}`)
-    .join(' & ');
-  // "Under Duty" = goods passed on duty (not seized)
-  const totalDutiableValue = items
-    .filter((i: any) => i.items_release_category === 'Under Duty')
-    .reduce((sum: number, i: any) => sum + Math.max(0, (Number(i.items_value) || 0) - effFa(i)), 0);
   // "Liable" = Under OS + RF + REF + CONFS items (value after FA deduction)
   const LIABLE_CATS = ['CONFS', 'ABS_CONFS', 'RE_EXP', 'RF', 'REF', 'UNDER OS'];
   const totalLiableValue = items
@@ -217,26 +254,51 @@ export default function OSPrintView() {
   const hasRfItems = rfItemsValue > 0;
   const hasRefItems = refItemsValue > 0;
   const hasConfsItems = confsItemsValue > 0;
-  // Fallback: if no items are categorized, use master-level values
-  let confValue = hasRfItems ? rfItemsValue : (data.confiscated_value || totalItemsValue);
-  const reExpValue = hasRefItems ? refItemsValue : (data.re_export_value || 0);
-  let absConfValue = hasConfsItems ? confsItemsValue : 0;
-
-  // "If there is no redemption fine, it means it is absolutely confiscated"
-  if ((data.rf_amount || 0) === 0 && confValue > 0) {
-    absConfValue += confValue;
-    confValue = 0;
-  }
-
   // Serial numbers grouped by disposal category (for ORDER paragraph)
   const rfSlNos = items.filter((i: any) => i.items_release_category === 'RF').map((i: any) => i.displaySno);
   const refSlNos = items.filter((i: any) => i.items_release_category === 'REF').map((i: any) => i.displaySno);
   const confsSlNos = items.filter((i: any) => i.items_release_category === 'CONFS').map((i: any) => i.displaySno);
 
+  // ORDER paragraph values.
+  // When item-level categories exist (new records), derive entirely from items.
+  // When no items exist (legacy records), fall back to master-level fields.
+  const hasItemData = items.length > 0;
+  let confValue = hasRfItems ? rfItemsValue : (hasItemData ? 0 : (data.confiscated_value || 0));
+  const reExpValue = hasRefItems ? refItemsValue : (data.re_export_value || 0);
+  let absConfValue = hasConfsItems ? confsItemsValue : 0;
+
+  // RF items with zero redemption fine → treat as absolute confiscation
+  // (also handles legacy cases where rf_amount=0 means the goods were absolutely confiscated)
+  if ((data.rf_amount || 0) === 0 && confValue > 0) {
+    absConfValue += confValue;
+    confValue = 0;
+  }
+
+  // When RF items are moved to absolute confiscation, merge their sl.nos
+  const allAbsConfSlNos = ((data.rf_amount || 0) === 0 && rfSlNos.length > 0)
+    ? [...confsSlNos, ...rfSlNos].sort((a: number, b: number) => a - b)
+    : confsSlNos;
+
   // Calculate prev offences count
-  const otherPpOffencesCount = otherPpOffences === 'NIL' ? 0 : otherPpOffences.split(',').length;
-  // Use DB field if it's purely a number, otherwise use the computed count
-  const prevOffenceCountDisplay = (data.previous_visits && /^\d+$/.test(data.previous_visits)) ? data.previous_visits : otherPpOffencesCount;
+  // "Prev. Offence in Above PP No(s).": live COPS data takes priority over legacy DB field
+  const prevOffenceCountDisplay = prevSamePpOffences !== 'NIL'
+    ? prevSamePpOffences
+    : (data.previous_visits || 'NIL');
+
+  // Summary Table Calculations
+  const FA_ELIGIBLE_CATS = ['UNDER DUTY', 'UNDER OS', 'RF', 'REF'];
+  const totalFaMonetary = items
+    .filter((i: any) => FA_ELIGIBLE_CATS.includes((i.items_release_category || 'Under OS').toUpperCase()) && (i.items_fa_type || 'value') === 'value')
+    .reduce((sum: number, i: any) => sum + effFa(i), 0);
+
+  const totalDutiable = items
+    .filter((i: any) => (i.items_release_category || '').toUpperCase() === 'UNDER DUTY')
+    .reduce((sum: number, i: any) => sum + Math.max(0, (i.items_value || 0) - effFa(i)), 0);
+
+  const qtyFaList = items
+    .filter((i: any) => (i.items_fa_type === 'qty' && Number(i.items_fa_qty || 0) > 0 && FA_ELIGIBLE_CATS.includes((i.items_release_category || 'Under OS').toUpperCase())))
+    .map((i: any) => `${fmtQty(i.items_fa_qty)} ${uqcLabel(i.items_fa_uqc || '')} of ${i.items_desc}`)
+    .join(' & ');
 
   return (
     <div className="bg-slate-200 min-h-screen pb-10 print:bg-white print:p-0 print:min-h-0 print:overflow-visible">
@@ -248,7 +310,7 @@ export default function OSPrintView() {
         </button>
         <div className="flex gap-3">
           <button onClick={handlePrint} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded shadow text-sm font-medium hover:bg-emerald-700 transition">
-            <Printer className="w-4 h-4" /> Print Legal Order (Both Sides)
+            <Printer className="w-4 h-4" /> Download OS
           </button>
         </div>
       </div>
@@ -257,7 +319,7 @@ export default function OSPrintView() {
       <div id="os-print-pages" className="max-w-[8.5in] mx-auto mt-8 print:mt-0 print:max-w-none print:w-[8.5in] text-black leading-tight print:leading-tight space-y-8 print:space-y-0" style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: '10.5pt' }}>
         
         {/* --- PAGE 1: BOOKING REPORT --- */}
-        <div className="bg-white p-8 shadow-md print:shadow-none relative print:w-[8.5in] box-border print:px-6 print:py-4 flex flex-col print:block" style={{ pageBreakAfter: 'always' }}>
+        <div className="bg-white p-8 shadow-md print:shadow-none relative print:w-[8.5in] print:max-w-[8.5in] box-border print:px-6 print:py-4 flex flex-col print:block overflow-hidden print:overflow-hidden m-auto" style={{ pageBreakAfter: 'always' }}>
           
           {/* Header */}
           <div className="border-4 border-solid border-black p-2 flex items-center mb-4 min-h-[5rem]">
@@ -267,12 +329,12 @@ export default function OSPrintView() {
             </div>
             {/* Header Text */}
             <div className="w-5/6 text-center font-bold flex flex-col justify-center">
-              <div className="text-2xl leading-none tracking-tight">Office of the Deputy / Asst. Commissioner of Customs</div>
-              <div className="text-lg leading-tight mt-1">(Airport), Anna International Airport, Chennai-600027</div>
+              <div className="text-2xl leading-none tracking-tight">{officeHeader1}</div>
+              <div className="text-lg leading-tight mt-1">{officeHeader2}</div>
             </div>
           </div>
 
-          <h2 className="text-lg font-bold uppercase text-center mb-6">Detention / Seizure of Passenger's Baggage</h2>
+          <h2 className="text-lg font-bold uppercase text-center mb-6">{page1Title}</h2>
           
           <table className="w-full border-collapse border-4 border-solid border-black mb-4 text-left" style={{ fontSize: '10.5pt', tableLayout: 'fixed' }}>
             <colgroup>
@@ -327,7 +389,7 @@ export default function OSPrintView() {
             </tbody>
           </table>
 
-          <h3 className="text-center font-bold text-xl mb-2">INVENTORY OF THE GOODS IMPORTED</h3>
+          <h3 className="text-center font-bold text-xl mb-2">{inventoryHeading}</h3>
           
           <table className="w-full border-collapse border-4 border-solid border-black mb-4 text-center" style={{ fontSize: '9.5pt', tableLayout: 'fixed' }}>
             <colgroup>
@@ -343,9 +405,9 @@ export default function OSPrintView() {
                 <th className="border-2 border-black border-solid p-0.5">S.No.</th>
                 <th className="border-2 border-black border-solid p-0.5 text-left">Description of Goods</th>
                 <th className="border-2 border-black border-solid p-0.5">Qty.</th>
-                <th className="border-2 border-black border-solid p-0.5" style={{ fontSize: '8.5pt', lineHeight: '1.2' }}>{colFaHeading}</th>
-                <th className="border-2 border-black border-solid p-0.5" style={{ fontSize: '8.5pt', lineHeight: '1.2' }}>Goods Passed On Duty<br/><span className="font-bold block mt-1">Value (in Rs.)</span></th>
-                <th className="border-2 border-black border-solid p-0.5" style={{ fontSize: '8.5pt', lineHeight: '1.2' }}>{colLiableHeading}<br/><span className="font-normal">Total Value (in Rs.)</span></th>
+                <th className="border-2 border-black border-solid p-0.5" style={{ fontSize: '10pt', lineHeight: '1.1' }}>{colFaHeading}</th>
+                <th className="border-2 border-black border-solid p-0.5" style={{ fontSize: '10pt', lineHeight: '1.1' }}>{colDutyHeading}<br/><span className="font-bold block mt-1">Value (in Rs.)</span></th>
+                <th className="border-2 border-black border-solid p-0.5" style={{ fontSize: '10pt', lineHeight: '1.1' }}>{colLiableHeading}<br/><span className="font-bold">Total Value (in Rs.)</span></th>
               </tr>
             </thead>
             <tbody>
@@ -399,32 +461,22 @@ export default function OSPrintView() {
             </tbody>
           </table>
 
-          <table className="w-full border-collapse border-4 border-black border-solid flex-shrink-0" style={{ fontSize: '10pt', tableLayout: 'fixed' }}>
-            <colgroup>
-              <col style={{ width: '72%' }} />
-              <col style={{ width: '28%' }} />
-            </colgroup>
+          <table className="w-full border-collapse border-4 border-black border-solid mb-4" style={{ fontSize: '11pt' }}>
             <tbody>
               <tr>
-                <td className="border-2 border-black border-b-0 border-solid px-2 py-0.5 align-top" style={{ wordBreak: 'break-word' }}>
-                  Value of {colFaHeading}
-                </td>
-                <td className="border-2 border-black border-b-0 border-solid px-2 py-0.5 text-right font-bold align-top" style={{ wordBreak: 'break-word' }}>
-                  Rs. {totalFAValueMonetary > 0 ? totalFAValueMonetary.toLocaleString('en-IN') : '0'}{totalFAValueMonetary > 0 ? '/-' : ''}
-                  {qtyFaList && (
-                    <span className="block text-[7pt] font-normal text-gray-600 mt-0.5 whitespace-normal">
-                      (along with {qtyFaList})
-                    </span>
-                  )}
+                <td className="border-2 border-black border-solid px-2 py-1 align-top w-[50%]">Value of {colFaHeading}</td>
+                <td className="border-2 border-black border-solid px-2 py-1 align-top font-bold text-right" style={{ width: '50%' }}>
+                  Rs. {totalFaMonetary.toLocaleString('en-IN')}{totalFaMonetary > 0 ? '/-' : ''}
+                  {qtyFaList && <><br /><span className="text-[8pt] font-normal text-slate-700">(along with {qtyFaList})</span></>}
                 </td>
               </tr>
               <tr>
-                <td className="border-2 border-black border-b-0 border-solid px-2 py-0.5" style={{ wordBreak: 'break-word' }}>{summaryDutyText}</td>
-                <td className="border-2 border-black border-b-0 border-solid px-2 py-0.5 text-right font-bold">Rs. {totalDutiableValue.toLocaleString('en-IN')}</td>
+                <td className="border-2 border-black border-solid px-2 py-1 align-top">{pitText('summary_duty_text', 'Value of Goods Charged to Duty Under Foreign Trade (D&R) Act, 1992 & Customs Act, 1962')}</td>
+                <td className="border-2 border-black border-solid px-2 py-1 align-top font-bold text-right">Rs. {totalDutiable.toLocaleString('en-IN')}</td>
               </tr>
               <tr>
-                <td className="border-2 border-black border-solid px-2 py-0.5 font-bold" style={{ wordBreak: 'break-word' }}>{summaryLiableText}</td>
-                <td className="border-2 border-black border-solid px-2 py-0.5 text-right font-bold">Rs. {totalItemsValue.toLocaleString('en-IN')}</td>
+                <td className="border-2 border-black border-solid px-2 py-1 align-top font-bold">{pitText('summary_liable_text', 'Value of Goods Liable to Action under FEMA / Foreign Trade (D&R) Act, 1992 & Customs Act 1962')}</td>
+                <td className="border-2 border-black border-solid px-2 py-1 align-top font-bold text-right">Rs. {totalItemsValue.toLocaleString('en-IN')}</td>
               </tr>
             </tbody>
           </table>
@@ -442,7 +494,7 @@ export default function OSPrintView() {
           </div>
 
           <div className="flex justify-end font-bold pr-8 mb-4" style={{ fontSize: '12pt' }}>
-            <div>Supdt. of Customs</div>
+            <div>{supdtSigTitle}</div>
           </div>
 
         </div>
@@ -451,7 +503,7 @@ export default function OSPrintView() {
         <div className="bg-white p-8 shadow-md print:shadow-none relative print:w-[8.5in] box-border print:px-6 print:py-4 flex flex-col print:block">
           
           <div className="w-full text-center">
-            <span className="font-bold">Office of the Deputy / Asst. Commissioner of Customs (Airport), Anna International airport, Chennai-600027.</span>
+            <span className="font-bold">{p2OfficeHeading}</span>
           </div>
 
           <div className="w-full flex justify-between mt-4 mb-2">
@@ -461,9 +513,9 @@ export default function OSPrintView() {
             </div>
           </div>
 
-          <div className="text-center font-bold underline uppercase mb-1">WAIVER OF SHOW CAUSE NOTICE</div>
+          <div className="text-center font-bold underline uppercase mb-1">{p2WaiverHeading}</div>
           <div className="mb-2 text-justify indent-8">
-            The Charges have been orally communicated to me in respect of the goods mentioned overleaf and imported by me. Orders in the case may please be passed without issue of Show Cause Notice. However I may kindly be given a Personal Hearing.
+            {waiverText1}
           </div>
           <div className="flex justify-end mb-2">
             <div className="w-[200px] text-center">
@@ -473,7 +525,7 @@ export default function OSPrintView() {
           </div>
 
           <div className="mb-2 text-justify indent-8">
-            I was present during the personal hearing conducted by the Deputy/Asst. Commissioner and I was heard.
+            {waiverText2}
           </div>
           <div className="flex justify-end mb-4">
             <div className="w-[200px] text-center">
@@ -490,48 +542,60 @@ export default function OSPrintView() {
           <div className="text-center font-bold underline uppercase mb-2">ORDER (ORIGINAL)</div>
         
           <div className="mb-2 space-y-1 text-justify">
-            <p><span className="font-bold">N.B: 1.</span> This copy is granted free of charge for the private use of the person to whom it is issued.</p>
-            <p><span className="font-bold">2.</span> An Appeal against this Order shall lie before the Commissioner of Customs (Appeals), Custom House, Chennai-600 001 on payment of 7.5% of the duty demanded where duty or duty and penalty are in dispute, or penalty, where penalty alone is in dispute. The Appeal shall be filed within 60 days provided under Section 128 of the Customs Act, 1962 from the date of receipt of this Order.</p>
+            <p>{nb1Text}</p>
+            <p>{nb2Text}</p>
           </div>
-          <p className="mb-2 indent-8"><span className="font-bold">Note: This issue of Show Cause Notice was waived at the instance of the Passenger.</span></p>
+          <p className="mb-2 indent-8"><span className="font-bold">{noteScnWaived}</span></p>
 
           <div className="mb-2 space-y-1 text-justify">
-            <p className="indent-8">In terms of Foreign Trade Policy notified by the Government in pursuance to Section 3(1) & 3(2) of the Foreign Trade (Development & Regulation) Act, 1992 read with the Rules framed thereunder, also read with Section 11(2)(u) of Customs Act, 1962, import of 'goods in commercial quantity / goods in the nature of non-bonafide baggage’ is not permitted without a valid import licence, though exemption exists under clause 3(h) of the Foreign Trade (Exemption from application of Rules in certain cases) order 1993 for import of goods by a passenger from abroad only to the extent admissible under the Baggage Rules framed under Section 79 of the Customs Act, 1962.</p>
-            <p className="indent-8">Import of goods non-declared / misdeclared / concealed / in trade and in commercial quantity / non-bonafide in excess of the baggage allowance is therefore liable for confiscation under Section 111(d), (i), (l), (m) & (o) of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992.</p>
+            <p className="indent-8">{legalPara1}</p>
+            <p className="indent-8">{legalPara2}</p>
           </div>
 
-          <div className="font-bold underline text-center uppercase mb-1">RECORD OF PERSONAL HEARING & FINDINGS</div>
-          <div className="mb-2 text-justify indent-8"
-            dangerouslySetInnerHTML={{ __html: (data.adjn_offr_remarks || 'No remarks provided.').replace(/\n/g, '<br/>') }}
-          />
+          <div className="font-bold underline text-center uppercase mb-1">{recordHeading}</div>
+          <div className="mb-2 text-justify indent-8">
+            {(data.adjn_offr_remarks || 'No remarks provided.').split('\n').map((line: string, i: number, arr: string[]) => (
+              <span key={i}>{line}{i < arr.length - 1 && <br />}</span>
+            ))}
+          </div>
 
-          <div className="font-bold underline text-center uppercase mb-1">ORDER</div>
+          <div className="font-bold underline text-center uppercase mb-1">{orderHeading}</div>
           <div className="mb-2 text-justify">
-            {/* Sentence 1: Confiscation + RF clause (Redemption Fine items) */}
             {confValue > 0 && (data.rf_amount || 0) > 0 && (
               <p className="mb-1 indent-8">
-                I Order confiscation of the goods{rfSlNos.length > 0 ? ` at Sl.No(s). ${rfSlNos.join(', ')}` : ''} valued at Rs.{confValue}/- under Section 111(d), (i), (l), (m) &amp; (o) of the Customs Act, 1962 read with Section 3(3) of Foreign Trade (D&amp;R) Act, 1992, but allow the passenger an option to redeem the goods valued at Rs.{confValue}/- on a fine of Rs.{data.rf_amount}/- (Rupees {numberToWords(data.rf_amount || 0).trim().replace(/\b\w/g, (l: string) => l.toUpperCase())} Only) in lieu of confiscation under Section 125 of the Customs Act 1962 within 7 days from the date of receipt of this Order, Duty extra.
+                {fillTpl(orderParaRfTpl, {
+                  rf_slnos_text: slnosText(rfSlNos),
+                  conf_value: confValue,
+                  rf_amount: data.rf_amount || 0,
+                  rf_words: numberToWords(data.rf_amount || 0).trim().replace(/\b\w/g, (l: string) => l.toUpperCase()),
+                })}
               </p>
             )}
-
-            {/* Sentence 2: Re-Export reship clause (REF items) */}
             {reExpValue > 0 && (data.ref_amount || 0) > 0 && (
               <p className="mb-1 indent-8">
-                However, I give an option to reship the goods{refSlNos.length > 0 ? ` at Sl.No(s). ${refSlNos.join(', ')}` : ''} valued at Rs.{reExpValue}/- on a fine of Rs.{data.ref_amount}/- (Rupees {numberToWords(data.ref_amount || 0).trim().replace(/\b\w/g, (l: string) => l.toUpperCase())} Only) under Section 125 of the Customs Act 1962 within 1 Month from the date of this Order.
+                {fillTpl(orderParaRefTpl, {
+                  ref_slnos_text: slnosText(refSlNos),
+                  re_exp_value: reExpValue,
+                  ref_amount: data.ref_amount || 0,
+                  ref_words: numberToWords(data.ref_amount || 0).trim().replace(/\b\w/g, (l: string) => l.toUpperCase()),
+                })}
               </p>
             )}
-
-            {/* Sentence 3: Absolute Confiscation */}
             {absConfValue > 0 && (
               <p className="mb-1 indent-8">
-                I {(confValue > 0 || reExpValue > 0) ? 'also ' : ''}order absolute confiscation of the goods{confsSlNos.length > 0 ? ` at Sl.No(s). ${confsSlNos.join(', ')}` : ''} valued at Rs.{absConfValue}/- under Section 111(d), (i), (l), (m) &amp; (o) of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (D&amp;R) Act, 1992.
+                {fillTpl(orderParaAbsConfTpl, {
+                  also_text: (confValue > 0 || reExpValue > 0) ? 'also ' : '',
+                  abs_conf_slnos_text: slnosText(allAbsConfSlNos),
+                  abs_conf_value: absConfValue,
+                })}
               </p>
             )}
-
-            {/* Sentence 4: Personal Penalty */}
             {(data.pp_amount || 0) > 0 && (
               <p className="indent-8">
-                I further impose a Personal Penalty of Rs.{data.pp_amount}/- (Rupees {numberToWords(data.pp_amount || 0).trim().replace(/\b\w/g, (l: string) => l.toUpperCase())} Only) under Section 112(a) of the Customs Act, 1962.
+                {fillTpl(orderParaPpTpl, {
+                  pp_amount: data.pp_amount || 0,
+                  pp_words: numberToWords(data.pp_amount || 0).trim().replace(/\b\w/g, (l: string) => l.toUpperCase()),
+                })}
               </p>
             )}
           </div>
@@ -539,14 +603,14 @@ export default function OSPrintView() {
           <div className="flex justify-end mb-4">
             <div className="w-[300px] text-center">
               <div className="h-6"></div>
-              <p className="font-bold">Deputy / Asst. Commissioner of Customs (Airport)</p>
+              <p className="font-bold">{deputySigTitle}</p>
             </div>
           </div>
 
           <div className="mb-3 text-justify">
-            <p><span className="font-bold">N.B:</span> 1. Perishables will be disposed off within seven days from the date of detention.</p>
-            <p>2. Where re-export is permitted, the passenger is advised to intimate the date of departure of flight atleast 48 hours in advance.</p>
-            <p>3. Warehouse rent and handling charges are chargeable for goods detained.</p>
+            <p>{bottomNb1}</p>
+            <p>{bottomNb2}</p>
+            <p>{bottomNb3}</p>
           </div>
 
           <table className="w-full border-collapse border-4 border-solid border-black mb-4">
@@ -586,7 +650,7 @@ export default function OSPrintView() {
 
           <div className="flex justify-end mb-4">
             <div>
-              <p className="font-bold">Received the Order-in-Original</p>
+              <p className="font-bold">{receivedOrderText}</p>
             </div>
           </div>
 

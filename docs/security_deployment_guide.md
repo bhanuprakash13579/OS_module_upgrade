@@ -206,6 +206,95 @@ To change the sysadmin password for a new release:
 
 ---
 
+## Tauri Auto-Updater Setup
+
+The desktop app supports in-app updates via `tauri-plugin-updater`. Before updates will work, you must:
+
+### Step A — Generate signing keys (one-time)
+
+On your development machine:
+
+```bash
+cd frontend
+npx tauri signer generate -w ~/.tauri/cops-updater.key
+```
+
+This produces two files:
+- `~/.tauri/cops-updater.key` — **private key** (keep secret, never commit)
+- `~/.tauri/cops-updater.key.pub` — **public key** (goes in `tauri.conf.json`)
+
+### Step B — Add private key to GitHub Secrets
+
+1. Open your GitHub repository → **Settings** → **Secrets and variables** → **Actions**.
+2. Click **New repository secret**.
+3. **Name:** `TAURI_SIGNING_PRIVATE_KEY`
+4. **Secret:** paste the entire contents of `~/.tauri/cops-updater.key`
+5. If the key file was generated with a passphrase, also add:
+   - **Name:** `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
+   - **Secret:** the passphrase
+
+### Step C — Set the public key in tauri.conf.json
+
+Open `frontend/src-tauri/tauri.conf.json` and replace the placeholder:
+
+```json
+"plugins": {
+  "updater": {
+    "pubkey": "PASTE_YOUR_PUBLIC_KEY_HERE",
+    "endpoints": [
+      "https://github.com/YOUR_ORG/YOUR_REPO/releases/latest/download/latest.json"
+    ],
+    "dialog": true
+  }
+}
+```
+
+Replace:
+- `PASTE_YOUR_PUBLIC_KEY_HERE` → contents of `~/.tauri/cops-updater.key.pub`
+- `YOUR_ORG/YOUR_REPO` → your actual GitHub org/username and repo name
+
+### Step D — Publish a GitHub Release
+
+For the updater to work, your GitHub Actions workflow must:
+1. Build the app with the private key (the workflow already reads `TAURI_SIGNING_PRIVATE_KEY` from secrets).
+2. Publish the artifacts as a **GitHub Release** (not just workflow artifacts).
+3. Include a `latest.json` file at the release — this is generated automatically by the Tauri build when signing is enabled.
+
+> [!IMPORTANT]
+> Until Steps A–D are completed, the "Check for Updates" button in the admin panel will show an error. This is expected for development builds. In production, all four steps must be done before the updater works.
+
+---
+
+## macOS Build Notes
+
+macOS builds require an Apple developer account for distribution outside the Mac App Store. For internal/government use on known machines, unsigned builds work fine with a one-time Gatekeeper exception.
+
+### Building for macOS via GitHub Actions
+
+The Tauri workflow in `.github/workflows/` includes a macOS runner (`macos-latest`). It produces:
+- `.dmg` — disk image installer
+- `.app` (inside the DMG) — the application bundle
+
+### Installing on macOS without code signing
+
+When a user opens the `.dmg` and tries to launch the app, macOS may block it with:
+> *"COPS Customs" cannot be opened because the developer cannot be verified.*
+
+**Fix (one-time per machine):**
+1. Go to **Apple menu** → **System Settings** → **Privacy & Security**.
+2. Scroll down — you will see: *"COPS Customs" was blocked from use because it is not from an identified developer.*
+3. Click **"Open Anyway"**.
+4. Confirm in the next dialog.
+
+After this one-time approval, the app opens normally every time.
+
+Alternatively, from Terminal:
+```bash
+xattr -dr com.apple.quarantine /Applications/COPS\ Customs.app
+```
+
+---
+
 ## Troubleshooting
 
 | Problem | Solution |
@@ -213,5 +302,7 @@ To change the sysadmin password for a new release:
 | "This device is not authorised" | Run "Register This Device" in the admin panel on the master PC |
 | "Your device is not on the approved access list" | Add the slave PC's IP in the admin panel → Allowed Devices |
 | "Access denied: outside local network" | The PC is not on the same LAN. Ensure both PCs are on the same WiFi/switch |
-| Forgot sysadmin password | Generate a new hash, edit `admin_auth.py`, rebuild the binary |
+| Forgot sysadmin password | Generate a new hash, update `ADMIN_PWD_HASH` GitHub secret, rebuild |
 | Slave PC can't reach `http://<ip>:8000` | Check firewall: the master PC must allow inbound TCP port 8000 |
+| Update check fails | Tauri signing keys and endpoints not configured — see "Tauri Auto-Updater Setup" above |
+| macOS Gatekeeper blocks the app | See "Installing on macOS without code signing" above |

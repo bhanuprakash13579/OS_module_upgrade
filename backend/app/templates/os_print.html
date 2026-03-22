@@ -110,13 +110,13 @@
         <img src="{{ logo_path }}" alt="Customs Logo"/>
       </td>
       <td class="header-text">
-        <div class="line1">Office of the Deputy / Asst. Commissioner of Customs</div>
-        <div class="line2">(Airport), Anna International Airport, Chennai-600027</div>
+        <div class="line1">{{ office_header_line1 }}</div>
+        <div class="line2">{{ office_header_line2 }}</div>
       </td>
     </tr>
   </table>
 
-  <h2>Detention / Seizure of Passenger's Baggage</h2>
+  <h2>{{ page1_title }}</h2>
 
   <!-- Info Table -->
   <table class="tbl-outer gap8">
@@ -172,7 +172,7 @@
     </tbody>
   </table>
 
-  <h3 class="gap4">INVENTORY OF THE GOODS IMPORTED</h3>
+  <h3 class="gap4">{{ inventory_heading }}</h3>
 
   <!-- Inventory Table -->
   <table class="inv-tbl gap8">
@@ -182,13 +182,13 @@
         <th>Description of Goods</th>
         <th style="width:60px">Qty.</th>
         <th style="width:14%; font-size:6.5pt; line-height:1.2">{{ col_fa_heading }}</th>
-        <th style="font-size:7pt; line-height:1.2; width:13%">Goods Passed On Duty<br/><span style="font-weight:bold; display:block; margin-top:4px">Value (in Rs.)</span></th>
+        <th style="font-size:7pt; line-height:1.2; width:13%">{{ col_duty_heading }}<br/><span style="font-weight:bold; display:block; margin-top:4px">Value (in Rs.)</span></th>
         <th style="font-size:6.5pt; width:18%">{{ col_liable_heading }}<br/><span style="font-weight:normal">Total Value (in Rs.)</span></th>
       </tr>
     </thead>
     <tbody>
       {% for item in items %}
-      {% set is_liable = item.cat_upper in ('CONFS','ABS_CONFS','RE_EXP','RF','UNDER OS') %}
+      {% set is_liable = item.cat_upper in ('CONFS','ABS_CONFS','RE_EXP','RF','REF','UNDER OS') %}
       <tr>
         <td>{{ loop.index }}</td>
         <td class="left upper">{{ item.items_desc or '' }}</td>
@@ -199,12 +199,6 @@
       </tr>
       {% endfor %}
     </tbody>
-    <tfoot>
-      <tr>
-        <td class="right bold td-bt4 upper" colspan="5">Grand Total</td>
-        <td class="right bold td-bt4">{{ total_items_value_fmt }}</td>
-      </tr>
-    </tfoot>
   </table>
 
   <!-- Previous Offences -->
@@ -259,7 +253,7 @@
   </div>
 
   <div class="supdt-sig" style="text-align:right;font-weight:bold;padding-right:30px">
-    Supdt. of Customs
+    {{ supdt_sig_title }}
   </div>
 
 </div><!-- /PAGE 1 -->
@@ -272,7 +266,7 @@
 
   <!-- Office + Passenger header -->
   <div style="text-align:center;font-weight:bold;margin-bottom:3px">
-    Office of the Deputy / Asst. Commissioner of Customs (Airport), Anna International airport, Chennai-600027.
+    {{ p2_office_heading }}
   </div>
 
   <table style="border-collapse:separate;margin-bottom:3px">
@@ -285,17 +279,17 @@
   </table>
 
   <!-- WAIVER heading -->
-  <div style="text-align:center;font-weight:bold;text-transform:uppercase;margin-bottom:1px"><span style="border-bottom:1px solid #000;padding-bottom:1px">WAIVER OF SHOW CAUSE NOTICE</span></div>
+  <div style="text-align:center;font-weight:bold;text-transform:uppercase;margin-bottom:1px"><span style="border-bottom:1px solid #000;padding-bottom:1px">{{ p2_waiver_heading }}</span></div>
 
   <!-- Waiver text — full width, right-aligned signature below -->
-  <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0">The Charges have been orally communicated to me in respect of the goods mentioned overleaf and imported by me. Orders in the case may please be passed without issue of Show Cause Notice. However I may kindly be given a Personal Hearing.</p>
+  <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0">{{ waiver_text_1 }}</p>
   <div style="text-align:right;margin-bottom:3px">
     <div style="height:16px"></div>
     <i>Signature of Passenger</i>
   </div>
 
   <!-- "I was present" — full width, right-aligned signature below -->
-  <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0">I was present during the personal hearing conducted by the Deputy / Asst. Commissioner and I was heard.</p>
+  <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0">{{ waiver_text_2 }}</p>
   <div style="text-align:right;margin-bottom:4px">
     <div style="height:16px"></div>
     <i>Signature of Passenger</i>
@@ -315,47 +309,47 @@
   <div style="text-align:center;font-weight:bold;margin-bottom:2px"><span style="border-bottom:1px solid #000;padding-bottom:1px">ORDER (ORIGINAL)</span></div>
 
   <!-- N.B. 1 & 2 -->
-  <p style="text-align:justify;margin:0 0 1px 0"><b>N.B:</b> 1. This copy is granted free of charge for the private use of the person to whom it is issued.</p>
-  <p style="text-align:justify;margin:0 0 2px 2em">2. An Appeal against this Order shall lie before the Commissioner of Customs (Appeals), Custom House, Chennai-600 001 on payment of 7.5% of the duty demanded where duty or duty and penalty are in dispute, or penalty, where penalty alone is in dispute. The Appeal shall be filed within 60 days provided under Section 128 of the Customs Act, 1962 from the date of receipt of this Order.</p>
+  <p style="text-align:justify;margin:0 0 1px 0">{{ nb1_text }}</p>
+  <p style="text-align:justify;margin:0 0 2px 2em">{{ nb2_text }}</p>
 
   <!-- Note: SCN waived -->
-  <p style="text-align:justify;margin:0 0 2px 0"><b>Note : The issue of Show Cause Notice was waived at the instance of the Passenger.</b></p>
+  <p style="text-align:justify;margin:0 0 2px 0"><b>{{ note_scn_waived }}</b></p>
 
   <!-- Legal paragraphs -->
-  <p style="text-align:justify;text-indent:2em;margin:0 0 1px 0">In terms of Foreign Trade Policy notified by the Government in pursuance to Section 3(1) &amp; 3(2) of the Foreign Trade (Development &amp; Regulation) Act, 1992 read with the Rules framed thereunder, also read with Section 11(2)(u) of Customs Act, 1962, import of 'goods in commercial quantity / goods in the nature of non-bonafide baggage' is not permitted without a valid import licence, though exemption exists under clause 3(h) of the Foreign Trade (Exemption from application of Rules in certain cases) order 1993 for import of goods by a passenger from abroad only to the extent admissible under the Baggage Rules framed under Section 79 of the Customs Act, 1962.</p>
-  <p style="text-align:justify;text-indent:2em;margin:0 0 3px 0">Import of goods non-declared / misdeclared / concealed / in trade and in commercial quantity / non-bonafide in excess of the baggage allowance is therefore liable for confiscation under Section 111(d), (i), (l), (m) &amp; (o) of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (Development &amp; Regulation) Act, 1992.</p>
+  <p style="text-align:justify;text-indent:2em;margin:0 0 1px 0">{{ legal_para_1 }}</p>
+  <p style="text-align:justify;text-indent:2em;margin:0 0 3px 0">{{ legal_para_2 }}</p>
 
   <!-- RECORD OF PERSONAL HEARING -->
-  <div style="text-align:center;font-weight:bold;text-transform:uppercase;margin-bottom:1px"><span style="border-bottom:1px solid #000;padding-bottom:1px">RECORD OF PERSONAL HEARING &amp; FINDINGS</span></div>
-  <p style="text-align:justify;text-indent:2em;margin:0 0 3px 0">{{ adjn_offr_remarks | replace('\n', '<br>') | safe or 'No remarks provided.' }}</p>
+  <div style="text-align:center;font-weight:bold;text-transform:uppercase;margin-bottom:1px"><span style="border-bottom:1px solid #000;padding-bottom:1px">{{ record_heading }}</span></div>
+  <p style="text-align:justify;text-indent:2em;margin:0 0 3px 0;white-space:pre-wrap">{{ adjn_offr_remarks or 'No remarks provided.' }}</p>
 
   <!-- ORDER heading — centered -->
-  <div style="text-align:center;font-weight:bold;margin-bottom:2px"><span style="border-bottom:1px solid #000;padding-bottom:1px">ORDER</span></div>
+  <div style="text-align:center;font-weight:bold;margin-bottom:2px"><span style="border-bottom:1px solid #000;padding-bottom:1px">{{ order_heading }}</span></div>
 
   <!-- Order paragraphs -->
   {% if conf_value > 0 and rf_amount > 0 %}
-  <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0">I Order confiscation of the goods{% if rf_slnos %} at Sl.No(s). {{ rf_slnos }}{% endif %} valued at Rs.{{ conf_value }}/- under Section 111(d), (i), (l), (m) &amp; (o) of the Customs Act, 1962 read with Section 3(3) of Foreign Trade (D&amp;R) Act, 1992, but allow the passenger an option to redeem the goods valued at Rs.{{ conf_value }}/- on a fine of Rs.{{ rf_amount }}/- (Rupees {{ rf_words }} Only) in lieu of confiscation under Section 125 of the Customs Act 1962 within 7 days from the date of receipt of this Order, Duty extra.</p>
+  <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0">{{ para_rf }}</p>
   {% endif %}
   {% if re_exp_value > 0 and ref_amount > 0 %}
-  <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0">However, I give an option to reship the goods{% if ref_slnos %} at Sl.No(s). {{ ref_slnos }}{% endif %} valued at Rs.{{ re_exp_value }}/- on a fine of Rs.{{ ref_amount }}/- (Rupees {{ ref_words }} Only) under Section 125 of the Customs Act 1962 within 1 Month from the date of this Order.</p>
+  <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0">{{ para_ref }}</p>
   {% endif %}
   {% if abs_conf_value > 0 %}
-  <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0">I {% if conf_value > 0 or re_exp_value > 0 %}also {% endif %}order absolute confiscation of the goods{% if confs_slnos %} at Sl.No(s). {{ confs_slnos }}{% endif %} valued at Rs.{{ abs_conf_value }}/- under Section 111(d), (i), (l), (m) &amp; (o) of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (D&amp;R) Act, 1992.</p>
+  <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0">{{ para_abs_conf }}</p>
   {% endif %}
   {% if pp_amount > 0 %}
-  <p style="text-align:justify;text-indent:2em;margin:0 0 3px 0">I further impose a Personal Penalty of Rs.{{ pp_amount }}/- (Rupees {{ pp_words }} Only) under Section 112(a) of the Customs Act, 1962.</p>
+  <p style="text-align:justify;text-indent:2em;margin:0 0 3px 0">{{ para_pp }}</p>
   {% endif %}
 
   <!-- Deputy signature — right-aligned -->
   <div style="text-align:right;margin-bottom:3px">
     <div style="height:16px"></div>
-    <b>Deputy / Asst. Commissioner of Customs (Airport)</b>
+    <b>{{ deputy_sig_title }}</b>
   </div>
 
   <!-- Bottom N.B. -->
-  <p style="text-align:justify;margin:0 0 1px 0"><b>N.B:</b> 1. Perishables will be disposed off within seven days from the date of detention.</p>
-  <p style="text-align:justify;margin:0 0 1px 2em">2. Where re-export is permitted, the passenger is advised to intimate the date of departure of flight atleast 48 hours in advance.</p>
-  <p style="text-align:justify;margin:0 0 3px 2em">3. Warehouse rent and Handling Charges are chargeable for the goods detained.</p>
+  <p style="text-align:justify;margin:0 0 1px 0">{{ bottom_nb1 }}</p>
+  <p style="text-align:justify;margin:0 0 1px 2em">{{ bottom_nb2 }}</p>
+  <p style="text-align:justify;margin:0 0 3px 2em">{{ bottom_nb3 }}</p>
 
   <!-- Record table -->
   <table class="adj-tbl" style="margin-bottom:4px">
@@ -392,7 +386,7 @@
   </table>
 
   <!-- Received + final signatures -->
-  <div style="text-align:right;margin-bottom:2px"><b>Received the Order-in-Original</b></div>
+  <div style="text-align:right;margin-bottom:2px"><b>{{ received_order_text }}</b></div>
   <table style="border-collapse:separate">
     <tbody>
       <tr>

@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import date, datetime
 import csv
 import io
@@ -7,7 +8,7 @@ from typing import List, Optional, Set, Tuple
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import text
+from sqlalchemy import text, or_, and_
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -476,21 +477,35 @@ def custom_report(
     all_cols = body.master_cols + body.item_cols
     rows = []
 
+    # Bulk-load all items for the filtered masters in a single query (avoids N+1)
+    items_map = defaultdict(list)
+    if include_items and masters:
+        _CHUNK = 900
+        os_keys_list = [(m.os_no, m.os_year, m.location_code or "") for m in masters]
+        for i in range(0, len(os_keys_list), _CHUNK):
+            chunk = os_keys_list[i:i + _CHUNK]
+            pair_filter = or_(*[
+                and_(
+                    CopsItems.os_no == no,
+                    CopsItems.os_year == yr,
+                    CopsItems.location_code == lc,
+                )
+                for no, yr, lc in chunk
+            ])
+            for it in (
+                db.query(CopsItems)
+                .filter(pair_filter)
+                .order_by(CopsItems.os_no, CopsItems.os_year, CopsItems.items_sno)
+                .all()
+            ):
+                items_map[(it.os_no, it.os_year, it.location_code or "")].append(it)
+
     for m in masters:
         master_data = {col: _val(getattr(m, col, None)) for col in body.master_cols}
         if include_items:
-            items = (
-                db.query(CopsItems)
-                .filter(
-                    CopsItems.os_no == m.os_no,
-                    CopsItems.os_year == m.os_year,
-                    CopsItems.location_code == (m.location_code or ""),
-                )
-                .order_by(CopsItems.items_sno)
-                .all()
-            )
-            if items:
-                for item in items:
+            m_items = items_map.get((m.os_no, m.os_year, m.location_code or ""), [])
+            if m_items:
+                for item in m_items:
                     row = dict(master_data)
                     for col in body.item_cols:
                         row[col] = _val(getattr(item, col, None))

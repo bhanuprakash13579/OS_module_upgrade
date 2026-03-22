@@ -1,5 +1,13 @@
-name: Build Desktop App (Tauri)
+name: CI Build (verify code compiles)
 
+# ─────────────────────────────────────────────────────────────────────────────
+# This workflow runs on EVERY push to main to verify the code compiles.
+# It uploads installers as temporary artifacts (7-day expiry) but does NOT
+# create a GitHub Release and does NOT trigger the auto-updater in the app.
+#
+# To publish an actual release that users can auto-update to, use:
+#   git tag v2.1.0 && git push origin v2.1.0
+# ─────────────────────────────────────────────────────────────────────────────
 on:
   push:
     branches: [ "main" ]

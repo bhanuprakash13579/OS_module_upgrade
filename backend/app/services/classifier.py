@@ -194,6 +194,25 @@ BRAND_MAP: list[tuple[str, str]] = [
     ("havana cigar",    "cigarette"),
     ("davidoff",        "cigarette"),
 
+    # E-Cigarettes / Vapes (Nos. instead of Sticks)
+    ("e cigarette",     "misc"),
+    ("e cigarettes",    "misc"),
+    ("e-cigarette",     "misc"),
+    ("e-cigarettes",    "misc"),
+    ("ecigarette",      "misc"),
+    ("ecigarettes",     "misc"),
+    ("electronic cigarette", "misc"),
+    ("ecig",            "misc"),
+    ("e-cig",           "misc"),
+    ("e cig",           "misc"),
+    ("vape",            "misc"),
+    ("vapes",           "misc"),
+    ("vaping",          "misc"),
+    ("e liquid",        "misc"),
+    ("e-liquid",        "misc"),
+    ("juul",            "misc"),
+    ("iqos",            "misc"),
+
     # Mobile / phone brands (always Cell Phones)
     ("iphone",          "cell_phone"),
     ("i phone",         "cell_phone"),
@@ -366,13 +385,19 @@ KEYWORD_MAP: list[tuple[str, str]] = [
     ("cognac",      "liquor"),
     ("mead",        "liquor"),
     ("sake",        "liquor"),
+    ("booze",       "liquor"),
+    ("tequila",     "liquor"),
+    ("arrack",      "liquor"),
+    ("toddy",       "liquor"),
+    ("alcoholic",   "liquor"),
 
     # Cigarettes / tobacco
     ("cigarette",   "cigarette"),
     ("cigarettes",  "cigarette"),
     ("cigar",       "cigarette"),
     ("cigars",      "cigarette"),
-    ("bidi",        "tobacco"),
+    ("bidi",        "cigarette"),
+    ("beedi",       "cigarette"),
     ("gutkha",      "tobacco"),
     ("tobacco",     "tobacco"),
 

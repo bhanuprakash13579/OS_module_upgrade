@@ -18,6 +18,7 @@ export default function SDOModule() {
         <Route path="offence" element={<OffenceList />} />
         <Route path="offence/new" element={<Suspense fallback={<RouteSpinner />}><OffenceForm /></Suspense>} />
         <Route path="offence/:osNo/:osYear/edit" element={<Suspense fallback={<RouteSpinner />}><OffenceForm /></Suspense>} />
+        <Route path="offence/:osNo/:osYear/view" element={<Suspense fallback={<RouteSpinner />}><OffenceForm /></Suspense>} />
         <Route path="users" element={<UserManagement moduleType="sdo" />} />
         <Route path="change-password" element={<ChangePassword />} />
       </Route>

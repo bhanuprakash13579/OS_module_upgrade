@@ -54,22 +54,29 @@ def push_events(events: List[SyncEventResponse], db: Session = Depends(get_db)):
     # Note: In a real conflict-free engine, we would verify signatures and blindly append
     # or handle the logical merge operations here.
     
+    if not events:
+        return {"status": "success", "events_merged": 0}
+
+    # Bulk-fetch all existing IDs in a single query (idempotency check without N+1)
+    incoming_ids = [evt.id for evt in events]
+    existing_ids = {
+        row.id
+        for row in db.query(AuditEvent.id).filter(AuditEvent.id.in_(incoming_ids)).all()
+    }
+
     saved = 0
     for evt in events:
-        # Check if already exists (idempotency)
-        existing = db.query(AuditEvent).filter(AuditEvent.id == evt.id).first()
-        if not existing:
-            new_evt = AuditEvent(
+        if evt.id not in existing_ids:
+            db.add(AuditEvent(
                 id=evt.id,
                 entity_id=evt.entity_id,
                 entity_type=evt.entity_type,
                 action=evt.action,
                 payload=evt.payload,
                 node_id=evt.node_id,
-                timestamp=evt.timestamp
-            )
-            db.add(new_evt)
+                timestamp=evt.timestamp,
+            ))
             saved += 1
-            
+
     db.commit()
     return {"status": "success", "events_merged": saved}

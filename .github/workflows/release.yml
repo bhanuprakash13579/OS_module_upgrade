@@ -1,0 +1,127 @@
+name: Release Desktop App
+
+# ─────────────────────────────────────────────────────────────────────────────
+# This workflow ONLY runs when you push a version tag (e.g. v2.1.0).
+# Regular pushes to main NEVER trigger a release.
+#
+# How to publish a release:
+#   git tag v2.1.0
+#   git push origin v2.1.0
+#
+# How to cancel / undo: delete the tag
+#   git tag -d v2.1.0
+#   git push origin :refs/tags/v2.1.0
+# ─────────────────────────────────────────────────────────────────────────────
+on:
+  push:
+    tags:
+      - 'v*'   # matches v2.0.0, v2.1.3, etc.
+
+jobs:
+  release:
+    name: Build & Release on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false   # if one platform fails, others still complete
+      matrix:
+        include:
+          - os: windows-latest
+            binary_src: backend/dist/python-server.exe
+            binary_dest: frontend/src-tauri/binaries/python-server-x86_64-pc-windows-msvc.exe
+
+          - os: ubuntu-22.04
+            binary_src: backend/dist/python-server
+            binary_dest: frontend/src-tauri/binaries/python-server-x86_64-unknown-linux-gnu
+
+          - os: macos-latest
+            binary_src: backend/dist/python-server
+            binary_dest: frontend/src-tauri/binaries/python-server-x86_64-apple-darwin
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ── Python setup ────────────────────────────────────────────────────────
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install GTK3 runtime (Windows — needed by WeasyPrint)
+        if: matrix.os == 'windows-latest'
+        run: choco install gtk-runtime --yes
+
+      - name: Build Python server (PyInstaller)
+        working-directory: backend
+        env:
+          ADMIN_PWD_HASH: ${{ secrets.ADMIN_PWD_HASH }}
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+          pyinstaller --clean python-server.spec
+
+      - name: Copy sidecar binary into Tauri binaries folder
+        shell: bash
+        run: |
+          mkdir -p frontend/src-tauri/binaries
+          cp ${{ matrix.binary_src }} ${{ matrix.binary_dest }}
+
+      # ── Node / Rust setup ───────────────────────────────────────────────────
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux system dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libgdk-pixbuf2.0-dev
+
+      - name: Install Node dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # ── Build + Sign + Publish GitHub Release ──────────────────────────────
+      # tauri-action with tagName set will:
+      #   1. Build the app
+      #   2. Sign all installers with TAURI_SIGNING_PRIVATE_KEY
+      #   3. Create a GitHub Release for this tag (or update existing draft)
+      #   4. Upload all installers (.msi, .exe, .deb, .AppImage, .dmg) as release assets
+      #   5. Upload latest.json (this is what the auto-updater in the app checks)
+      - name: Build, sign, and publish release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          ADMIN_PWD_HASH: ${{ secrets.ADMIN_PWD_HASH }}
+        with:
+          projectPath: ./frontend
+          tagName: ${{ github.ref_name }}
+          releaseName: "COPS v${{ github.ref_name }}"
+          releaseBody: |
+            ## What's in this release
+
+            Download the installer for your platform from the assets below.
+
+            | Platform | File |
+            |----------|------|
+            | Windows | `cops-customs-app_*_x64.msi` or `cops-customs-app_*_x64-setup.exe` |
+            | Linux (Ubuntu/Debian) | `cops-customs-app_*_amd64.deb` |
+            | Linux (portable) | `cops-customs-app_*_amd64.AppImage` |
+            | macOS | `cops-customs-app_*_x64.dmg` |
+
+            **First install:** download and run the installer.
+            **Existing install:** the app will auto-update — click "Check for Updates" in Admin Panel.
+          releaseDraft: false
+          prerelease: false

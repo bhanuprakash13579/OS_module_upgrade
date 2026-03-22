@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Filter, AlertCircle, RefreshCw, Trash2, X, FileText } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -84,7 +84,10 @@ export default function OffenceList() {
   };
 
   const currentYear = new Date().getFullYear();
-  const yearOptions = Array.from({ length: currentYear - 1989 }, (_, i) => currentYear - i);
+  const yearOptions = useMemo(
+    () => Array.from({ length: currentYear - 1989 }, (_, i) => currentYear - i),
+    [currentYear]
+  );
 
   const handleDelete = async (os_no: string, os_year: number, is_draft: string) => {
     const label = is_draft === 'Y' ? 'DRAFT' : 'PENDING';
@@ -289,7 +292,14 @@ export default function OffenceList() {
                       </td>
                       <td className="px-5 py-3 align-middle text-center">
                         <div className="flex justify-center items-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
-                          {!isAdjudicated && (
+                          {isAdjudicated ? (
+                            <button
+                              onClick={() => navigate(`/sdo/offence/${row.os_no}/${row.os_year}/view`)}
+                              className="px-4 py-1.5 text-xs font-bold text-white bg-slate-600 hover:bg-slate-700 rounded-md transition-colors"
+                            >
+                              View
+                            </button>
+                          ) : (
                             <div className="flex items-center gap-1.5">
                               <button
                                 onClick={() => navigate(`/sdo/offence/${row.os_no}/${row.os_year}/edit`)}
