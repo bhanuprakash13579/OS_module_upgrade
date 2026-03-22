@@ -188,6 +188,7 @@ const SPLASH_BG = { background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%
 
 function BackendGate({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
+  const [fadeOut, setFadeOut] = useState(false);
   const [dots, setDots] = useState('');
 
   useEffect(() => {
@@ -198,7 +199,10 @@ function BackendGate({ children }: { children: React.ReactNode }) {
       while (!cancelled) {
         try {
           await api.get('/mode', { timeout: 2000 });
-          if (!cancelled) setReady(true);
+          if (!cancelled) {
+            setFadeOut(true);
+            setTimeout(() => { if (!cancelled) setReady(true); }, 300);
+          }
           return;
         } catch {
           await new Promise(r => setTimeout(r, 800));
@@ -216,7 +220,10 @@ function BackendGate({ children }: { children: React.ReactNode }) {
 
   if (!ready) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center" style={SPLASH_BG}>
+      <div
+        className="min-h-screen flex flex-col items-center justify-center"
+        style={{ ...SPLASH_BG, opacity: fadeOut ? 0 : 1, transition: 'opacity 0.3s ease' }}
+      >
         <img src="/cops_logo.png" alt="COPS" className="w-24 h-24 object-contain mb-6 opacity-90" />
         <p className="text-white text-lg font-semibold tracking-widest">COPS</p>
         <p className="text-blue-300 text-sm mt-2 w-32 text-center">Starting{dots}</p>
