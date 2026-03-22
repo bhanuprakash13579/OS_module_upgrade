@@ -82,21 +82,6 @@ jobs:
           python-version: "3.12"
           cache: "pip"
 
-      # WeasyPrint needs Cairo + Pango DLLs to be present when PyInstaller runs
-      # so the hook can find and bundle them into the binary.
-      # choco gtk-runtime installs GTK2 which lacks the required DLLs; use MSYS2 GTK3 instead.
-      - name: Install GTK3 via MSYS2 (Windows — Cairo + Pango for WeasyPrint PDF)
-        if: matrix.os == 'windows-latest'
-        shell: powershell
-        run: |
-          C:\msys64\usr\bin\pacman -S --noconfirm --needed `
-            mingw-w64-x86_64-cairo `
-            mingw-w64-x86_64-pango `
-            mingw-w64-x86_64-gdk-pixbuf2 `
-            mingw-w64-x86_64-fontconfig `
-            mingw-w64-x86_64-harfbuzz
-          "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-
       - name: Install native dependencies (macOS — pyodbc + WeasyPrint Cairo/Pango)
         if: matrix.os == 'macos-latest'
         run: brew install unixodbc pango cairo fontconfig
@@ -114,6 +99,22 @@ jobs:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         run: python bake_hash.py
 
+      # WeasyPrint needs Cairo + Pango DLLs to be present when PyInstaller runs
+      # so the hook can find and bundle them into the binary. Must come AFTER pip
+      # install — adding C:\msys64\mingw64\bin to PATH before pip would shadow
+      # setup-python's python.exe with MSYS2's python.exe.
+      - name: Install GTK3 via MSYS2 (Windows — Cairo + Pango for WeasyPrint PDF)
+        if: matrix.os == 'windows-latest'
+        shell: powershell
+        run: |
+          C:\msys64\usr\bin\pacman -S --noconfirm --needed `
+            mingw-w64-x86_64-cairo `
+            mingw-w64-x86_64-pango `
+            mingw-w64-x86_64-gdk-pixbuf2 `
+            mingw-w64-x86_64-fontconfig `
+            mingw-w64-x86_64-harfbuzz
+          "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
       - name: Build Python server (PyInstaller)
         working-directory: backend
         run: pyinstaller --clean python-server.spec
@@ -128,7 +129,7 @@ jobs:
       - name: Setup Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.os == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
+          targets: aarch64-apple-darwin
 
       # ── Build + Sign + Publish GitHub Release ────────────────────────────────
       # tauri-action with tagName set will:
@@ -148,7 +149,7 @@ jobs:
           tauriScript: npx tauri
           args: ${{ matrix.tauri_args }}
           tagName: ${{ github.ref_name }}
-          releaseName: "COPS v${{ github.ref_name }}"
+          releaseName: "COPS ${{ github.ref_name }}"
           releaseBody: |
             ## What's in this release
 
