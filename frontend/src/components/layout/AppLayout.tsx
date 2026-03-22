@@ -89,7 +89,7 @@ function NavItem({ to, icon, label }: { to: string, icon: React.ReactNode, label
     <NavLink 
       to={to} 
       className={({isActive}) => cn(
-        "flex items-center px-4 py-3 rounded-md transition-all duration-200 mb-1",
+        "flex items-center px-4 py-3 rounded-md transition-colors duration-200 mb-1",
         isActive 
           ? "bg-brand-500/30 text-white shadow-inner border border-white/10" 
           : "text-brand-100 hover:bg-white/10 hover:text-white"

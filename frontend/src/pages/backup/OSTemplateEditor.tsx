@@ -52,7 +52,7 @@ function ES({ fieldKey, value: _value, children, onEdit, selected }: {
 }) {
   return (
     <span
-      className={`group/es relative cursor-pointer rounded transition-all ${
+      className={`group/es relative cursor-pointer rounded transition-[outline,outline-color] ${
         selected ? 'outline outline-2 outline-blue-500 outline-offset-1' : 'hover:outline hover:outline-2 hover:outline-dashed hover:outline-blue-400 hover:outline-offset-1'
       }`}
       onClick={e => { e.stopPropagation(); onEdit(fieldKey); }}
@@ -150,7 +150,7 @@ export default function OSTemplateEditor({ adminToken }: OSTemplateEditorProps) 
   return (
     <div className="flex gap-4 min-h-[600px]">
       {/* ── OS Shell (left / main) ───────────────────────────────────────── */}
-      <div className={`flex-1 min-w-0 overflow-y-auto transition-all ${edit ? 'max-w-[60%]' : 'max-w-full'}`}>
+      <div className={`flex-1 min-w-0 overflow-y-auto transition-[max-width] duration-200 ${edit ? 'max-w-[60%]' : 'max-w-full'}`}>
         <div className="text-[9px] text-slate-400 mb-2 text-center">
           Click any <span className="text-blue-500 font-medium">highlighted section</span> to edit it. Changes are versioned by effective date.
         </div>

@@ -143,7 +143,7 @@ export default function PassportScanner({ onScan }: PassportScannerProps) {
             </button>
 
             {isOpen && (
-                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <div className="fixed inset-0 bg-slate-900/75 z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-xl w-full max-w-lg border border-slate-200 overflow-hidden">
                         <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50">
                             <h3 className="font-bold text-slate-800 flex items-center">
@@ -170,7 +170,7 @@ export default function PassportScanner({ onScan }: PassportScannerProps) {
                                 value={scanBuffer}
                                 onChange={handleInput}
                                 onKeyDown={handleKeyDown}
-                                className="w-full px-4 py-3 bg-slate-50 border-2 border-dashed border-indigo-300 rounded-lg focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-mono text-center text-slate-700 placeholder:text-slate-300"
+                                className="w-full px-4 py-3 bg-slate-50 border-2 border-dashed border-indigo-300 rounded-lg focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors font-mono text-center text-slate-700 placeholder:text-slate-300"
                                 placeholder="Waiting for scanner input..."
                                 autoFocus
                             />

@@ -80,7 +80,7 @@ export default function QueryModule() {
         
         <div className={`border-t border-slate-700/50 space-y-3 shrink-0 ${isCollapsed ? 'p-2' : 'p-4'}`}>
           {!isCollapsed && (
-            <div className="bg-slate-800/50 rounded-lg p-3 backdrop-blur-sm border border-slate-700/50">
+            <div className="bg-slate-800 rounded-lg p-3 border border-slate-700/50">
               <div className="flex items-center gap-2 mb-1">
                 <FileSearch size={18} className="text-emerald-400" />
                 <p className="text-emerald-300 text-xs uppercase tracking-wider font-semibold">Logged in as</p>

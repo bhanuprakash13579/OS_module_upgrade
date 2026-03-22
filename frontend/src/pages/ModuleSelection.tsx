@@ -61,7 +61,7 @@ export default function ModuleSelection() {
           {/* SDO Module Card */}
           <button
             onClick={() => navigate('/login/sdo')}
-            className="group relative bg-white/10 border border-white/20 rounded-2xl p-6 text-left hover:bg-white/20 hover:border-blue-400/50 hover:shadow-2xl hover:shadow-blue-500/20 transition-all duration-300 hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="group relative bg-white/10 border border-white/20 rounded-2xl p-6 text-left hover:bg-white/20 hover:border-blue-400/50 hover:shadow-2xl hover:shadow-blue-500/20 transition-[transform,box-shadow,background-color,border-color] duration-300 hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-blue-400"
             id="btn-sdo-module"
           >
             <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-blue-400 to-transparent rounded-t-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -70,7 +70,7 @@ export default function ModuleSelection() {
               <div className="bg-blue-500/20 border border-blue-400/30 p-4 rounded-xl group-hover:bg-blue-500/30 transition-colors">
                 <ClipboardEdit className="w-8 h-8 text-blue-300" />
               </div>
-              <ArrowRight className="text-white/30 group-hover:text-blue-300 group-hover:translate-x-1 transition-all mt-2" size={24} />
+              <ArrowRight className="text-white/30 group-hover:text-blue-300 group-hover:translate-x-1 transition-[transform,color] mt-2" size={24} />
             </div>
 
             <div className="space-y-2 mb-6">
@@ -88,7 +88,7 @@ export default function ModuleSelection() {
           {/* Adjudication Module Card */}
           <button
             onClick={() => navigate('/login/adjudication')}
-            className="group relative bg-white/10 border border-white/20 rounded-2xl p-6 text-left hover:bg-white/20 hover:border-amber-400/50 hover:shadow-2xl hover:shadow-amber-500/20 transition-all duration-300 hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-amber-400"
+            className="group relative bg-white/10 border border-white/20 rounded-2xl p-6 text-left hover:bg-white/20 hover:border-amber-400/50 hover:shadow-2xl hover:shadow-amber-500/20 transition-[transform,box-shadow,background-color,border-color] duration-300 hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-amber-400"
             id="btn-adjudication-module"
           >
             <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent rounded-t-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -97,7 +97,7 @@ export default function ModuleSelection() {
               <div className="bg-amber-500/20 border border-amber-400/30 p-4 rounded-xl group-hover:bg-amber-500/30 transition-colors">
                 <Gavel className="w-8 h-8 text-amber-300" />
               </div>
-              <ArrowRight className="text-white/30 group-hover:text-amber-300 group-hover:translate-x-1 transition-all mt-2" size={24} />
+              <ArrowRight className="text-white/30 group-hover:text-amber-300 group-hover:translate-x-1 transition-[transform,color] mt-2" size={24} />
             </div>
 
             <div className="space-y-2 mb-6">
@@ -115,7 +115,7 @@ export default function ModuleSelection() {
           {/* Query & Printing Module Card */}
           <button
             onClick={() => navigate('/login/query')}
-            className="group relative bg-white/10 border border-white/20 rounded-2xl p-6 text-left hover:bg-white/20 hover:border-emerald-400/50 hover:shadow-2xl hover:shadow-emerald-500/20 transition-all duration-300 hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+            className="group relative bg-white/10 border border-white/20 rounded-2xl p-6 text-left hover:bg-white/20 hover:border-emerald-400/50 hover:shadow-2xl hover:shadow-emerald-500/20 transition-[transform,box-shadow,background-color,border-color] duration-300 hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-emerald-400"
             id="btn-query-module"
           >
             <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-emerald-400 to-transparent rounded-t-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -124,7 +124,7 @@ export default function ModuleSelection() {
               <div className="bg-emerald-500/20 border border-emerald-400/30 p-4 rounded-xl group-hover:bg-emerald-500/30 transition-colors">
                 <Search className="w-8 h-8 text-emerald-300" />
               </div>
-              <ArrowRight className="text-white/30 group-hover:text-emerald-300 group-hover:translate-x-1 transition-all mt-2" size={24} />
+              <ArrowRight className="text-white/30 group-hover:text-emerald-300 group-hover:translate-x-1 transition-[transform,color] mt-2" size={24} />
             </div>
 
             <div className="space-y-2 mb-6">
@@ -142,7 +142,7 @@ export default function ModuleSelection() {
           {/* COPS ↔ APIS Module Card — only shown when enabled by admin */}
           {apisEnabled && <button
             onClick={() => navigate('/login/apis')}
-            className="group relative bg-white/10 border border-white/20 rounded-2xl p-6 text-left hover:bg-white/20 hover:border-violet-400/50 hover:shadow-2xl hover:shadow-violet-500/20 transition-all duration-300 hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-violet-400"
+            className="group relative bg-white/10 border border-white/20 rounded-2xl p-6 text-left hover:bg-white/20 hover:border-violet-400/50 hover:shadow-2xl hover:shadow-violet-500/20 transition-[transform,box-shadow,background-color,border-color] duration-300 hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-violet-400"
             id="btn-apis-module"
           >
             <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-violet-400 to-transparent rounded-t-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -151,7 +151,7 @@ export default function ModuleSelection() {
               <div className="bg-violet-500/20 border border-violet-400/30 p-4 rounded-xl group-hover:bg-violet-500/30 transition-colors">
                 <ScanLine className="w-8 h-8 text-violet-300" />
               </div>
-              <ArrowRight className="text-white/30 group-hover:text-violet-300 group-hover:translate-x-1 transition-all mt-2" size={24} />
+              <ArrowRight className="text-white/30 group-hover:text-violet-300 group-hover:translate-x-1 transition-[transform,color] mt-2" size={24} />
             </div>
 
             <div className="space-y-2 mb-6">
@@ -167,11 +167,11 @@ export default function ModuleSelection() {
           </button>}
         </div>
 
-        {/* Secret backup trigger - bottom-left corner */}
+        {/* Secret backup trigger - bottom-left corner, above footer */}
         <button
           type="button"
           onClick={handleSecretClick}
-          className="absolute bottom-0 left-0 w-16 h-16 bg-transparent"
+          className="absolute bottom-10 left-0 w-16 h-16 bg-transparent z-20"
           aria-label="hidden-backup-trigger"
         />
         {secretClicks > 0 && (
@@ -179,7 +179,7 @@ export default function ModuleSelection() {
             {[...Array(4)].map((_, i) => (
               <div
                 key={i}
-                className={`w-2 h-2 rounded-full transition-all ${i < secretClicks ? 'bg-white/60' : 'bg-white/15'}`}
+                className={`w-2 h-2 rounded-full transition-colors ${i < secretClicks ? 'bg-white/60' : 'bg-white/15'}`}
               />
             ))}
           </div>
@@ -187,7 +187,7 @@ export default function ModuleSelection() {
       </div>
 
       {/* Footer */}
-      <div className="absolute bottom-0 left-0 right-0 flex justify-center items-center py-3 z-10">
+      <div className="absolute bottom-0 left-0 right-0 flex justify-center items-center py-3 z-0 pointer-events-none">
         <p className="text-white/30 text-xs tracking-widest uppercase select-none">
           Powered by{' '}
           <span className="text-white/50 font-semibold">Get Some Idea Technologies</span>
