@@ -208,6 +208,7 @@ function isDuty(item: any) { const c = categorize(item); return c === 'UNDER DUT
 // Without this, every OffenceForm mount (new/edit/view) re-fetches the full
 // statutes list from the backend, adding a round-trip before the wand button works.
 let _statutesCache: Statute[] | null = null;
+let _statutesFetch: Promise<Statute[]> | null = null;
 
 // ────────────────────────────────────────────────────────────────────────────
 export function useRemarksGenerator() {
@@ -217,35 +218,36 @@ export function useRemarksGenerator() {
   useEffect(() => {
     if (_statutesCache !== null) return; // already loaded for this session
     let mounted = true;
-    let retryCount = 0;
-    const MAX_RETRIES = 6;
-    const RETRY_DELAY_MS = 2000; // 2s between retries — gives Python sidecar time to start
 
-    const fetchStatutes = async () => {
-      while (retryCount <= MAX_RETRIES) {
-        try {
-          const res = await api.get('/statutes');
-          if (!mounted) return;
-          if (Array.isArray(res.data) && res.data.length > 0) {
-            _statutesCache = res.data;
-            setStatutes(res.data);
-            setLoading(false);
-            return;
+    // Promise lock: if a concurrent mount already started the fetch, reuse it
+    if (!_statutesFetch) {
+      let retryCount = 0;
+      const MAX_RETRIES = 6;
+      const RETRY_DELAY_MS = 2000;
+      _statutesFetch = (async () => {
+        while (retryCount <= MAX_RETRIES) {
+          try {
+            const res = await api.get('/statutes');
+            if (Array.isArray(res.data) && res.data.length > 0) {
+              _statutesCache = res.data;
+              return res.data as Statute[];
+            }
+          } catch { /* server still starting, retry */ }
+          retryCount++;
+          if (retryCount <= MAX_RETRIES) {
+            await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
           }
-          // Empty array — might be server starting up, retry
-        } catch {
-          // Network error — server still starting, retry
         }
-        retryCount++;
-        if (retryCount <= MAX_RETRIES && mounted) {
-          await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
-        }
-      }
-      // Exhausted retries — set loading false so UI unblocks
-      if (mounted) setLoading(false);
-    };
+        return [] as Statute[];
+      })();
+    }
 
-    fetchStatutes();
+    _statutesFetch.then(data => {
+      if (!mounted) return;
+      if (data.length > 0) setStatutes(data);
+      setLoading(false);
+    });
+
     return () => { mounted = false; };
   }, []);
 
@@ -612,7 +614,7 @@ export function useRemarksGenerator() {
     if (lastDot > cutAt * 0.7) {
       return text.substring(0, lastDot + 1).trim();
     }
-    return text.substring(0, cutAt).trim() + '...';
+    return text.substring(0, cutAt - 3).trim() + '...';
   }
 
   return { statutes, loading, generateRemark };

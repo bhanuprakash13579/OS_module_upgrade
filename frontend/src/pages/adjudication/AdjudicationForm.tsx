@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, memo, startTransition } from 'react';
+import { useState, useEffect, useMemo, memo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Gavel, ArrowLeft, Save, XCircle, User, Package, FileText, AlertCircle, CheckCircle, Edit, Printer, Wand2 } from 'lucide-react';
 import DatePicker from '@/components/DatePicker';
@@ -424,18 +424,16 @@ export default function AdjudicationForm() {
     api.get(`/os/${os_no}/${os_year}`)
       .then(res => {
         const data: OSCase = res.data;
-        startTransition(() => {
-          setOsCase(data);
+        setOsCase(data);
 
-          if (data.adj_offr_name) {
-            setOffrName(data.adj_offr_name || user?.user_name || '');
-            setRemarks(data.adjn_offr_remarks || '');
-            setRfAmt(data.rf_amount || 0);
-            setRefAmt(data.ref_amount || 0);
-            setPpAmt(data.pp_amount || 0);
-          }
-          setLoading(false);
-        });
+        if (data.adj_offr_name) {
+          setOffrName(data.adj_offr_name || user?.user_name || '');
+          setRemarks(data.adjn_offr_remarks || '');
+          setRfAmt(data.rf_amount || 0);
+          setRefAmt(data.ref_amount || 0);
+          setPpAmt(data.pp_amount || 0);
+        }
+        setLoading(false);
       })
       .catch(err => {
         setError(err.response?.data?.detail || 'Failed to load case');
@@ -877,6 +875,7 @@ export default function AdjudicationForm() {
             {isAlreadyAdjudicated && (
               <button
                 onClick={handlePrint}
+                disabled={submitting}
                 className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Printer size={17} />

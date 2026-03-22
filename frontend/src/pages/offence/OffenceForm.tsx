@@ -674,11 +674,16 @@ export default function OffenceForm() {
   }, []);
 
   // Smart classification — runs every time the description field loses focus.
-  // Always updates duty_type and UQC when classifier returns a result.
+  // AbortController cancels any in-flight request from a prior blur on the same row.
+  const classifyAbortRefs = useRef<Record<number, AbortController>>({});
   const onDescBlur = useCallback(async (idx: number, desc: string) => {
     if (!desc || desc.trim().length < 3) return;
+    // Cancel previous in-flight classify for this row
+    classifyAbortRefs.current[idx]?.abort();
+    const ctrl = new AbortController();
+    classifyAbortRefs.current[idx] = ctrl;
     try {
-      const res = await api.get('/os/classify-item', { params: { description: desc } });
+      const res = await api.get('/os/classify-item', { params: { description: desc }, signal: ctrl.signal });
       if (res.data?.duty_type && res.data.duty_type !== 'Miscellaneous-22') {
         setItems(prev => {
           const row = prev[idx];
@@ -690,7 +695,7 @@ export default function OffenceForm() {
           return prev.map((item, i) => i === idx ? updated : item);
         });
       }
-    } catch { /* silent — classification is best-effort */ }
+    } catch { /* silent — classification is best-effort, AbortError included */ }
   }, []);
 
   // Stable updateItem — uses functional setItems so no stale closure on items
