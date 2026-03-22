@@ -112,16 +112,7 @@ jobs:
         working-directory: backend
         env:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
-        shell: python {0}
-        run: |
-          import os, re, bcrypt as _b
-          pw = os.environ['ADMIN_PASSWORD'].encode('utf-8')
-          h = _b.hashpw(pw, _b.gensalt(12)).decode('utf-8')
-          path = 'app/security/admin_auth.py'
-          src = open(path).read()
-          src = re.sub(r'_ADMIN_PWD_HASH = [^\n]+', '_ADMIN_PWD_HASH = ' + repr(h), src)
-          open(path, 'w').write(src)
-          print('Patched admin_auth.py: hash baked in.')
+        run: python bake_hash.py
 
       - name: Build Python server (PyInstaller)
         working-directory: backend
