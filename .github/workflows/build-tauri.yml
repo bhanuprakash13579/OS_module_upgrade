@@ -60,6 +60,10 @@ jobs:
           python-version: "3.12"
           cache: "pip"
 
+      - name: Install unixodbc (macOS — required by pyodbc)
+        if: matrix.os == 'macos-latest'
+        run: brew install unixodbc
+
       - name: Install Python Dependencies
         working-directory: ./backend
         run: |
