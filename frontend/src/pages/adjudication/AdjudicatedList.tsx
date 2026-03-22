@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle, Search, Filter, RefreshCw, X, AlertCircle } from 'lucide-react';
 import api from '@/lib/api';
@@ -51,7 +51,7 @@ export default function AdjudicatedList() {
   const handlePageChange = (newPage: number) => { setCurrentPage(newPage); fetchCases(newPage, searchTerm); };
 
   const currentYear = new Date().getFullYear();
-  const yearOptions = Array.from({ length: currentYear - 1989 }, (_, i) => currentYear - i);
+  const yearOptions = useMemo(() => Array.from({ length: currentYear - 1989 }, (_, i) => currentYear - i), [currentYear]);
   const totalPages = Math.ceil(total / PER_PAGE) || 1;
   const showing = { from: total === 0 ? 0 : (currentPage - 1) * PER_PAGE + 1, to: Math.min(currentPage * PER_PAGE, total) };
 
