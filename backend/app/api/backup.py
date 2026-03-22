@@ -2,6 +2,9 @@ from collections import defaultdict
 from datetime import date, datetime
 import csv
 import io
+import os
+import sqlite3
+import tempfile
 import zipfile
 from typing import List, Optional, Set, Tuple
 
@@ -11,6 +14,7 @@ from pydantic import BaseModel
 from sqlalchemy import text, or_, and_
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.models.offence import CopsMaster, CopsItems
 from app.models.auth import User
@@ -412,6 +416,47 @@ def export_csv(
         iter([zip_buf.read()]),
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/export/db")
+def export_db(
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Stream a consistent binary copy of the entire SQLite database.
+    Uses sqlite3.backup() into a temp file so the snapshot is crash-safe
+    and WAL-flushed. Restoring this file on a new machine gives the complete
+    state: OS cases, users, settings, print template history, statutes, masters.
+    """
+    if not settings.DATABASE_URL.startswith("sqlite"):
+        raise HTTPException(status_code=400, detail="SQLite export is only available for SQLite deployments.")
+
+    db_path = settings.DATABASE_URL.replace("sqlite:///", "").replace("sqlite://", "")
+    if not os.path.isabs(db_path):
+        db_path = os.path.abspath(db_path)
+
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".db")
+    try:
+        os.close(tmp_fd)
+        src = sqlite3.connect(db_path)
+        dst = sqlite3.connect(tmp_path)
+        src.backup(dst)
+        src.close()
+        dst.close()
+        with open(tmp_path, "rb") as f:
+            data = f.read()
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+
+    today = date.today().isoformat()
+    return StreamingResponse(
+        iter([data]),
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="cops_fulldb_{today}.db"'},
     )
 
 
