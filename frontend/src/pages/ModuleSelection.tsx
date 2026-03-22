@@ -50,7 +50,7 @@ export default function ModuleSelection() {
             </div>
           </div>
           <h1 className="text-4xl font-extrabold text-white tracking-tight mb-2">
-            COPS — Customs Offence Processing System
+            COPS
           </h1>
           <p className="text-blue-200 text-lg font-medium">CBIC · Customs · Chennai Airport</p>
         </div>

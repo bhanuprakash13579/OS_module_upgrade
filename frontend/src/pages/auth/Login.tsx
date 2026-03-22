@@ -107,7 +107,7 @@ export default function Login() {
             {isSDO ? 'SDO MODULE' : isQuery ? 'QUERY MODULE' : isApis ? 'COPS ↔ APIS' : 'ADJUDICATION MODULE'}
           </h2>
           <p className="mt-2 text-center text-sm text-slate-500 font-medium">
-            COPS — Customs Offence Processing System
+            COPS
           </p>
         </div>
       </div>
