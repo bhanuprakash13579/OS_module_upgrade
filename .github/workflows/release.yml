@@ -60,6 +60,21 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+      # ── Linux system dependencies (must come before PyInstaller) ────────────
+      - name: Install Linux system dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libgdk-pixbuf2.0-dev \
+            libcairo2-dev \
+            libpango1.0-dev \
+            libfontconfig1-dev
+
       # ── Python / PyInstaller ─────────────────────────────────────────────────
       - name: Setup Python 3.12
         uses: actions/setup-python@v5
@@ -67,13 +82,24 @@ jobs:
           python-version: "3.12"
           cache: "pip"
 
-      - name: Install GTK3 runtime (Windows — needed by WeasyPrint)
+      # WeasyPrint needs Cairo + Pango DLLs to be present when PyInstaller runs
+      # so the hook can find and bundle them into the binary.
+      # choco gtk-runtime installs GTK2 which lacks the required DLLs; use MSYS2 GTK3 instead.
+      - name: Install GTK3 via MSYS2 (Windows — Cairo + Pango for WeasyPrint PDF)
         if: matrix.os == 'windows-latest'
-        run: choco install gtk-runtime --yes
+        shell: powershell
+        run: |
+          C:\msys64\usr\bin\pacman -S --noconfirm --needed `
+            mingw-w64-x86_64-cairo `
+            mingw-w64-x86_64-pango `
+            mingw-w64-x86_64-gdk-pixbuf2 `
+            mingw-w64-x86_64-fontconfig `
+            mingw-w64-x86_64-harfbuzz
+          "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      - name: Install unixodbc (macOS — required by pyodbc)
+      - name: Install native dependencies (macOS — pyodbc + WeasyPrint Cairo/Pango)
         if: matrix.os == 'macos-latest'
-        run: brew install unixodbc
+        run: brew install unixodbc pango cairo fontconfig
 
       - name: Build Python server (PyInstaller)
         working-directory: backend
@@ -95,17 +121,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin
-
-      - name: Install Linux system dependencies
-        if: matrix.os == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            libgdk-pixbuf2.0-dev
 
       # ── Build + Sign + Publish GitHub Release ────────────────────────────────
       # tauri-action with tagName set will:
