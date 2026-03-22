@@ -153,7 +153,7 @@ def get_br(br_no: int, br_year: int, db: Session = Depends(get_db)):
 @router.get("/passport/{passport_no}")
 def get_previous_brs_by_passport(passport_no: str, db: Session = Depends(get_db)):
     """Legacy feature: Previous B/R Details Retrieval by Passport."""
-    brs = db.query(BrMaster).filter(BrMaster.passport_no == passport_no, BrMaster.entry_deleted == "N").all()
+    brs = db.query(BrMaster).filter(BrMaster.passport_no == passport_no, BrMaster.entry_deleted == "N").order_by(BrMaster.br_date.desc()).limit(50).all()
     if not brs:
         raise HTTPException(status_code=404, detail="Previous B/R Details Could not be retrieved from Database...")
     return brs

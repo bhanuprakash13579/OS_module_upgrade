@@ -142,7 +142,7 @@ function UploadZone({
       onClick={() => !loading && inputRef.current?.click()}
       className={`
         relative flex flex-col items-center justify-center gap-4 p-12 rounded-2xl border-2 border-dashed
-        transition-all duration-200 cursor-pointer select-none
+        transition-[border-color,background-color,transform,opacity] duration-200 cursor-pointer select-none
         ${dragging
           ? 'border-violet-400 bg-violet-50 scale-[1.01]'
           : 'border-slate-300 bg-white hover:border-violet-400 hover:bg-violet-50/40'

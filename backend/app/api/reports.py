@@ -25,9 +25,13 @@ def generate_report(
     output = StringIO()
     writer = csv.writer(output)
 
+    # Hard safety ceiling — prevents loading the entire DB into memory for
+    # an accidentally wide date range. 50 000 rows is ~5 years of daily ops.
+    ROW_LIMIT = 50_000
+
     if report_id == "r4":  # B.R. Register
         writer.writerow(["BR No", "Date", "Passenger Name", "Passport No", "Flight", "Total Assessed", "Total Payable", "Receipt No", "Status"])
-        records = db.query(BrMaster).filter(BrMaster.br_date >= start_date, BrMaster.br_date <= end_date, BrMaster.entry_deleted == "N").all()
+        records = db.query(BrMaster).filter(BrMaster.br_date >= start_date, BrMaster.br_date <= end_date, BrMaster.entry_deleted == "N").limit(ROW_LIMIT).all()
         for r in records:
             writer.writerow([
                 f"{r.br_no}/{r.br_year}", r.br_date, r.pax_name, r.passport_no, r.flight_no,
@@ -37,7 +41,7 @@ def generate_report(
 
     elif report_id == "r5":  # O.S. Register
         writer.writerow(["OS No", "Date", "Passenger Name", "Passport No", "Flight", "Assessed Value", "Status"])
-        records = db.query(CopsMaster).filter(CopsMaster.os_date >= start_date, CopsMaster.os_date <= end_date, CopsMaster.entry_deleted == "N").all()
+        records = db.query(CopsMaster).filter(CopsMaster.os_date >= start_date, CopsMaster.os_date <= end_date, CopsMaster.entry_deleted == "N").limit(ROW_LIMIT).all()
         for r in records:
             writer.writerow([
                 f"{r.os_no}/{r.os_year}", r.os_date, r.pax_name, r.passport_no, r.flight_no,
@@ -47,7 +51,7 @@ def generate_report(
 
     elif report_id == "r6":  # D.R. Register
         writer.writerow(["DR No", "Date", "Passenger Name", "Passport No", "Flight", "Items Value", "Status"])
-        records = db.query(DrMaster).filter(DrMaster.dr_date >= start_date, DrMaster.dr_date <= end_date, DrMaster.entry_deleted == "N").all()
+        records = db.query(DrMaster).filter(DrMaster.dr_date >= start_date, DrMaster.dr_date <= end_date, DrMaster.entry_deleted == "N").limit(ROW_LIMIT).all()
         for r in records:
             writer.writerow([
                 f"{r.dr_no}/{r.dr_year}", r.dr_date, r.pax_name, r.passport_no, r.flight_no,

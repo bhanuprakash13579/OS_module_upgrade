@@ -147,7 +147,7 @@ export default function AdjudicationLayout() {
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
 
 
-        <div className="flex-1 overflow-y-auto p-5 md:p-7 bg-amber-50" style={{ willChange: 'scroll-position' }}>
+        <div className="flex-1 overflow-y-auto p-5 md:p-7 bg-amber-50">
           {user?.user_status === 'TEMP' && !location.pathname.endsWith('/users') ? (
             <Navigate to="/adjudication/users" replace />
           ) : (

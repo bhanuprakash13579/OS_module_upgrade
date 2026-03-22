@@ -31,7 +31,7 @@ def pull_events(last_sync: str, db: Session = Depends(get_db)):
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid ISO timestamp format")
 
-    events = db.query(AuditEvent).filter(AuditEvent.timestamp > dt).order_by(AuditEvent.timestamp.asc()).all()
+    events = db.query(AuditEvent).filter(AuditEvent.timestamp > dt).order_by(AuditEvent.timestamp.asc()).limit(1000).all()
     
     return [
         SyncEventResponse(

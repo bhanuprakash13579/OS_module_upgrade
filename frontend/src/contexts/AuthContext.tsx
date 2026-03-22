@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
 
 interface User {
   id: number;
@@ -64,8 +64,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const canAccessQuery = () => !!user && (SDO_ROLES.includes(user.user_role) || ADJN_ROLES.includes(user.user_role));
   const canAccessApis = () => !!user && (SDO_ROLES.includes(user.user_role) || ADJN_ROLES.includes(user.user_role));
 
+  const value = useMemo(() => ({
+    user, token, login, logout,
+    isAuthenticated: !!token,
+    canAccessSDO, canAccessAdjudication, canAccessQuery, canAccessApis,
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [user, token]);
+
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token, canAccessSDO, canAccessAdjudication, canAccessQuery, canAccessApis }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

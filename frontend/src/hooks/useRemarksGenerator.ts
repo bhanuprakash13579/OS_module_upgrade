@@ -204,12 +204,18 @@ function isDuty(item: any) { const c = categorize(item); return c === 'UNDER DUT
 
 // ────────────────────────────────────────────────────────────────────────────
 // MAIN HOOK
+// ── Module-level cache — statutes are seeded at startup and never change ─────
+// Without this, every OffenceForm mount (new/edit/view) re-fetches the full
+// statutes list from the backend, adding a round-trip before the wand button works.
+let _statutesCache: Statute[] | null = null;
+
 // ────────────────────────────────────────────────────────────────────────────
 export function useRemarksGenerator() {
-  const [statutes, setStatutes] = useState<Statute[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [statutes, setStatutes] = useState<Statute[]>(_statutesCache ?? []);
+  const [loading, setLoading] = useState(_statutesCache === null);
 
   useEffect(() => {
+    if (_statutesCache !== null) return; // already loaded for this session
     let mounted = true;
     let retryCount = 0;
     const MAX_RETRIES = 6;
@@ -221,6 +227,7 @@ export function useRemarksGenerator() {
           const res = await api.get('/statutes');
           if (!mounted) return;
           if (Array.isArray(res.data) && res.data.length > 0) {
+            _statutesCache = res.data;
             setStatutes(res.data);
             setLoading(false);
             return;

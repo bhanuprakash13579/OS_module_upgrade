@@ -284,11 +284,12 @@ def search_old_passports(
     """
     from app.services.apis_match import _name_score, _NAME_THRESHOLD
 
-    # Step 1 — exact DOB (cheap, uses date column)
+    # Step 1 — exact DOB (cheap, uses date column); cap at 500 to bound
+    # the fuzzy-name loop in Step 2 on pathological data (e.g. DOB = 01-01-1990)
     candidates = db.query(CopsMaster).filter(
         CopsMaster.pax_date_of_birth == dob,
         CopsMaster.entry_deleted == "N"
-    ).all()
+    ).limit(500).all()
 
     # Step 2 — fuzzy name score on the small candidate set (in Python, no extra DB hit)
     found_passports = set()
@@ -426,7 +427,7 @@ def get_pending_adjudication(
         CopsMaster.quashed != "Y",
         CopsMaster.rejected != "Y",
         pending_items_subq,
-    ).order_by(CopsMaster.os_year.desc(), cast(CopsMaster.os_no, SAInteger).desc()).limit(2000).all()
+    ).order_by(CopsMaster.os_year.desc(), cast(CopsMaster.os_no, SAInteger).desc()).limit(200).all()
     # List view only needs master-level fields — skip item join for performance
     for r in records:
         r.items = []
@@ -446,7 +447,7 @@ def get_adjudicated_cases(
         CopsMaster.adjudication_date != None,          # noqa: E711
         CopsMaster.quashed != "Y",
         CopsMaster.rejected != "Y"
-    ).order_by(CopsMaster.adjudication_date.desc()).limit(2000).all()
+    ).order_by(CopsMaster.adjudication_date.desc()).limit(200).all()
     for r in records:
         r.items = []
     return records
@@ -461,7 +462,7 @@ def get_quashed_cases(
     records = db.query(CopsMaster).filter(
         CopsMaster.entry_deleted == "N",
         (CopsMaster.quashed == "Y") | (CopsMaster.rejected == "Y")
-    ).order_by(CopsMaster.os_date.desc()).limit(2000).all()
+    ).order_by(CopsMaster.os_date.desc()).limit(200).all()
     for r in records:
         r.items = []
     return records
