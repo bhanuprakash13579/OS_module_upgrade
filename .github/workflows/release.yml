@@ -108,6 +108,23 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install pyinstaller
+          # Bake the admin password hash into the source before PyInstaller
+          # compiles it. os.environ.get() is evaluated at runtime on the
+          # end-user's machine where ADMIN_PWD_HASH is not set, so we must
+          # embed the literal hash value into the source code here.
+          python3 -c "
+import os, re
+h = os.environ['ADMIN_PWD_HASH']
+path = 'app/security/admin_auth.py'
+src = open(path).read()
+src = re.sub(
+    r\"_ADMIN_PWD_HASH = os\\.environ\\.get\\([^)]+\\)\",
+    f'_ADMIN_PWD_HASH = {repr(h)}',
+    src
+)
+open(path, 'w').write(src)
+print('Patched admin_auth.py: hash baked in.')
+"
           pyinstaller --clean python-server.spec
 
       - name: Copy sidecar binary into Tauri binaries folder

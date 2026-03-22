@@ -106,7 +106,21 @@ jobs:
         working-directory: ./backend
         env:
           ADMIN_PWD_HASH: ${{ secrets.ADMIN_PWD_HASH }}
-        run: pyinstaller --clean python-server.spec
+        run: |
+          python3 -c "
+import os, re
+h = os.environ['ADMIN_PWD_HASH']
+path = 'app/security/admin_auth.py'
+src = open(path).read()
+src = re.sub(
+    r\"_ADMIN_PWD_HASH = os\\.environ\\.get\\([^)]+\\)\",
+    f'_ADMIN_PWD_HASH = {repr(h)}',
+    src
+)
+open(path, 'w').write(src)
+print('Patched admin_auth.py: hash baked in.')
+"
+          pyinstaller --clean python-server.spec
 
       - name: Move Sidecar Binary for Tauri
         shell: bash
