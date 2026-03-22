@@ -79,6 +79,12 @@ interface OSCase {
 
 // ── Pure helpers (module-level, never recreated) ──────────────────────────────
 
+const _UQC_LABEL: Record<string, string> = {
+  NOS: 'Nos.', STK: 'Sticks', KGS: 'Kgs.', GMS: 'Gms.', LTR: 'Ltrs.', MTR: 'Mtrs.', PRS: 'Pairs',
+};
+const _uqcLabel = (code: string) => _UQC_LABEL[(code || '').toUpperCase()] ?? (code || 'Nos.');
+const _fmtQty = (q: number | string) => { const n = Number(q); return n % 1 === 0 ? Math.trunc(n).toString() : String(q); };
+
 const fmtDateStr = (d: string | null | undefined): string => {
   if (!d) return '—';
   if (d === 'N.A.' || d === 'NA' || d === 'n.a.') return d;
@@ -238,27 +244,15 @@ const ItemsPanel = memo(function ItemsPanel({ osCase }: { osCase: OSCase }) {
   let rfVal = 0, refVal = 0, confsVal = 0, underDutyVal = 0, unassignedVal = 0, totalFA = 0;
   const qtyFaItems: string[] = [];
   
-  const UQC_LABEL: Record<string, string> = {
-    NOS: 'Nos.', STK: 'Sticks', KGS: 'Kgs.', GMS: 'Gms.', LTR: 'Ltrs.', MTR: 'Mtrs.', PRS: 'Pairs',
-  };
-  const uqcLabel = (code: string) => UQC_LABEL[(code || '').toUpperCase()] ?? (code || 'Nos.');
-
-  const fmtQty = (q: number | string) => {
-    const n = Number(q);
-    return n % 1 === 0 ? Math.trunc(n).toString() : String(q);
-  };
-  
   for (const item of osCase.items) {
     const rc = item.items_release_category || 'Under OS';
     const val = valueAfterFA(item);
-    
-    // Only capture VALUE-based Free Allowance into the numeric totalFA
+
     if ((item.items_fa_type || 'value') === 'value') {
       const origVal = Number(item.items_value) || 0;
       totalFA += Math.max(0, origVal - val);
     } else if (Number(item.items_fa_qty) > 0) {
-      // Capture QTY-based FAs for the textual description instead
-      qtyFaItems.push(`${fmtQty(item.items_fa_qty || 0)} ${uqcLabel(item.items_fa_uqc || '')} of ${item.items_desc}`);
+      qtyFaItems.push(`${_fmtQty(item.items_fa_qty || 0)} ${_uqcLabel(item.items_fa_uqc || '')} of ${item.items_desc}`);
     }
 
     if (rc === 'CONFS') confsVal += val;
@@ -390,10 +384,6 @@ export default function AdjudicationForm() {
     let rf = 0, ref = 0, confs = 0, uos = 0, duty = 0, fa = 0, dutySum = 0;
     const qFa: string[] = [];
 
-    const UQC_LABEL: Record<string, string> = { NOS: 'Nos.', STK: 'Sticks', KGS: 'Kgs.', GMS: 'Gms.', LTR: 'Ltrs.', MTR: 'Mtrs.', PRS: 'Pairs' };
-    const uqcLabel = (code: string) => UQC_LABEL[(code || '').toUpperCase()] ?? (code || 'Nos.');
-    const fmtQty = (q: number | string) => { const n = Number(q); return n % 1 === 0 ? Math.trunc(n).toString() : String(q); };
-
     for (const item of osCase.items) {
       const rc = item.items_release_category || 'Under OS';
       const valAfterFa = valueAfterFA(item);
@@ -403,7 +393,7 @@ export default function AdjudicationForm() {
         const origVal = Number(item.items_value) || 0;
         fa += Math.max(0, origVal - valAfterFa);
       } else if (Number(item.items_fa_qty) > 0) {
-        qFa.push(`${fmtQty(item.items_fa_qty || 0)} ${uqcLabel(item.items_fa_uqc || '')} of ${item.items_desc}`);
+        qFa.push(`${_fmtQty(item.items_fa_qty || 0)} ${_uqcLabel(item.items_fa_uqc || '')} of ${item.items_desc}`);
       }
 
       if (rc === 'CONFS') confs += valAfterFa;

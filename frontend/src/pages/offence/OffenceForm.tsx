@@ -3,7 +3,6 @@ import { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Save, ArrowLeft, Plus, Trash2, FileText, User, Plane, AlertCircle, FileDigit, CheckCircle, Wand2 } from 'lucide-react';
 import DatePicker from '@/components/DatePicker';
-import { useAuth } from '@/contexts/AuthContext';
 import PassportScanner from '@/components/PassportScanner';
 import api from '@/lib/api';
 import { useRemarksGenerator, detectContextualQuestions, ContextualAnswers, ContextualQuestion } from '@/hooks/useRemarksGenerator';
@@ -376,27 +375,29 @@ const ItemRow = memo(function ItemRow({ itm, idx, rowErrors, updateItem, onRemov
   );
 });
 
+// Module-level cache — item descriptions are fetched once per session
+let _descSuggestionsCache: string[] | null = null;
+
 // ─────────────────────────────────────────────────────────────────────────────
 export default function OffenceForm() {
   const { osNo, osYear } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { token } = useAuth();
   const { generateRemark, loading: remarksLoading } = useRemarksGenerator();
 
   // ── Item-description autocomplete suggestions ────────────────────────────
-  const [descSuggestions, setDescSuggestions] = useState<string[]>(STATIC_ITEM_SUGGESTIONS);
+  const [descSuggestions, setDescSuggestions] = useState<string[]>(_descSuggestionsCache ?? STATIC_ITEM_SUGGESTIONS);
   useEffect(() => {
+    if (_descSuggestionsCache !== null) return; // already fetched this session
     api.get('/os/item-descriptions')
       .then(res => {
         if (!Array.isArray(res.data)) return;
         const dbItems: string[] = res.data.map((s: string) => (s || '').toUpperCase()).filter(Boolean);
-        setDescSuggestions(prev => {
-          const merged = [...dbItems];
-          const existing = new Set(dbItems);
-          for (const s of prev) { if (!existing.has(s)) { merged.push(s); existing.add(s); } }
-          return merged;
-        });
+        const merged = [...dbItems];
+        const existing = new Set(dbItems);
+        for (const s of STATIC_ITEM_SUGGESTIONS) { if (!existing.has(s)) { merged.push(s); existing.add(s); } }
+        _descSuggestionsCache = merged;
+        setDescSuggestions(merged);
       })
       .catch(() => { /* keep static list on error */ });
   }, []);
@@ -580,7 +581,7 @@ export default function OffenceForm() {
       })
       .catch(err => setErrorMsg(err.message));
     }
-  }, [isEditing, osNo, osYear, token]);
+  }, [isEditing, osNo, osYear]);
 
   // Auto-calculate Stay Abroad Days — bail early if already correct to avoid spurious re-renders
   useEffect(() => {
@@ -629,7 +630,7 @@ export default function OffenceForm() {
     };
     const timer = setTimeout(searchPassports, 1000);
     return () => clearTimeout(timer);
-  }, [formData.pax_name, formData.pax_date_of_birth, formData.passport_no, token]);
+  }, [formData.pax_name, formData.pax_date_of_birth, formData.passport_no]);
 
   const acceptPassportSuggestion = () => {
       setFormData(prev => ({
