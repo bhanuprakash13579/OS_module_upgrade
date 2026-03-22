@@ -290,7 +290,7 @@ def seed_initial_data():
 
 
         # ── Seed Default Shift Timing ──
-        if db.query(ShiftTimingMaster).count() == 0:
+        if db.query(ShiftTimingMaster).first() is None:
             db.add(ShiftTimingMaster(
                 day_shift_from_hrs=settings.DEFAULT_DAY_SHIFT_FROM,
                 day_shift_to_hrs=settings.DEFAULT_DAY_SHIFT_TO,
@@ -299,14 +299,14 @@ def seed_initial_data():
             ))
 
         # ── Seed Default Margins ──
-        if db.query(MarginMaster).count() == 0:
+        if db.query(MarginMaster).first() is None:
             db.add(MarginMaster(
                 br_top_margin=settings.DEFAULT_BR_TOP_MARGIN,
                 dr_top_margin=settings.DEFAULT_DR_TOP_MARGIN,
             ))
 
         # ── Seed Feature Flags (all OFF by default) ──
-        if db.query(FeatureFlags).count() == 0:
+        if db.query(FeatureFlags).first() is None:
             db.add(FeatureFlags(apis_enabled=False))
 
         # Print Template Config is intentionally NOT seeded.
@@ -314,7 +314,7 @@ def seed_initial_data():
         # (Baggage Rules 1994 era).  Admin adds entries only when rules change.
 
         # ── Seed Baggage Rules Config ─────────────────────────────────────────
-        if db.query(BaggageRulesConfig).count() == 0:
+        if db.query(BaggageRulesConfig).first() is None:
             from datetime import date as _date
             _brc = [
                 # General FA — Indian / OCI passport holders
@@ -368,7 +368,7 @@ def seed_initial_data():
             db.add_all(_brc)
 
         # ── Seed Special Item Allowances ──────────────────────────────────────
-        if db.query(SpecialItemAllowance).count() == 0:
+        if db.query(SpecialItemAllowance).first() is None:
             from datetime import date as _date
             _sia = [
                 SpecialItemAllowance(item_name="Liquor",

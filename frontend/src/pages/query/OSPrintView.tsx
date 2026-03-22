@@ -43,51 +43,54 @@ export default function OSPrintView() {
           const fetchedData = response.data.items[0];
           setData(fetchedData);
 
-          // Fetch versioned config for OS date
-          try {
-            const pitRes = await api.get('/admin/config/pit', { params: { ref_date: fetchedData.os_date } });
-            setPitConfig(pitRes.data);
-          } catch { setPitConfig(null); }
+          // Fetch versioned config and prior offences in parallel — independent requests
+          const [pitResult, ppResult] = await Promise.allSettled([
+            api.get('/admin/config/pit', { params: { ref_date: fetchedData.os_date } }),
+            api.post('/os-query/search', { pax_name: fetchedData.pax_name, page: 1, limit: 50 }),
+          ]);
 
-          // Fetch offences for same passenger (by name) to populate both fields
-          try {
-            const ppRes = await api.post('/os-query/search', {
-              pax_name: fetchedData.pax_name,
-              page: 1, limit: 50
-            });
-            // Exclude the current OS record itself
-            const allOther = ppRes.data.items.filter((item: any) =>
-              item.os_no !== fetchedData.os_no || item.os_year !== fetchedData.os_year
-            );
+          setPitConfig(pitResult.status === 'fulfilled' ? pitResult.value.data : null);
 
-            // Same passport + strictly before current OS date → "Prev. Offence in Above PP No(s)."
-            const currentOsDate = new Date(fetchedData.os_date);
-            const samePassportPrior = allOther.filter((o: any) =>
-              o.passport_no === fetchedData.passport_no &&
-              new Date(o.os_date) < currentOsDate
-            );
-            if (samePassportPrior.length > 0) {
-              const osList = samePassportPrior
-                .sort((a: any, b: any) => new Date(b.os_date).getTime() - new Date(a.os_date).getTime())
-                .map((o: any) => `${o.os_no}/${o.os_year}`)
-                .join(', ');
-              setPrevSamePpOffences(`${samePassportPrior.length} (${osList})`);
-            } else {
-              setPrevSamePpOffences('NIL');
-            }
-
-            // Different passport, same pax name → "Offences of Other PPs(if any)"
-            const otherPassport = allOther.filter((o: any) =>
-              o.passport_no !== fetchedData.passport_no
-            );
-            if (otherPassport.length > 0) {
-              setOtherPpOffences(
-                otherPassport.map((o: any) => `${o.passport_no} (OS ${o.os_no}/${o.os_year})`).join(', ')
+          if (ppResult.status === 'fulfilled') {
+            try {
+              const ppData = ppResult.value.data;
+              // Exclude the current OS record itself
+              const allOther = ppData.items.filter((item: any) =>
+                item.os_no !== fetchedData.os_no || item.os_year !== fetchedData.os_year
               );
-            } else {
+
+              // Same passport + strictly before current OS date → "Prev. Offence in Above PP No(s)."
+              const currentOsDate = new Date(fetchedData.os_date);
+              const samePassportPrior = allOther.filter((o: any) =>
+                o.passport_no === fetchedData.passport_no &&
+                new Date(o.os_date) < currentOsDate
+              );
+              if (samePassportPrior.length > 0) {
+                const osList = samePassportPrior
+                  .sort((a: any, b: any) => new Date(b.os_date).getTime() - new Date(a.os_date).getTime())
+                  .map((o: any) => `${o.os_no}/${o.os_year}`)
+                  .join(', ');
+                setPrevSamePpOffences(`${samePassportPrior.length} (${osList})`);
+              } else {
+                setPrevSamePpOffences('NIL');
+              }
+
+              // Different passport, same pax name → "Offences of Other PPs(if any)"
+              const otherPassport = allOther.filter((o: any) =>
+                o.passport_no !== fetchedData.passport_no
+              );
+              if (otherPassport.length > 0) {
+                setOtherPpOffences(
+                  otherPassport.map((o: any) => `${o.passport_no} (OS ${o.os_no}/${o.os_year})`).join(', ')
+                );
+              } else {
+                setOtherPpOffences('NIL');
+              }
+            } catch {
+              setPrevSamePpOffences('NIL');
               setOtherPpOffences('NIL');
             }
-          } catch(e) {
+          } else {
             setPrevSamePpOffences('NIL');
             setOtherPpOffences('NIL');
           }
