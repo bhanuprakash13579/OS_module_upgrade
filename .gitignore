@@ -38,3 +38,6 @@ frontend_dist/
 build/
 backend/build/
 backend/dist/
+
+# Large source assets (icons are generated from these; not needed as web assets)
+frontend/public/new_cops_logo.png
