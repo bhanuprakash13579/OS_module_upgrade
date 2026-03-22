@@ -45,17 +45,25 @@ def _get_mac_address() -> str:
     return hex(uuid.getnode())
 
 
+_fingerprint_cache: str | None = None
+
 def _compute_fingerprint() -> str:
     """
     Compute a machine-specific fingerprint:
         HMAC-SHA256( _BINDING_SECRET, "MAC:hostname" )
     Tied to both the hardware MAC and the hostname so that even
     a VM clone with spoofed MAC is harder to fake.
+    Result is cached for the lifetime of the process — MAC and hostname
+    do not change at runtime, and uuid.getnode() can be slow on Windows.
     """
+    global _fingerprint_cache
+    if _fingerprint_cache is not None:
+        return _fingerprint_cache
     mac = _get_mac_address()
     hostname = platform.node().lower()
     message = f"{mac}:{hostname}".encode()
-    return hmac.new(_BINDING_SECRET, message, hashlib.sha256).hexdigest()
+    _fingerprint_cache = hmac.new(_BINDING_SECRET, message, hashlib.sha256).hexdigest()
+    return _fingerprint_cache
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -72,17 +80,26 @@ def _key_path() -> Path:
     return Path(cops_db).parent / "machine.key"
 
 
+_registered_cache: bool | None = None
+
 def is_device_registered() -> bool:
-    """Return True if machine.key exists and matches current hardware."""
+    """Return True if machine.key exists and matches current hardware.
+    Result is cached — file I/O + HMAC on every HTTP request adds latency.
+    Cache is invalidated when register_device() is called."""
+    global _registered_cache
+    if _registered_cache is not None:
+        return _registered_cache
     path = _key_path()
     if not path.exists():
+        _registered_cache = False
         return False
     try:
         stored = path.read_text().strip()
         expected = _compute_fingerprint()
-        return hmac.compare_digest(stored, expected)
+        _registered_cache = hmac.compare_digest(stored, expected)
     except Exception:
-        return False
+        _registered_cache = False
+    return _registered_cache
 
 
 def register_device() -> str:
@@ -90,9 +107,11 @@ def register_device() -> str:
     Write machine.key for the current device.
     Returns the fingerprint string (for admin confirmation display).
     """
+    global _registered_cache
     fingerprint = _compute_fingerprint()
     path = _key_path()
     path.write_text(fingerprint)
+    _registered_cache = True  # invalidate / update cache immediately
     return fingerprint
 
 
@@ -134,6 +153,9 @@ _PRIVATE_RANGES = [
 
 def is_lan_ip(ip: str) -> bool:
     """Return True if the IP is localhost or a private LAN address."""
+    # Fast path: local desktop app always hits these — avoids ipaddress parsing
+    if ip in ("127.0.0.1", "::1"):
+        return True
     try:
         addr = ipaddress.ip_address(ip)
         return any(addr in net for net in _PRIVATE_RANGES)

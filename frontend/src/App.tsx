@@ -102,15 +102,19 @@ function QueryRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// Module-level cache — feature flags don't change during a session
+let _apisEnabledCache: boolean | null = null;
+
 // APIS guard (SDO and Adjn roles + feature flag must be enabled)
 function ApisRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, canAccessApis } = useAuth();
-  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [enabled, setEnabled] = useState<boolean | null>(_apisEnabledCache);
 
   useEffect(() => {
+    if (_apisEnabledCache !== null) return; // already cached
     api.get('/features')
-      .then(r => setEnabled(!!r.data.apis_enabled))
-      .catch(() => setEnabled(false));
+      .then(r => { _apisEnabledCache = !!r.data.apis_enabled; setEnabled(_apisEnabledCache); })
+      .catch(() => { _apisEnabledCache = false; setEnabled(false); });
   }, []);
 
   if (enabled === null) return <div className="min-h-screen bg-slate-900" />; // still loading
