@@ -180,14 +180,62 @@ function AppRoutes() {
   );
 }
 
+// Polls /api/mode until the Python backend is ready, then renders the app.
+// Without this, the window opens immediately while the sidecar is still
+// running startup migrations and seed queries — resulting in blank pages
+// and API errors for the first few seconds.
+function BackendGate({ children }: { children: React.ReactNode }) {
+  const [ready, setReady] = useState(false);
+  const [dots, setDots] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    let dotTimer: ReturnType<typeof setInterval>;
+
+    const poll = async () => {
+      while (!cancelled) {
+        try {
+          await api.get('/mode', { timeout: 2000 });
+          if (!cancelled) setReady(true);
+          return;
+        } catch {
+          await new Promise(r => setTimeout(r, 800));
+        }
+      }
+    };
+
+    dotTimer = setInterval(() => setDots(d => d.length >= 3 ? '' : d + '.'), 500);
+    poll();
+    return () => {
+      cancelled = true;
+      clearInterval(dotTimer);
+    };
+  }, []);
+
+  if (!ready) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center"
+        style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%)' }}>
+        <img src="/cops_logo.png" alt="COPS" className="w-24 h-24 object-contain mb-6 opacity-90" />
+        <p className="text-white text-lg font-semibold tracking-widest">COPS</p>
+        <p className="text-blue-300 text-sm mt-2 w-32 text-center">Starting{dots}</p>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
+
 export default function App() {
   return (
     <AuthProvider>
-      <AutoUpdater />
-      <DevModeBanner />
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
+      <BackendGate>
+        <AutoUpdater />
+        <DevModeBanner />
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </BackendGate>
     </AuthProvider>
   );
 }

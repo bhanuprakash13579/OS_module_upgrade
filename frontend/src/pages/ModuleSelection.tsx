@@ -171,9 +171,19 @@ export default function ModuleSelection() {
         <button
           type="button"
           onClick={handleSecretClick}
-          className="absolute bottom-3 left-3 w-8 h-8 bg-transparent"
+          className="absolute bottom-0 left-0 w-16 h-16 bg-transparent"
           aria-label="hidden-backup-trigger"
         />
+        {secretClicks > 0 && (
+          <div className="absolute bottom-4 left-4 flex gap-1 pointer-events-none">
+            {[...Array(4)].map((_, i) => (
+              <div
+                key={i}
+                className={`w-2 h-2 rounded-full transition-all ${i < secretClicks ? 'bg-white/60' : 'bg-white/15'}`}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Footer */}

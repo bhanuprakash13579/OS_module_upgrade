@@ -413,14 +413,13 @@ def _seed_legal_statutes():
 
     db = SessionLocal()
     try:
-        count = 0
-        for entry in DEFAULT_STATUTES:
-            if not db.query(LegalStatute).filter(LegalStatute.keyword == entry["keyword"]).first():
-                db.add(LegalStatute(**entry))
-                count += 1
-        if count:
+        # Single query to get all existing keywords — avoids N+1 per-row queries
+        existing = {row[0] for row in db.query(LegalStatute.keyword).all()}
+        new_entries = [LegalStatute(**e) for e in DEFAULT_STATUTES if e["keyword"] not in existing]
+        if new_entries:
+            db.bulk_save_objects(new_entries)
             db.commit()
-            print(f"✅ Seeded {count} legal statutes")
+            print(f"✅ Seeded {len(new_entries)} legal statutes")
     except Exception as e:
         db.rollback()
         print(f"Legal statutes seed error: {e}")
@@ -504,22 +503,19 @@ def _seed_print_template_config():
 
     db = SessionLocal()
     try:
-        count = 0
-        for key, label, value in _DEFAULTS:
-            if not db.query(PrintTemplateConfig).filter(
-                PrintTemplateConfig.field_key == key
-            ).first():
-                db.add(PrintTemplateConfig(
-                    field_key=key,
-                    field_label=label,
-                    field_value=value,
-                    effective_from=_date(1900, 1, 1),
-                    created_by="seed",
-                ))
-                count += 1
-        if count:
+        # Single query to get all existing keys — avoids N+1 per-row queries
+        existing = {row[0] for row in db.query(PrintTemplateConfig.field_key).all()}
+        new_entries = [
+            PrintTemplateConfig(
+                field_key=key, field_label=label, field_value=value,
+                effective_from=_date(1900, 1, 1), created_by="seed",
+            )
+            for key, label, value in _DEFAULTS if key not in existing
+        ]
+        if new_entries:
+            db.bulk_save_objects(new_entries)
             db.commit()
-            print(f"✅ Seeded {count} print template fields")
+            print(f"✅ Seeded {len(new_entries)} print template fields")
     except Exception as e:
         db.rollback()
         print(f"Print template seed error: {e}")
