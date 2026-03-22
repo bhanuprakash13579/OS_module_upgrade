@@ -30,10 +30,10 @@ jobs:
             binary_dest: "frontend/src-tauri/binaries/python-server-x86_64-unknown-linux-gnu"
             tauri_args: "--bundles deb,appimage"
 
-          - os: macos-13   # x86_64 Intel — macos-latest is arm64 which mismatches binary name
+          - os: macos-latest   # arm64 Apple Silicon (macos-13 Intel no longer available)
             binary_src: "backend/dist/python-server"
-            binary_dest: "frontend/src-tauri/binaries/python-server-x86_64-apple-darwin"
-            tauri_args: "--bundles app,dmg"
+            binary_dest: "frontend/src-tauri/binaries/python-server-aarch64-apple-darwin"
+            tauri_args: "--bundles app,dmg --target aarch64-apple-darwin"
 
     steps:
       - name: Checkout Code
@@ -82,6 +82,8 @@ jobs:
       # ── Rust setup ───────────────────────────────────────────────────────────
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
 
       - name: Install Linux Dependencies
         if: matrix.os == 'ubuntu-22.04'
