@@ -31,10 +31,13 @@ _ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # ── Admin credentials (read from env or fallback to hardcoded hash) ─────────
 # In production builds via GitHub Actions, ADMIN_PWD_HASH is injected as an env var.
 _ADMIN_USERNAME = "sysadmin"
-# ADMIN_PWD_HASH must be injected via environment variable at build time.
-# If not set, the fallback is a deliberately invalid string so admin login
-# is impossible in any build that was not produced by the secure CI pipeline.
+# CI bakes a literal bcrypt hash here at build time (see release.yml).
+# For local dev only: set ADMIN_PASSWORD env var (plaintext) and the hash
+# is generated on startup. Never use ADMIN_PASSWORD in production builds.
 _ADMIN_PWD_HASH = os.environ.get("ADMIN_PWD_HASH", "__ADMIN_PWD_HASH_NOT_CONFIGURED__")
+_local_dev_pass = os.environ.get("ADMIN_PASSWORD", "")
+if _ADMIN_PWD_HASH == "__ADMIN_PWD_HASH_NOT_CONFIGURED__" and _local_dev_pass:
+    _ADMIN_PWD_HASH = _ctx.hash(_local_dev_pass)
 
 _BEARER = HTTPBearer(auto_error=False)
 

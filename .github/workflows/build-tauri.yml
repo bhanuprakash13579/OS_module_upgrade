@@ -105,15 +105,17 @@ jobs:
       - name: Bake admin password hash into source
         working-directory: ./backend
         env:
-          ADMIN_PWD_HASH: ${{ secrets.ADMIN_PWD_HASH }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         shell: python3 {0}
         run: |
           import os, re
-          h = os.environ['ADMIN_PWD_HASH']
+          from passlib.context import CryptContext
+          password = os.environ['ADMIN_PASSWORD']
+          h = CryptContext(schemes=['bcrypt'], deprecated='auto').hash(password)
           path = 'app/security/admin_auth.py'
           src = open(path).read()
           src = re.sub(
-              r'_ADMIN_PWD_HASH = os\.environ\.get\([^)]+\)',
+              r'_ADMIN_PWD_HASH = [^\n]+',
               '_ADMIN_PWD_HASH = ' + repr(h),
               src,
           )
