@@ -38,4 +38,3 @@ frontend_dist/
 build/
 backend/build/
 backend/dist/
-*.spec
