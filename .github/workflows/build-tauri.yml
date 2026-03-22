@@ -96,6 +96,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: "./frontend"
+          tauriScript: npx tauri
           args: ${{ matrix.tauri_args }}
 
       # ── Upload Artifacts ─────────────────────────────────────────────────────

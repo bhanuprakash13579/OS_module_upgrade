@@ -112,6 +112,7 @@ jobs:
           ADMIN_PWD_HASH: ${{ secrets.ADMIN_PWD_HASH }}
         with:
           projectPath: ./frontend
+          tauriScript: npx tauri
           tagName: ${{ github.ref_name }}
           releaseName: "COPS v${{ github.ref_name }}"
           releaseBody: |
