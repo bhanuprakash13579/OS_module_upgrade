@@ -21,17 +21,16 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            pyinstaller_args: "--clean python-server.spec"
             binary_src: "backend/dist/python-server.exe"
             binary_dest: "frontend/src-tauri/binaries/python-server-x86_64-pc-windows-msvc.exe"
             tauri_args: ""
+
           - os: ubuntu-22.04
-            pyinstaller_args: "--clean python-server.spec"
             binary_src: "backend/dist/python-server"
             binary_dest: "frontend/src-tauri/binaries/python-server-x86_64-unknown-linux-gnu"
             tauri_args: "--bundles deb,appimage"
-          - os: macos-latest
-            pyinstaller_args: "--clean python-server.spec"
+
+          - os: macos-13   # x86_64 Intel — macos-latest is arm64 which mismatches binary name
             binary_src: "backend/dist/python-server"
             binary_dest: "frontend/src-tauri/binaries/python-server-x86_64-apple-darwin"
             tauri_args: "--bundles app,dmg"
@@ -40,28 +39,27 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # ── Dependencies ──
+      # ── Node setup (must come before PyInstaller — spec bundles frontend/dist) ──
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
+      - name: Install Node Dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Build frontend (creates frontend/dist required by PyInstaller spec)
+        working-directory: ./frontend
+        run: npm run build
+
+      # ── Python / PyInstaller ─────────────────────────────────────────────────
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: "pip"
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install Linux Dependencies
-        if: matrix.os == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libgdk-pixbuf2.0-dev
-
-      # ── Build Backend (PyInstaller) ──
       - name: Install Python Dependencies
         working-directory: ./backend
         run: |
@@ -73,7 +71,7 @@ jobs:
         working-directory: ./backend
         env:
           ADMIN_PWD_HASH: ${{ secrets.ADMIN_PWD_HASH }}
-        run: pyinstaller ${{ matrix.pyinstaller_args }}
+        run: pyinstaller --clean python-server.spec
 
       - name: Move Sidecar Binary for Tauri
         shell: bash
@@ -81,11 +79,17 @@ jobs:
           mkdir -p frontend/src-tauri/binaries
           cp ${{ matrix.binary_src }} ${{ matrix.binary_dest }}
 
-      # ── Build Frontend & Tauri App ──
-      - name: Install Node Dependencies
-        working-directory: ./frontend
-        run: npm ci
+      # ── Rust setup ───────────────────────────────────────────────────────────
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
 
+      - name: Install Linux Dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libgdk-pixbuf2.0-dev
+
+      # ── Build Tauri App ──────────────────────────────────────────────────────
       - name: Build Tauri App
         uses: tauri-apps/tauri-action@v0
         env:
@@ -94,7 +98,7 @@ jobs:
           projectPath: "./frontend"
           args: ${{ matrix.tauri_args }}
 
-      # ── Upload Artifacts ──
+      # ── Upload Artifacts ─────────────────────────────────────────────────────
       - name: Upload Windows MSI/EXE
         if: matrix.os == 'windows-latest'
         uses: actions/upload-artifact@v4
@@ -115,8 +119,8 @@ jobs:
             frontend/src-tauri/target/release/bundle/appimage/*.AppImage
           retention-days: 7
 
-      - name: Upload macOS DMG/App
-        if: matrix.os == 'macos-latest'
+      - name: Upload macOS DMG
+        if: matrix.os == 'macos-13'
         uses: actions/upload-artifact@v4
         with:
           name: cops-desktop-macos
