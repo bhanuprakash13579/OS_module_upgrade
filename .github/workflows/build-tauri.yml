@@ -106,9 +106,8 @@ jobs:
         working-directory: ./backend
         env:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
-        shell: bash
+        shell: python {0}
         run: |
-          python - <<'EOF'
           import os, re, bcrypt as _b
           pw = os.environ['ADMIN_PASSWORD'].encode('utf-8')
           h = _b.hashpw(pw, _b.gensalt(12)).decode('utf-8')
@@ -117,7 +116,6 @@ jobs:
           src = re.sub(r'_ADMIN_PWD_HASH = [^\n]+', '_ADMIN_PWD_HASH = ' + repr(h), src)
           open(path, 'w').write(src)
           print('Patched admin_auth.py: hash baked in.')
-          EOF
 
       - name: Build Python Sidecar (PyInstaller)
         working-directory: ./backend
@@ -133,7 +131,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin
+          targets: ${{ matrix.os == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
 
       # ── Build Tauri App ──────────────────────────────────────────────────────
       - name: Build Tauri App
