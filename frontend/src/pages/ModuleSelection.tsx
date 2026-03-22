@@ -176,6 +176,14 @@ export default function ModuleSelection() {
         />
       </div>
 
+      {/* Footer */}
+      <div className="absolute bottom-0 left-0 right-0 flex justify-center items-center py-3 z-10">
+        <p className="text-white/30 text-xs tracking-widest uppercase select-none">
+          Powered by{' '}
+          <span className="text-white/50 font-semibold">Get Some Idea Technologies</span>
+        </p>
+      </div>
+
     </div>
   );
 }

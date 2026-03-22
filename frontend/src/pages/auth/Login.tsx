@@ -112,7 +112,7 @@ export default function Login() {
         </div>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10 mb-10">
         <div className={`py-8 px-4 shadow-2xl sm:rounded-xl sm:px-10 border ${isSDO ? 'bg-white/80 border-blue-100' : isQuery ? 'bg-white/80 border-emerald-100' : isApis ? 'bg-white/80 border-violet-100' : 'bg-white/80 border-amber-200'}`}>
           
           {bootstrapInfo && (
@@ -233,6 +233,17 @@ export default function Login() {
 
         </div>
       </div>
+
+      {/* Footer */}
+      <div className="absolute bottom-0 left-0 right-0 flex justify-center items-center py-3">
+        <p className={`text-xs tracking-widest uppercase select-none ${isSDO ? 'text-slate-400/60' : isQuery ? 'text-emerald-900/30' : isApis ? 'text-violet-900/30' : 'text-amber-900/30'}`}>
+          Powered by{' '}
+          <span className={`font-semibold ${isSDO ? 'text-slate-500/70' : isQuery ? 'text-emerald-900/50' : isApis ? 'text-violet-900/50' : 'text-amber-900/50'}`}>
+            Get Some Idea Technologies
+          </span>
+        </p>
+      </div>
+
     </div>
   );
 }
