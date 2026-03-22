@@ -10,23 +10,19 @@ Security model
   infeasible against bcrypt with a strong password.
 
 To change the admin password before a release build:
-  1. Run:  python3 -c "from passlib.context import CryptContext; \
-                        c=CryptContext(schemes=['bcrypt'],deprecated='auto'); \
-                        print(c.hash('YourNewPassword'))"
+  1. Run:  python3 -c "import bcrypt; print(bcrypt.hashpw(b'YourNewPassword', bcrypt.gensalt(12)).decode())"
   2. Replace _ADMIN_PWD_HASH below with the printed output.
   3. Rebuild the binary (pyinstaller python-server.spec --noconfirm).
 """
 import os
 from datetime import datetime, timedelta
 
+import bcrypt as _bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 from app.config import settings
-
-_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # ── Admin credentials (read from env or fallback to hardcoded hash) ─────────
 # In production builds via GitHub Actions, ADMIN_PWD_HASH is injected as an env var.
@@ -37,7 +33,7 @@ _ADMIN_USERNAME = "sysadmin"
 _ADMIN_PWD_HASH = os.environ.get("ADMIN_PWD_HASH", "__ADMIN_PWD_HASH_NOT_CONFIGURED__")
 _local_dev_pass = os.environ.get("ADMIN_PASSWORD", "")
 if _ADMIN_PWD_HASH == "__ADMIN_PWD_HASH_NOT_CONFIGURED__" and _local_dev_pass:
-    _ADMIN_PWD_HASH = _ctx.hash(_local_dev_pass)
+    _ADMIN_PWD_HASH = _bcrypt.hashpw(_local_dev_pass.encode("utf-8"), _bcrypt.gensalt(12)).decode("utf-8")
 
 _BEARER = HTTPBearer(auto_error=False)
 
@@ -47,7 +43,7 @@ def verify_admin_credentials(username: str, password: str) -> bool:
     if username != _ADMIN_USERNAME:
         return False
     try:
-        return _ctx.verify(password, _ADMIN_PWD_HASH)
+        return _bcrypt.checkpw(password.encode("utf-8"), _ADMIN_PWD_HASH.encode("utf-8"))
     except Exception:
         return False
 
