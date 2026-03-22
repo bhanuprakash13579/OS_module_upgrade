@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "cops-customs-app",
+  "productName": "COPS",
   "version": "1.0.0",
   "identifier": "gov.in.customs.cops",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "COPS — Customs Offence Processing System",
+        "title": "COPS",
         "width": 1280,
         "height": 800,
         "minWidth": 1024,

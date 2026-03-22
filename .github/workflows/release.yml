@@ -165,10 +165,10 @@ jobs:
 
             | Platform | File |
             |----------|------|
-            | Windows | `cops-customs-app_*_x64.msi` or `cops-customs-app_*_x64-setup.exe` |
-            | Linux (Ubuntu/Debian) | `cops-customs-app_*_amd64.deb` |
-            | Linux (portable) | `cops-customs-app_*_amd64.AppImage` |
-            | macOS (Apple Silicon) | `cops-customs-app_*_aarch64.dmg` |
+            | Windows | `COPS_*_x64.msi` or `COPS_*_x64-setup.exe` |
+            | Linux (Ubuntu/Debian) | `COPS_*_amd64.deb` |
+            | Linux (portable) | `COPS_*_amd64.AppImage` |
+            | macOS (Apple Silicon) | `COPS_*_aarch64.dmg` |
 
             **First install:** download and run the installer.
             **Existing install:** the app will auto-update — open the app and wait for the update banner.
