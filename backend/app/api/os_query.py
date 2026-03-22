@@ -143,7 +143,7 @@ def search_os_cases(
         q = db.query(CopsMaster)
 
     # Always exclude soft-deleted cases
-    q = q.filter(or_(CopsMaster.entry_deleted == None, CopsMaster.entry_deleted != "Y"))
+    q = q.filter(CopsMaster.entry_deleted != "Y")
 
     # ── Identifiers ──
     if query.os_no:

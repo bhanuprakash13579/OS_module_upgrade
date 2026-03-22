@@ -35,7 +35,7 @@ def generate_report(
         for r in records:
             writer.writerow([
                 f"{r.br_no}/{r.br_year}", r.br_date, r.pax_name, r.passport_no, r.flight_no,
-                r.total_assessed_value, r.total_payable, r.customs_receipt_no, "Printed" if r.br_printed == "Y" else "Open"
+                r.total_items_value, r.total_payable, r.challan_no or '', "Printed" if r.br_printed == "Y" else "Open"
             ])
         filename = f"BR_Register_{start_date}_to_{end_date}.csv"
 
@@ -43,9 +43,10 @@ def generate_report(
         writer.writerow(["OS No", "Date", "Passenger Name", "Passport No", "Flight", "Assessed Value", "Status"])
         records = db.query(CopsMaster).filter(CopsMaster.os_date >= start_date, CopsMaster.os_date <= end_date, CopsMaster.entry_deleted == "N").limit(ROW_LIMIT).all()
         for r in records:
+            _status = 'Adjudicated' if r.adjudication_date else ('Quashed' if r.quashed == 'Y' else ('Rejected' if r.rejected == 'Y' else 'Pending'))
             writer.writerow([
                 f"{r.os_no}/{r.os_year}", r.os_date, r.pax_name, r.passport_no, r.flight_no,
-                r.total_assessed_value, r.current_status
+                r.total_items_value, _status
             ])
         filename = f"OS_Register_{start_date}_to_{end_date}.csv"
 

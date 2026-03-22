@@ -243,6 +243,8 @@ export function useRemarksGenerator() {
     }
 
     _statutesFetch.then(data => {
+      // If retries exhausted and got nothing, clear lock so next mount can retry
+      if (data.length === 0) _statutesFetch = null;
       if (!mounted) return;
       if (data.length > 0) setStatutes(data);
       setLoading(false);

@@ -608,28 +608,26 @@ export default function OffenceForm() {
 
   // Search Old Passports on Name + DOB change
   useEffect(() => {
-    const searchPassports = async () => {
-        if (formData.pax_name.length > 3 && formData.pax_date_of_birth) {
-            try {
-                const res = await api.get('/os/passports/search', {
-                    params: { name: formData.pax_name, dob: formData.pax_date_of_birth }
-                });
-                const data = res.data;
-                if (data.passports && data.passports.length > 0) {
-                    const existing = (formData.old_passport_no || '').split(';').map(s=>s.trim()).filter(Boolean);
-                    const newSuggestions = data.passports.filter((p: string) => !existing.includes(p) && p !== formData.passport_no);
-                    if (newSuggestions.length > 0) {
-                        setOldPassportsSuggestion(newSuggestions);
-                        setShowPassportAlert(true);
-                    }
-                }
-            } catch (e) {
-                console.error("Passport search failed", e);
-            }
+    if (formData.pax_name.length <= 3 || !formData.pax_date_of_birth) return;
+    const ctrl = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const res = await api.get('/os/passports/search', {
+          params: { name: formData.pax_name, dob: formData.pax_date_of_birth },
+          signal: ctrl.signal,
+        });
+        const data = res.data;
+        if (data.passports && data.passports.length > 0) {
+          const existing = (formData.old_passport_no || '').split(';').map((s: string) => s.trim()).filter(Boolean);
+          const newSuggestions = data.passports.filter((p: string) => !existing.includes(p) && p !== formData.passport_no);
+          if (newSuggestions.length > 0) {
+            setOldPassportsSuggestion(newSuggestions);
+            setShowPassportAlert(true);
+          }
         }
-    };
-    const timer = setTimeout(searchPassports, 1000);
-    return () => clearTimeout(timer);
+      } catch { /* aborted or network error — silent */ }
+    }, 1000);
+    return () => { clearTimeout(timer); ctrl.abort(); };
   }, [formData.pax_name, formData.pax_date_of_birth, formData.passport_no]);
 
   const acceptPassportSuggestion = () => {
@@ -677,6 +675,8 @@ export default function OffenceForm() {
   // Smart classification — runs every time the description field loses focus.
   // AbortController cancels any in-flight request from a prior blur on the same row.
   const classifyAbortRefs = useRef<Record<number, AbortController>>({});
+  // Abort all pending classify calls on unmount
+  useEffect(() => () => { Object.values(classifyAbortRefs.current).forEach(c => c.abort()); }, []);
   const onDescBlur = useCallback(async (idx: number, desc: string) => {
     if (!desc || desc.trim().length < 3) return;
     // Cancel previous in-flight classify for this row

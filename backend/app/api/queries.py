@@ -78,8 +78,8 @@ def universal_query(
         os_results.append({
             "os_no": f"{os.os_no}/{os.os_year}",
             "date": os.os_date.isoformat(),
-            "val": os.total_assessed_value or 0.0,
-            "status": os.current_status or "Apprehended"
+            "val": os.total_items_value or 0.0,
+            "status": 'Adjudicated' if os.adjudication_date else ('Quashed' if os.quashed == 'Y' else 'Pending')
         })
 
     return {

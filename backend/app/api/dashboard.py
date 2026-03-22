@@ -34,7 +34,7 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
     os_pending = db.query(func.count(CopsMaster.id)).filter(
         CopsMaster.os_date == today,
         CopsMaster.entry_deleted == 'N',
-        CopsMaster.current_status != 'Adjudicated',
+        CopsMaster.adjudication_date == None,
     ).scalar() or 0
 
     # 3. DR active today — one count query
@@ -61,7 +61,8 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
     for br in recent_brs:
         recent.append({"type": "BR", "number": f"{br.br_no}/{br.br_year}", "details": f"{br.pax_name} / {br.flight_no}", "amount": f"₹ {br.total_payable}", "status": "Paid" if br.br_printed == 'Y' else "Pending"})
     for os in recent_os:
-        recent.append({"type": "OS", "number": f"{os.os_no}/{os.os_year}", "details": f"{os.pax_name} / {os.flight_no}", "amount": f"₹ {os.total_assessed_value}", "status": os.current_status or 'Pending'})
+        _os_status = 'Adjudicated' if os.adjudication_date else ('Quashed' if os.quashed == 'Y' else ('Rejected' if os.rejected == 'Y' else 'Pending'))
+        recent.append({"type": "OS", "number": f"{os.os_no}/{os.os_year}", "details": f"{os.pax_name} / {os.flight_no}", "amount": f"₹ {os.total_items_value}", "status": _os_status})
     for dr in recent_drs:
         recent.append({"type": "DR", "number": f"{dr.dr_no}/{dr.dr_year}", "details": f"{dr.pax_name} / {dr.flight_no}", "amount": "-", "status": "Warehoused" if dr.closure_ind != 'Y' else "Closed"})
 
