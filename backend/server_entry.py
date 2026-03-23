@@ -106,6 +106,15 @@ try:
     from app.main import app  # explicit import so PyInstaller bundles all deps
     _slog("app imported — starting uvicorn on 0.0.0.0:8000")
 
+    # console=False (windowed EXE) sets sys.stdout = sys.stderr = None.
+    # Uvicorn's DefaultFormatter calls sys.stdout.isatty() during logging
+    # setup, which crashes with AttributeError on None. Redirect to the
+    # startup log file so uvicorn output is also captured.
+    if sys.stdout is None:
+        sys.stdout = open(_LOG_PATH, "a", encoding="utf-8", buffering=1)
+    if sys.stderr is None:
+        sys.stderr = sys.stdout
+
     if __name__ == "__main__":
         # Bind to all interfaces so LAN clients (other PCs on the same network)
         # can access the app via browser. The LAN-only middleware in main.py still
