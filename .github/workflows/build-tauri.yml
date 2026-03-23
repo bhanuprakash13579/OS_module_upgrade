@@ -141,8 +141,10 @@ jobs:
         run: |
           # PyInstaller onefile EXEs extract to %TEMP%\_MEIxxxxxx; Defender scans
           # every extracted DLL which can take 60-120 s on CI runners.
-          # Excluding these paths drops startup to < 10 s.
           Add-MpPreference -ExclusionPath $env:TEMP
+          Add-MpPreference -ExclusionPath $env:TMP
+          Add-MpPreference -ExclusionPath "C:\Users"
+          Add-MpPreference -ExclusionPath "D:\"
           Add-MpPreference -ExclusionPath (Resolve-Path "backend\dist").Path
           Set-MpPreference -DisableRealtimeMonitoring $true
 
@@ -150,12 +152,19 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: powershell
         run: |
+          # console=False EXEs don't inherit stdio pipes, so stdout/stderr redirect
+          # is useless. Instead, server_entry.py writes a timestamped progress log
+          # to RUNNER_TEMP\cops_startup.log — printed below on any failure.
+          $startupLog = "$env:RUNNER_TEMP\cops_startup.log"
+          Remove-Item $startupLog -ErrorAction SilentlyContinue
           $proc = Start-Process -FilePath "${{ matrix.binary_src }}" -WindowStyle Hidden -PassThru
           Write-Host "Sidecar PID: $($proc.Id)"
           $ok = $false
-          for ($i = 1; $i -le 30; $i++) {
+          for ($i = 1; $i -le 60; $i++) {
             Start-Sleep -Seconds 1
             if ($proc.HasExited) {
+              Write-Host "--- cops_startup.log ---"
+              Get-Content $startupLog -ErrorAction SilentlyContinue
               Write-Error "FAIL Sidecar process exited early (code $($proc.ExitCode)) after ${i}s"
               exit 1
             }
@@ -170,7 +179,9 @@ jobs:
           }
           Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
           if (-not $ok) {
-            Write-Error "FAIL Sidecar did not respond within 30 seconds"
+            Write-Host "--- cops_startup.log (last reached step + any error) ---"
+            Get-Content $startupLog -ErrorAction SilentlyContinue
+            Write-Error "FAIL Sidecar did not respond within 60 seconds"
             exit 1
           }
 
