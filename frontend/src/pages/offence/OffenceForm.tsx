@@ -677,6 +677,19 @@ export default function OffenceForm() {
   const classifyAbortRefs = useRef<Record<number, AbortController>>({});
   // Abort all pending classify calls on unmount
   useEffect(() => () => { Object.values(classifyAbortRefs.current).forEach(c => c.abort()); }, []);
+
+  // Ctrl+S / Cmd+S → save as draft without leaving the page
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        submitData('Y');
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+
   const onDescBlur = useCallback(async (idx: number, desc: string) => {
     if (!desc || desc.trim().length < 3) return;
     // Cancel previous in-flight classify for this row

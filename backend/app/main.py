@@ -15,6 +15,7 @@ import sys
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
@@ -585,10 +586,14 @@ async def security_middleware(request: Request, call_next):
     return await call_next(request)
 
 
-# ── CORS ─────────────────────────────────────────────────────────
-# IMPORTANT: add_middleware(CORSMiddleware) must come AFTER @app.middleware("http")
-# so that CORS is the outermost layer and adds headers even to early-return
-# security responses (device-not-registered 403, LAN-only 403, etc.).
+# ── Middleware stack ──────────────────────────────────────────────
+# In Starlette, middleware added LAST is outermost (first to run on request,
+# last to run on response). Stack below (outer → inner):
+#   GZip → CORS → @app.middleware("http") security gate → route handler
+#
+# GZip outermost: compresses the final response after CORS headers are added.
+# CORS must wrap the security gate so that early-return 403s (device-not-registered,
+# LAN-only blocks) still carry correct CORS headers for browser clients.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -596,6 +601,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# GZip added last = outermost. Compresses responses ≥ 1 KB (60-80% smaller payloads).
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 
 # ── Health Check ─────────────────────────────────────────────────

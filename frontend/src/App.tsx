@@ -1,16 +1,27 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import api from './lib/api';
 import DevModeBanner from './components/DevModeBanner';
+import ErrorBoundary from './components/ErrorBoundary';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './pages/auth/Login';
 import ModuleSelection from './pages/ModuleSelection';
-// Static imports — Tauri is a local desktop app; lazy-loading only adds startup latency
-import SDOModule from './pages/sdo';
-import AdjudicationModule from './pages/adjudication';
-import QueryModule from './pages/query';
-import ApisModule from './pages/apis';
-import RestoreBackup from './pages/backup/RestoreBackup';
+// Lazy-loaded — defers JS parsing until the user actually navigates to that module.
+// Each module is a large sub-tree; parsing all four on startup wastes ~300-500ms.
+const SDOModule = lazy(() => import('./pages/sdo'));
+const AdjudicationModule = lazy(() => import('./pages/adjudication'));
+const QueryModule = lazy(() => import('./pages/query'));
+const ApisModule = lazy(() => import('./pages/apis'));
+const RestoreBackup = lazy(() => import('./pages/backup/RestoreBackup'));
+
+// Minimal fallback shown while a lazy module chunk is loading (first navigation only)
+function ModuleLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-900">
+      <div className="text-blue-300 text-sm animate-pulse">Loading module…</div>
+    </div>
+  );
+}
 
 // ── Auto-updater banner (Tauri desktop only) ──────────────────────────────────
 // Checks for a new release silently in the background 5 seconds after startup.
@@ -126,6 +137,7 @@ function ApisRoute({ children }: { children: React.ReactNode }) {
 
 function AppRoutes() {
   return (
+    <Suspense fallback={<ModuleLoader />}>
     <Routes>
       {/* Public Landing Page */}
       <Route path="/modules" element={<ModuleSelection />} />
@@ -181,6 +193,7 @@ function AppRoutes() {
       <Route path="/login" element={<Navigate to="/modules" replace />} />
       <Route path="*" element={<Navigate to="/modules" replace />} />
     </Routes>
+    </Suspense>
   );
 }
 
@@ -254,14 +267,16 @@ function BackendGate({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BackendGate>
-        <AutoUpdater />
-        <DevModeBanner />
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </BackendGate>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <BackendGate>
+          <AutoUpdater />
+          <DevModeBanner />
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </BackendGate>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

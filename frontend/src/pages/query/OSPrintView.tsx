@@ -10,6 +10,7 @@ export default function OSPrintView() {
   const [prevSamePpOffences, setPrevSamePpOffences] = useState<string>('NIL');
   const [otherPpOffences, setOtherPpOffences] = useState<string>('NIL');
   const [loading, setLoading] = useState(true);
+  const [pdfError, setPdfError] = useState('');
   // Versioned config for the OS date
   const [pitConfig, setPitConfig] = useState<any>(null);
   // Pre-generated PDF promise — starts in background as soon as data loads
@@ -193,7 +194,7 @@ export default function OSPrintView() {
         setTimeout(() => URL.revokeObjectURL(url), 5000);
       } catch (e) {
         console.error('Failed to generate PDF:', e);
-        alert('Could not generate PDF. Please try again.');
+        setPdfError('Could not generate PDF. Please try again.');
       }
     }
   };
@@ -311,8 +312,11 @@ export default function OSPrintView() {
         <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900">
           <ArrowLeft className="w-4 h-4" /> Back to Search
         </button>
-        <div className="flex gap-3">
-          <button onClick={handlePrint} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded shadow text-sm font-medium hover:bg-emerald-700 transition">
+        <div className="flex items-center gap-3">
+          {pdfError && (
+            <span className="text-red-600 text-xs font-medium">{pdfError}</span>
+          )}
+          <button onClick={() => { setPdfError(''); handlePrint(); }} className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded shadow text-sm font-medium hover:bg-emerald-700 transition">
             <Printer className="w-4 h-4" /> Download OS
           </button>
         </div>

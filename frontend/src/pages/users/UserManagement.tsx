@@ -58,13 +58,12 @@ export default function UserManagement({ moduleType }: { moduleType: 'sdo' | 'ad
     if (!window.confirm(`Are you sure you want to CLOSE your account? This action cannot be undone.`)) return;
     try {
       await api.delete(`/auth/users/${userId}`, { headers: { Authorization: `Bearer ${token}` } });
-      alert('Account closed successfully. You will now be logged out.');
+      setMessage({ type: 'success', text: 'Account closed. Logging out…' });
       if (userId === currentUser?.user_id) {
-        logout();
-        window.location.href = '/login';
+        setTimeout(() => { logout(); window.location.href = '/modules'; }, 1200);
       }
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Failed to close user');
+      setMessage({ type: 'error', text: err.response?.data?.detail || 'Failed to close user' });
     }
   };
 
@@ -75,7 +74,7 @@ export default function UserManagement({ moduleType }: { moduleType: 'sdo' | 'ad
       setMessage({ type: 'success', text: `User ${userId} upgraded to DC.` });
       fetchUsers();
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Failed to upgrade role');
+      setMessage({ type: 'error', text: err.response?.data?.detail || 'Failed to upgrade role' });
     }
   };
 

@@ -431,6 +431,18 @@ export default function AdjudicationForm() {
       });
   }, [os_no, os_year, user]);
 
+  // Ctrl+S / Cmd+S → trigger save
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        handleSave();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleSave = async () => {
     if (!offrName.trim()) { setError('Adjudicating Officer Name is required.'); return; }
     if (remarksLen > REMARKS_MAX) { setError(`Remarks exceeds ${REMARKS_MAX} character limit.`); return; }

@@ -41,6 +41,7 @@ export default function OSQueryPage() {
     has_prev: false
   });
   const [hasSearched, setHasSearched] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const navigate = useNavigate();
 
@@ -67,7 +68,8 @@ export default function OSQueryPage() {
   const executeSearch = async (targetPage: number = 1) => {
     setLoading(true);
     setHasSearched(false);
-    
+    setSearchError(null);
+
     // Clean up empty strings and parse numbers for the API
     const payload: Record<string, any> = {};
     Object.entries(formData).forEach(([key, value]) => {
@@ -98,7 +100,7 @@ export default function OSQueryPage() {
       });
     } catch (err) {
       console.error("Search failed:", err);
-      alert("Failed to execute search query. Check console for details.");
+      setSearchError("Search failed. Please check your connection and try again.");
     } finally {
       setLoading(false);
       setHasSearched(true);
@@ -230,8 +232,15 @@ export default function OSQueryPage() {
         </form>
       </div>
 
+      {/* Inline search error */}
+      {searchError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 flex items-center gap-2">
+          <span className="font-semibold">Error:</span> {searchError}
+        </div>
+      )}
+
       {/* Results Table */}
-      {hasSearched && (
+      {hasSearched && !searchError && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col items-stretch print:border-none print:shadow-none">
           <div className="hidden print:block mb-4">
             <h1 className="text-xl font-bold border-b pb-2">Customs OS Query Report</h1>

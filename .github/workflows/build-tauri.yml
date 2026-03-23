@@ -112,6 +112,53 @@ jobs:
         working-directory: ./backend
         run: pyinstaller --clean python-server.spec
 
+      # ── Smoke-test: verify the sidecar actually starts ───────────────────────
+      # Runs the binary for up to 30 s and checks that it binds on port 8000.
+      # Catches silent startup crashes (missing imports, bad hash bake, etc.)
+      # before the binary is bundled and distributed.
+      - name: Smoke-test Python sidecar (Linux / macOS)
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: |
+          ${{ matrix.binary_src }} &
+          SIDECAR_PID=$!
+          echo "Sidecar PID: $SIDECAR_PID"
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:8000/api/mode > /dev/null 2>&1; then
+              echo "✓ Sidecar responded on port 8000 after ${i}s"
+              kill $SIDECAR_PID 2>/dev/null || true
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "✗ Sidecar did not respond within 30 seconds"
+          kill $SIDECAR_PID 2>/dev/null || true
+          exit 1
+
+      - name: Smoke-test Python sidecar (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: powershell
+        run: |
+          $proc = Start-Process -FilePath "${{ matrix.binary_src }}" -PassThru
+          Write-Host "Sidecar PID: $($proc.Id)"
+          $ok = $false
+          for ($i = 1; $i -le 30; $i++) {
+            Start-Sleep -Seconds 1
+            try {
+              $r = Invoke-WebRequest -Uri "http://127.0.0.1:8000/api/mode" -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
+              if ($r.StatusCode -eq 200) {
+                Write-Host "✓ Sidecar responded on port 8000 after ${i}s"
+                $ok = $true
+                break
+              }
+            } catch {}
+          }
+          Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+          if (-not $ok) {
+            Write-Error "✗ Sidecar did not respond within 30 seconds"
+            exit 1
+          }
+
       - name: Move Sidecar Binary for Tauri
         shell: bash
         run: |

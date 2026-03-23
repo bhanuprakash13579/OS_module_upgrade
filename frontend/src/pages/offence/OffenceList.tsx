@@ -96,7 +96,7 @@ export default function OffenceList() {
     );
     if (!reason) return;                              // user cancelled
     if (reason.trim().length < 5) {
-      alert('Reason must be at least 5 characters. Deletion cancelled.');
+      setErrorMsg('Reason must be at least 5 characters. Deletion cancelled.');
       return;
     }
     try {
@@ -104,7 +104,7 @@ export default function OffenceList() {
       fetchCases(currentPage, searchTerm);
     } catch (err: any) {
       const detail = err.response?.data?.detail || err.message;
-      alert(`Deletion failed: ${detail}`);
+      setErrorMsg(`Deletion failed: ${detail}`);
     }
   };
 

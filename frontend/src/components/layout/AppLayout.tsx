@@ -1,5 +1,5 @@
-import React from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Plane, Gavel, FileText, Database, ShieldAlert, LogOut, Search, Settings } from 'lucide-react';
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -9,9 +9,32 @@ function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
 }
 
+const TITLE_MAP: [string, string][] = [
+  ['/offence/new',    'New O.S. — COPS'],
+  ['/offence/',       'Edit O.S. — COPS'],
+  ['/offence',        'Offence Cases — COPS'],
+  ['/baggage/new',    'New Baggage Receipt — COPS'],
+  ['/baggage/',       'Edit Baggage Receipt — COPS'],
+  ['/baggage',        'Baggage Receipts — COPS'],
+  ['/detention/new',  'New Detention — COPS'],
+  ['/detention/',     'Edit Detention — COPS'],
+  ['/detention',      'Detention (DR) — COPS'],
+  ['/query',          'Search / Query — COPS'],
+  ['/reports',        'Reports — COPS'],
+  ['/master',         'System Settings — COPS'],
+  ['/dashboard',      'Dashboard — COPS'],
+  ['/adjudication',   'Adjudication — COPS'],
+];
+
 export default function AppLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const match = TITLE_MAP.find(([prefix]) => location.pathname.startsWith(prefix));
+    document.title = match ? match[1] : 'COPS';
+  }, [location.pathname]);
   // TODO: Fetch current shift details from an API Context
   const currentBatch = "10 AM TO 10 PM";
   const _d = new Date();

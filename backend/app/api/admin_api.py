@@ -34,6 +34,7 @@ from app.models.masters import (
     NationalityMaster, PortMaster, ItemCatMaster, DutyRateMaster, BrNoLimits,
 )
 from app.models.baggage import BrMaster, BrItems
+from app.api.masters import bust_all_master_caches
 from app.models.detention import DrMaster, DrItems
 from app.models.fuel import FuelMaster
 from app.models.offence import OsMaster, ItemTrans
@@ -975,6 +976,7 @@ def admin_restore_backup(
         os.unlink(_zip_tmp)
     except OSError:
         pass
+    bust_all_master_caches()  # master tables were just written — invalidate all caches
     return {
         "master_inserted": master_inserted,
         "master_skipped": master_skipped,
@@ -1232,6 +1234,7 @@ def admin_import_mdb(
         except OSError:
             pass
 
+    bust_all_master_caches()  # MDB import writes master tables — invalidate all caches
     return result
 
 
