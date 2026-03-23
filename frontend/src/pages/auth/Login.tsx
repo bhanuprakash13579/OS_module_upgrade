@@ -28,7 +28,7 @@ export default function Login() {
           setBootstrapInfo(res.data.credentials);
         }
       } catch (err) {
-        console.error("Bootstrap check failed", err);
+        import.meta.env.DEV && console.error("Bootstrap check failed", err);
       }
     };
     if (moduleType) checkBootstrap();

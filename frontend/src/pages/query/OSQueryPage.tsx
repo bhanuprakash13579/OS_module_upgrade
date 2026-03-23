@@ -99,7 +99,7 @@ export default function OSQueryPage() {
         has_prev: response.data.has_prev || false
       });
     } catch (err) {
-      console.error("Search failed:", err);
+      import.meta.env.DEV && console.error("Search failed:", err);
       setSearchError("Search failed. Please check your connection and try again.");
     } finally {
       setLoading(false);

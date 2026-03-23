@@ -26,7 +26,7 @@ export default function UserManagement({ moduleType }: { moduleType: 'sdo' | 'ad
       const filtered = res.data.filter((u: User) => availableRoles.includes(u.user_role) && u.user_status !== 'TEMP');
       setUsers(filtered);
     } catch (err) {
-      console.error(err);
+      import.meta.env.DEV && console.error(err);
     }
   };
 

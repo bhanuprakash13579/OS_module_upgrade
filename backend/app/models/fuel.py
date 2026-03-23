@@ -40,6 +40,6 @@ class FuelMaster(Base):
     unique_no = Column(Integer)
     location_code = Column(String(20))
     login_id = Column(String(50))
-    entry_deleted = Column(String(5), default="N")  # N / Y / D
+    entry_deleted = Column(String(5), default="N", index=True)  # N / Y / D
     br_printed = Column(String(5), default="N")
     assessable_value = Column(Float, default=0.0)

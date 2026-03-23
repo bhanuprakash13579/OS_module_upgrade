@@ -222,9 +222,9 @@ def create_os(
         item_value = float(item.items_value or 0.0)
         fa = _eff_fa(item_value, item)
         rate = float(item.cumulative_duty_rate or 0.0)
-        duty = max(0.0, (item_value - fa)) * rate / 100.0
+        duty = round(max(0.0, (item_value - fa)) * rate / 100.0, 2)
         total_val += item_value
-        total_duty += duty
+        total_duty = round(total_duty + duty, 2)
     total_items = len(data.items)
 
     # NOTE: os_no and os_year are passed explicitly, so exclude them from the Pydantic dump
@@ -537,9 +537,9 @@ def update_os(
         item_value = float(item.items_value or 0.0)
         fa = _eff_fa(item_value, item)
         rate = float(item.cumulative_duty_rate or 0.0)
-        duty = max(0.0, (item_value - fa)) * rate / 100.0
+        duty = round(max(0.0, (item_value - fa)) * rate / 100.0, 2)
         total_val += item_value
-        total_duty += duty
+        total_duty = round(total_duty + duty, 2)
 
     os_obj.total_items_value = total_val
     os_obj.total_duty_amount = total_duty
@@ -1154,8 +1154,9 @@ def cancel_adjudicate(
         )
         del_obj.adjn_offr_remarks1 = "ADJN. CANCELLED"
         db.add(del_obj)
-    except Exception:
-        pass  # audit table may differ in schema — don't block the cancel
+    except Exception as _e:
+        import logging as _log
+        _log.getLogger(__name__).warning("Audit archive failed on adjudication cancel: %s", _e)
 
     # Reset adjudication fields
     os_obj.online_adjn = "N"
@@ -1232,10 +1233,9 @@ def delete_os(
             }
         )
         db.add(snapshot)
-    except Exception:
-        # Never block deletion just because the audit archive fails.
-        # The primary audit is the fields on the cops_master record itself.
-        pass
+    except Exception as _e:
+        import logging as _log
+        _log.getLogger(__name__).warning("Audit archive failed on soft-delete: %s", _e)
 
     # Soft-delete with full audit trail
     os_obj.entry_deleted = "Y"

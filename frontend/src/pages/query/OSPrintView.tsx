@@ -97,7 +97,7 @@ export default function OSPrintView() {
           }
         }
       } catch (err) {
-        console.error("Failed to load OS record", err);
+        import.meta.env.DEV && console.error("Failed to load OS record", err);
       } finally {
         setLoading(false);
       }
@@ -193,7 +193,7 @@ export default function OSPrintView() {
         document.body.removeChild(a);
         setTimeout(() => URL.revokeObjectURL(url), 5000);
       } catch (e) {
-        console.error('Failed to generate PDF:', e);
+        import.meta.env.DEV && console.error('Failed to generate PDF:', e);
         setPdfError('Could not generate PDF. Please try again.');
       }
     }

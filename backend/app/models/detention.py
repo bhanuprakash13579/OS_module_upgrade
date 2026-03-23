@@ -48,7 +48,7 @@ class DrMaster(Base):
     warehouse_no = Column(String(50))
 
     # ── Administrative ──
-    entry_deleted = Column(String(5), default="N")
+    entry_deleted = Column(String(5), default="N", index=True)
     unique_no = Column(Integer)
     location_code = Column(String(20))
     login_id = Column(String(50))

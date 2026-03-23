@@ -21,9 +21,12 @@ def get_current_batch(db: Session):
 @router.post("/", response_model=schemas.RevenueOut)
 def record_revenue(data: schemas.RevenueCreate, db: Session = Depends(get_db), _: User = Depends(get_adjn_user)):
     """Record daily revenue entry. Admin only."""
-    total = (data.baggage_duty + data.addl_duty + data.sadcess_duty + 
-             data.gold_duty + data.silver_duty + data.rf_amount + 
-             data.pp_amount + data.misc_amount) - data.ref_amount
+    total = round(
+        (data.baggage_duty + data.addl_duty + data.sadcess_duty +
+         data.gold_duty + data.silver_duty + data.rf_amount +
+         data.pp_amount + data.misc_amount) - data.ref_amount,
+        2,
+    )
              
     obj = Revenue(
         total_duty=total,

@@ -26,7 +26,7 @@ class DutyCalculator:
         category = self.categories.get(category_code)
         if not category:
             # Fallback to standard 35% if category unknown
-            return {"bcd": 0, "cvd": 0, "cess": 0, "hec": 0, "duty": round(dutiable_value * 0.35)}
+            return {"bcd": 0, "cvd": 0, "cess": 0, "hec": 0, "duty": round(dutiable_value * 0.35, 2)}
 
         # Legacy duty logic approximations: Custom rules applied here
         # E.g. BCD = dutiable * bcd_adv_rate

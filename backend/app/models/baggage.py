@@ -73,7 +73,7 @@ class BrMaster(Base):
     login_id = Column(String(50))
 
     # ── Flags ──
-    entry_deleted = Column(String(5), default="N")    # Y = soft-deleted
+    entry_deleted = Column(String(5), default="N", index=True)    # Y = soft-deleted
     bkup_taken = Column(String(5), default="N")       # Y = synced to server
     br_printed = Column(String(5), default="N")       # Y = locked
     ff_ind = Column(String(5))                         # Y = frequent flier
@@ -139,5 +139,5 @@ class BrItems(Base):
     unique_no = Column(Integer)
     location_code = Column(String(20))
     login_id = Column(String(50))
-    entry_deleted = Column(String(5), default="N")
+    entry_deleted = Column(String(5), default="N", index=True)
     bkup_taken = Column(String(5), default="N")

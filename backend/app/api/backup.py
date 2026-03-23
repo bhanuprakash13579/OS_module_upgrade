@@ -263,7 +263,9 @@ def upload_new(
         os_date_str = row.get("os_date")
         try:
             os_date_val = date.fromisoformat(os_date_str) if os_date_str else date.today()
-        except Exception:
+        except (ValueError, TypeError):
+            import logging as _log
+            _log.getLogger(__name__).warning("Invalid os_date %r in CSV row — defaulting to today", os_date_str)
             os_date_val = date.today()
 
         master = CopsMaster(

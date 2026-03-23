@@ -53,7 +53,7 @@ export default function StatutesAdmin({ adminToken }: { adminToken: string }) {
       setEditingKey(null);
       setEditData({});
     } catch (err) {
-      console.error('Failed to save statute', err);
+      import.meta.env.DEV && console.error('Failed to save statute', err);
     } finally {
       setSaving(false);
     }
