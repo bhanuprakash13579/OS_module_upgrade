@@ -11,7 +11,7 @@ import tempfile
 import threading
 import time
 import zipfile
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
 from fastapi.responses import StreamingResponse, Response
@@ -1356,7 +1356,7 @@ def add_print_template(body: PrintConfigIn, admin=Depends(require_admin), db: Se
         field_value=body.field_value.strip(),
         effective_from=body.effective_from,
         created_by=admin.get("sub", "admin"),
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
     )
     db.add(row)
     db.commit()
@@ -1408,7 +1408,7 @@ def add_baggage_rule(body: BaggageRuleIn, admin=Depends(require_admin), db: Sess
         rule_uqc=body.rule_uqc.strip(),
         effective_from=body.effective_from,
         created_by=admin.get("sub", "admin"),
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
     )
     db.add(row)
     db.commit()
@@ -1463,7 +1463,7 @@ def add_special_allowance(body: SpecialAllowanceIn, admin=Depends(require_admin)
         effective_from=body.effective_from,
         active=body.active or 'Y',
         created_by=admin.get("sub", "admin"),
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
     )
     db.add(row)
     db.commit()

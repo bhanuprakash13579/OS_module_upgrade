@@ -194,15 +194,26 @@ function BackendGate({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [fadeOut, setFadeOut] = useState(false);
   const [dots, setDots] = useState('');
+  const [slowStart, setSlowStart] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     let dotTimer: ReturnType<typeof setInterval>;
+    const slowTimer = setTimeout(() => { if (!cancelled) setSlowStart(true); }, 15000);
 
     const poll = async () => {
+      // Fast path: if backend is already up (e.g. app restart), skip splash entirely
+      try {
+        await api.get('/mode', { timeout: 500 });
+        if (!cancelled) setReady(true);
+        return;
+      } catch { /* not ready yet — fall through to normal polling with splash */ }
+
+      // Backend is starting — show splash and poll until it responds
+      dotTimer = setInterval(() => setDots(d => d.length >= 3 ? '' : d + '.'), 500);
       while (!cancelled) {
         try {
-          await api.get('/mode', { timeout: 2000 });
+          await api.get('/mode', { timeout: 5000 });
           if (!cancelled) {
             setFadeOut(true);
             setTimeout(() => { if (!cancelled) setReady(true); }, 300);
@@ -214,11 +225,11 @@ function BackendGate({ children }: { children: React.ReactNode }) {
       }
     };
 
-    dotTimer = setInterval(() => setDots(d => d.length >= 3 ? '' : d + '.'), 500);
     poll();
     return () => {
       cancelled = true;
       clearInterval(dotTimer);
+      clearTimeout(slowTimer);
     };
   }, []);
 
@@ -230,7 +241,10 @@ function BackendGate({ children }: { children: React.ReactNode }) {
       >
         <img src="/cops_logo.png" alt="COPS" className="w-24 h-24 object-contain mb-6 opacity-90" />
         <p className="text-white text-lg font-semibold tracking-widest">COPS</p>
-        <p className="text-blue-300 text-sm mt-2 w-32 text-center">Starting{dots}</p>
+        {slowStart
+          ? <p className="text-yellow-300 text-sm mt-2 text-center px-8">First launch: setting up database, please wait{dots}</p>
+          : <p className="text-blue-300 text-sm mt-2 w-32 text-center">Starting{dots}</p>
+        }
       </div>
     );
   }

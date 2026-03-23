@@ -15,7 +15,7 @@ To change the admin password before a release build:
   3. Rebuild the binary (pyinstaller python-server.spec --noconfirm).
 """
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import bcrypt as _bcrypt
 from fastapi import Depends, HTTPException, status
@@ -50,7 +50,7 @@ def verify_admin_credentials(username: str, password: str) -> bool:
 
 def create_admin_token() -> str:
     """Issue a short-lived JWT for the system admin."""
-    expire = datetime.utcnow() + timedelta(hours=8)
+    expire = datetime.now(timezone.utc) + timedelta(hours=8)
     return jwt.encode(
         {"sub": "__sysadmin__", "role": "system_admin", "exp": expire},
         settings.SECRET_KEY,

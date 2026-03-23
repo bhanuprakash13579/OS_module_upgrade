@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     # Set COPS_ENV=production in the environment (or .env file) to enable prod mode.
     # Anything else (including the default) is treated as development.
     COPS_ENV: str = "development"
-    DEBUG: bool = os.environ.get("COPS_ENV", "development").strip().lower() != "production"
+    DEBUG: bool = True  # corrected after instantiation based on COPS_ENV
     SECRET_KEY: str = "cops-customs-secret-key-change-in-production"  # overridden at runtime by derive_secret_key()
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480  # 8 hour shift
 
@@ -80,13 +80,16 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",    # Vite dev (explicit IPv4 — needed on Linux where localhost→::1)
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "tauri://localhost",         # Tauri desktop (Windows/macOS)
-        "http://tauri.localhost",    # Tauri v2
+        "tauri://localhost",         # Tauri v2 macOS/Linux
+        "http://tauri.localhost",    # Tauri v2 fallback
+        "https://tauri.localhost",   # Tauri v2 Windows (uses HTTPS custom protocol)
     ]
 
     class Config:
         env_file = ".env"
         case_sensitive = True
+        extra = "ignore"
 
 
 settings = Settings()
+settings.DEBUG = settings.COPS_ENV.strip().lower() != "production"

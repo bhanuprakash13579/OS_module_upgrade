@@ -31,9 +31,6 @@ a = Analysis(
         'sqlalchemy.dialects.sqlite',
         'sqlalchemy.dialects.postgresql',
         'sqlalchemy.sql.default_comparator',
-        # Passlib
-        'passlib.handlers.bcrypt',
-        'passlib.handlers.sha2_crypt',
         # Python-jose
         'jose',
         'jose.jwt',
@@ -47,6 +44,12 @@ a = Analysis(
         'multipart',
         # aiosqlite
         'aiosqlite',
+        # bcrypt + cffi (native extensions — must be explicit for PyInstaller hooks to fire)
+        'bcrypt',
+        '_cffi_backend',
+        'cryptography',
+        'cryptography.hazmat.backends',
+        'cryptography.hazmat.primitives',
         # charset detection (fixes requests warning)
         'charset_normalizer',
         'charset_normalizer.md__mypyc',
@@ -77,7 +80,7 @@ a = Analysis(
         'PIL',
     ],
     noarchive=False,
-    optimize=0,
+    optimize=0,  # 0 = keep docstrings — pydantic v2 uses introspection that breaks with optimize=2
 )
 
 pyz = PYZ(a.pure)
@@ -92,7 +95,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,        # no terminal window

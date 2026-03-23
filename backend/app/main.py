@@ -41,6 +41,7 @@ def apply_sqlite_migrations():
     """
     Lightweight SQLite schema migrations for offline/desktop mode.
     SQLAlchemy `create_all()` does not add new columns to existing tables.
+    All DDL runs in a single connection to avoid repeated open/lock/close cycles.
     """
     if not settings.DATABASE_URL.startswith("sqlite"):
         return
@@ -72,59 +73,37 @@ def apply_sqlite_migrations():
 
     with engine.connect() as conn:
         try:
+            # ── Legacy columns for cops_master tables ─────────────────────────
             for table in TABLES_TO_MIGRATE:
-                # Check if table exists
                 exists = conn.execute(text(
                     f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table}'"
                 )).fetchone()
                 if not exists:
                     continue
-
                 cols = conn.execute(text(f"PRAGMA table_info({table})")).fetchall()
                 col_names = {c[1] for c in cols}
-
                 for col_name, col_type in LEGACY_COLS:
                     if col_name not in col_names:
                         conn.execute(text(
                             f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}"
                         ))
 
-            conn.commit()
-        except Exception as e:
-            conn.rollback()
-            print(f"SQLite migration error: {e}")
-
-    # ── shift_timing_master: fix 10/22 → 7/19 for existing installs ──────────
-    with engine.connect() as conn:
-        try:
+            # ── shift_timing_master: fix 10/22 → 7/19 for existing installs ──
             conn.execute(text("""
                 UPDATE shift_timing_master
                 SET day_shift_from_hrs=7, day_shift_to_hrs=19,
                     night_shift_from_hrs=19, night_shift_to_hrs=7
                 WHERE day_shift_from_hrs=10 AND day_shift_to_hrs=22
             """))
-            conn.commit()
-        except Exception as e:
-            conn.rollback()
-            print(f"shift_timing migration error: {e}")
 
-    # ── feature_flags: add prod_mode + session_timeout_minutes ───────────────
-    with engine.connect() as conn:
-        try:
-            cols = conn.execute(text("PRAGMA table_info(feature_flags)")).fetchall()
-            col_names = {c[1] for c in cols}
-            if "prod_mode" not in col_names:
+            # ── feature_flags: add prod_mode + session_timeout_minutes ────────
+            ff_cols = {c[1] for c in conn.execute(text("PRAGMA table_info(feature_flags)")).fetchall()}
+            if "prod_mode" not in ff_cols:
                 conn.execute(text("ALTER TABLE feature_flags ADD COLUMN prod_mode BOOLEAN DEFAULT 0"))
-            if "session_timeout_minutes" not in col_names:
+            if "session_timeout_minutes" not in ff_cols:
                 conn.execute(text("ALTER TABLE feature_flags ADD COLUMN session_timeout_minutes INTEGER DEFAULT 480"))
-            conn.commit()
-        except Exception as e:
-            conn.rollback()
-            print(f"feature_flags migration error: {e}")
 
-    # ── allowed_devices: new table for IP/MAC whitelist ──────────────────────
-    with engine.connect() as conn:
-        try:
+            # ── allowed_devices: new table for IP/MAC whitelist ───────────────
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS allowed_devices (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -138,24 +117,58 @@ def apply_sqlite_migrations():
                     notes TEXT
                 )
             """))
+
+            # ── Versioned config tables ────────────────────────────────────────
+            for ddl in [
+                """CREATE TABLE IF NOT EXISTS print_template_config (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    field_key TEXT NOT NULL, field_label TEXT,
+                    field_value TEXT NOT NULL, effective_from DATE NOT NULL,
+                    created_by TEXT, created_at DATETIME
+                )""",
+                """CREATE TABLE IF NOT EXISTS baggage_rules_config (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    rule_key TEXT NOT NULL, rule_label TEXT,
+                    rule_value REAL NOT NULL, rule_uqc TEXT,
+                    effective_from DATE NOT NULL,
+                    created_by TEXT, created_at DATETIME
+                )""",
+                """CREATE TABLE IF NOT EXISTS special_item_allowances (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    item_name TEXT NOT NULL, keywords TEXT,
+                    allowance_qty REAL NOT NULL, allowance_uqc TEXT,
+                    effective_from DATE NOT NULL, active TEXT DEFAULT 'Y',
+                    created_by TEXT, created_at DATETIME
+                )""",
+            ]:
+                conn.execute(text(ddl))
+
+            # ── print_template_config: remove system-seeded rows ──────────────
+            conn.execute(text("DELETE FROM print_template_config WHERE created_by = 'system'"))
+
+            # ── cops_items: add FA type/qty/uqc columns ───────────────────────
+            items_cols = {c[1] for c in conn.execute(text("PRAGMA table_info(cops_items)")).fetchall()}
+            for col_name, col_ddl in [
+                ("items_fa_type", "ALTER TABLE cops_items ADD COLUMN items_fa_type VARCHAR(10) DEFAULT 'value'"),
+                ("items_fa_qty",  "ALTER TABLE cops_items ADD COLUMN items_fa_qty REAL"),
+                ("items_fa_uqc",  "ALTER TABLE cops_items ADD COLUMN items_fa_uqc VARCHAR(20)"),
+            ]:
+                if col_name not in items_cols:
+                    conn.execute(text(col_ddl))
+
             conn.commit()
         except Exception as e:
             conn.rollback()
-            print(f"allowed_devices migration error: {e}")
+            print(f"SQLite migration error: {e}")
 
     # ── cops_items.os_date: drop NOT NULL constraint (SQLite table rebuild) ──
+    # Kept separate — requires PRAGMA foreign_keys toggle and a full table copy.
     with engine.connect() as conn:
         try:
             pragma = conn.execute(text("PRAGMA table_info(cops_items)")).fetchall()
-            # col[3] = notnull flag; col[1] = name
             os_date_col = next((c for c in pragma if c[1] == "os_date"), None)
             if os_date_col and os_date_col[3] == 1:  # still NOT NULL
-                # Rebuild table without the NOT NULL on os_date
                 conn.execute(text("PRAGMA foreign_keys=OFF"))
-                conn.execute(text("""
-                    CREATE TABLE IF NOT EXISTS cops_items_new AS
-                    SELECT * FROM cops_items WHERE 0
-                """))
                 conn.execute(text("DROP TABLE IF EXISTS cops_items_new"))
                 conn.execute(text("""
                     CREATE TABLE cops_items_new (
@@ -193,82 +206,6 @@ def apply_sqlite_migrations():
         except Exception as e:
             conn.rollback()
             print(f"cops_items migration error: {e}")
-
-    # ── cops_items: add FA type/qty/uqc columns ───────────────────────────────
-    with engine.connect() as conn:
-        for col, ddl in [
-            ("items_fa_type", "ALTER TABLE cops_items ADD COLUMN items_fa_type VARCHAR(10) DEFAULT 'value'"),
-            ("items_fa_qty",  "ALTER TABLE cops_items ADD COLUMN items_fa_qty REAL"),
-            ("items_fa_uqc",  "ALTER TABLE cops_items ADD COLUMN items_fa_uqc VARCHAR(20)"),
-        ]:
-            try:
-                conn.execute(text(ddl))
-                conn.commit()
-            except Exception:
-                conn.rollback()  # column already exists — safe to ignore
-
-    # ── Versioned config tables ───────────────────────────────────────────────
-    _CONFIG_TABLES = {
-        "print_template_config": """
-            CREATE TABLE IF NOT EXISTS print_template_config (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                field_key TEXT NOT NULL,
-                field_label TEXT,
-                field_value TEXT NOT NULL,
-                effective_from DATE NOT NULL,
-                created_by TEXT,
-                created_at DATETIME
-            )
-        """,
-        "baggage_rules_config": """
-            CREATE TABLE IF NOT EXISTS baggage_rules_config (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                rule_key TEXT NOT NULL,
-                rule_label TEXT,
-                rule_value REAL NOT NULL,
-                rule_uqc TEXT,
-                effective_from DATE NOT NULL,
-                created_by TEXT,
-                created_at DATETIME
-            )
-        """,
-        "special_item_allowances": """
-            CREATE TABLE IF NOT EXISTS special_item_allowances (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                item_name TEXT NOT NULL,
-                keywords TEXT,
-                allowance_qty REAL NOT NULL,
-                allowance_uqc TEXT,
-                effective_from DATE NOT NULL,
-                active TEXT DEFAULT 'Y',
-                created_by TEXT,
-                created_at DATETIME
-            )
-        """,
-    }
-    with engine.connect() as conn:
-        try:
-            for tbl, ddl in _CONFIG_TABLES.items():
-                conn.execute(text(ddl))
-            conn.commit()
-        except Exception as e:
-            conn.rollback()
-            print(f"config tables migration error: {e}")
-
-    # ── print_template_config: remove all system-seeded rows ─────────────────
-    # Legacy OS cases must use the hardcoded fallback headings in the app code.
-    # Only admin-added entries (effective_from >= a real date) should be in the
-    # table.  Rows with effective_from = '1900-01-01' were seeded by mistake and
-    # would silently override every historical case on any DB that still has them.
-    with engine.connect() as conn:
-        try:
-            conn.execute(text(
-                "DELETE FROM print_template_config WHERE created_by = 'system'"
-            ))
-            conn.commit()
-        except Exception as e:
-            conn.rollback()
-            print(f"print_template_config cleanup error: {e}")
 
 
 def seed_initial_data():

@@ -34,6 +34,19 @@
       "binaries/python-server"
     ],
     "resources": {},
+    "linux": {
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libcairo2",
+          "libpango-1.0-0",
+          "libpangocairo-1.0-0",
+          "libfontconfig1",
+          "libgdk-pixbuf-2.0-0",
+          "libharfbuzz0b"
+        ]
+      }
+    },
     "icon": [
       "icons/icon.png",
       "icons/32x32.png",

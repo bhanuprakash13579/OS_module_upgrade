@@ -14,7 +14,16 @@ pw = password.encode("utf-8")
 h = _b.hashpw(pw, _b.gensalt(12)).decode("utf-8")
 
 path = "app/security/admin_auth.py"
-src = open(path).read()
-src = re.sub(r"_ADMIN_PWD_HASH = [^\n]+", "_ADMIN_PWD_HASH = " + repr(h), src)
-open(path, "w").write(src)
+try:
+    with open(path) as f:
+        src = f.read()
+except FileNotFoundError:
+    raise SystemExit(f"ERROR: {path} not found. Working directory: {os.getcwd()}")
+
+new_src = re.sub(r"_ADMIN_PWD_HASH = [^\n]+", "_ADMIN_PWD_HASH = " + repr(h), src)
+if new_src == src:
+    raise SystemExit("ERROR: _ADMIN_PWD_HASH pattern not found in admin_auth.py — regex did not match.")
+
+with open(path, "w") as f:
+    f.write(new_src)
 print("Patched admin_auth.py: hash baked in.")
