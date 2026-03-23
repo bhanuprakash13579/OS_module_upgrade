@@ -139,18 +139,25 @@ jobs:
           kill $SIDECAR_PID 2>/dev/null || true
           exit 1
 
+      - name: Disable Windows Defender real-time scanning for CI paths
+        if: matrix.os == 'windows-latest'
+        shell: powershell
+        run: |
+          # PyInstaller onefile EXEs extract to %TEMP%\_MEIxxxxxx; Defender scans
+          # every extracted DLL which can take 60-120 s on CI runners.
+          # Excluding these paths drops startup to < 10 s.
+          Add-MpPreference -ExclusionPath $env:TEMP
+          Add-MpPreference -ExclusionPath (Resolve-Path "backend\dist").Path
+          Set-MpPreference -DisableRealtimeMonitoring $true
+
       - name: Smoke-test Python sidecar (Windows)
         if: matrix.os == 'windows-latest'
         shell: powershell
         run: |
-          # PyInstaller onefile EXEs extract to %TEMP%\_MEIxxxxxx on first run.
-          # Windows Defender scans every extracted DLL before execution — on a
-          # large bundle (Cairo/Pango) this alone can take 30-60 s on CI runners.
-          # Allow 120 s so Defender finishes before we declare failure.
           $proc = Start-Process -FilePath "${{ matrix.binary_src }}" -WindowStyle Hidden -PassThru
           Write-Host "Sidecar PID: $($proc.Id)"
           $ok = $false
-          for ($i = 1; $i -le 120; $i++) {
+          for ($i = 1; $i -le 30; $i++) {
             Start-Sleep -Seconds 1
             if ($proc.HasExited) {
               Write-Error "FAIL Sidecar process exited early (code $($proc.ExitCode)) after ${i}s"
@@ -167,7 +174,7 @@ jobs:
           }
           Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
           if (-not $ok) {
-            Write-Error "FAIL Sidecar did not respond within 120 seconds"
+            Write-Error "FAIL Sidecar did not respond within 30 seconds"
             exit 1
           }
 
