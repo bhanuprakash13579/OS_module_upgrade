@@ -347,7 +347,7 @@ def get_all_os(
                 CopsMaster.quashed != 'Y',
                 CopsMaster.rejected != 'Y',
                 or_(
-                    CopsMaster.adjudication_date != None,
+                    CopsMaster.adjudication_date.isnot(None),
                     not_(pending_items_subq)
                 )
             )
@@ -362,7 +362,7 @@ def get_all_os(
             )
             q = q.filter(
                 CopsMaster.is_draft == 'N',
-                CopsMaster.adjudication_date == None,
+                CopsMaster.adjudication_date.is_(None),
                 CopsMaster.quashed != 'Y',
                 CopsMaster.rejected != 'Y',
                 pending_items_subq,
@@ -397,7 +397,7 @@ def get_pending_count(
     count = db.query(func.count(CopsMaster.id)).filter(
         CopsMaster.entry_deleted == "N",
         CopsMaster.is_draft == "N",
-        CopsMaster.adjudication_date == None,
+        CopsMaster.adjudication_date.is_(None),
         CopsMaster.quashed != "Y",
         CopsMaster.rejected != "Y",
         pending_items_subq,
@@ -422,8 +422,8 @@ def get_pending_adjudication(
     records = db.query(CopsMaster).filter(
         CopsMaster.entry_deleted == "N",
         CopsMaster.is_draft == "N",
-        CopsMaster.adjudication_date == None,          # noqa: E711
-        CopsMaster.adj_offr_name == None,              # noqa: E711
+        CopsMaster.adjudication_date.is_(None),
+        CopsMaster.adj_offr_name.is_(None),
         CopsMaster.quashed != "Y",
         CopsMaster.rejected != "Y",
         pending_items_subq,
@@ -444,7 +444,7 @@ def get_adjudicated_cases(
     records = db.query(CopsMaster).filter(
         CopsMaster.entry_deleted == "N",
         CopsMaster.is_draft == "N",
-        CopsMaster.adjudication_date != None,          # noqa: E711
+        CopsMaster.adjudication_date.isnot(None),
         CopsMaster.quashed != "Y",
         CopsMaster.rejected != "Y"
     ).order_by(CopsMaster.adjudication_date.desc()).limit(200).all()
@@ -706,23 +706,53 @@ def print_os_pdf(
     def uqc_label(code: str) -> str:
         return _UQC_LABEL.get((code or "").upper(), code or "Nos.")
 
-    # ── Item rows ─────────────────────────────────────────────────────────────
+    # ── Item rows + summary totals (single pass) ─────────────────────────────
     item_rows = []
     LIABLE_CATS = ["CONFS", "ABS_CONFS", "RE_EXP", "RF", "REF", "UNDER OS"]
+    FA_SUM_CATS = {"UNDER DUTY", "UNDER OS", "RF", "REF"}
+    total_fa = 0.0
+    total_fa_monetary = 0.0
+    total_dutiable = 0.0
+    total_liable_value = 0.0
+    rf_val_items = 0.0
+    ref_val_items = 0.0
+    confs_val_items = 0.0
+    qty_fa_list = []
     for idx, item in enumerate(items_db):
         cat = (item.items_release_category or "UNDER OS").upper()
         # "Liable" = Under OS + RF + REF + CONFS
         is_liable = cat in LIABLE_CATS
         is_duty = cat == "UNDER DUTY"
         is_confs = cat == "CONFS"
-        
+
         val = float(item.items_value or 0)
         vpu = float(item.value_per_piece or 0)
         fa = _eff_fa(val, item)
         dutiable = max(0, val - fa)
         fa_type = (item.items_fa_type or 'value')
         qty = float(item.items_qty or 0)
-        
+
+        # Accumulate summary totals in this same pass
+        if cat in FA_SUM_CATS:
+            total_fa += fa
+            if fa_type == 'value':
+                total_fa_monetary += fa
+            fa_qty_val = float(item.items_fa_qty or 0)
+            if fa_type == 'qty' and fa_qty_val > 0:
+                qty_fa_list.append(
+                    f"{fa_qty_val:g} {_UQC_LABEL.get((item.items_fa_uqc or '').upper(), item.items_fa_uqc or 'Nos.')} of {item.items_desc}"
+                )
+        if is_duty:
+            total_dutiable += dutiable
+        if is_liable:
+            total_liable_value += dutiable
+        if cat == "RF":
+            rf_val_items += dutiable
+        elif cat == "REF":
+            ref_val_items += dutiable
+        elif cat == "CONFS":
+            confs_val_items += dutiable
+
         # FA display: show for Under Duty and Under OS/RF/REF items (but not CONFS)
         show_fa = is_duty or (is_liable and not is_confs)
         if not show_fa:
@@ -733,7 +763,7 @@ def print_os_pdf(
             fa_disp = f"{fa_qty:g} {fa_uqc_label}".strip() if fa_qty else "—"
         else:
             fa_disp = fmt_indian(fa) if fa > 0 else "—"
-            
+
         item_rows.append({
             "items_desc": item.items_desc,
             "items_qty": f"{qty:g}",
@@ -746,18 +776,7 @@ def print_os_pdf(
             "total_display": (fmt_indian(dutiable) if is_liable else "—"),
         })
 
-    # Summary Totals for the Template
-    total_fa = sum(_eff_fa(float(i.items_value or 0), i) for i in items_db if (i.items_release_category or "").upper() in ("UNDER DUTY", "UNDER OS", "RF", "REF"))
-    total_fa_monetary = sum(_eff_fa(float(i.items_value or 0), i) for i in items_db if (i.items_release_category or "").upper() in ("UNDER DUTY", "UNDER OS", "RF", "REF") and (i.items_fa_type or 'value') == 'value')
-    total_dutiable = sum(max(0, float(i.items_value or 0) - _eff_fa(float(i.items_value or 0), i)) for i in items_db if (i.items_release_category or "").upper() == "UNDER DUTY")
-    
-    qty_fa_list = [
-        f"{float(i.items_fa_qty):g} {_UQC_LABEL.get((i.items_fa_uqc or '').upper(), i.items_fa_uqc or 'Nos.')} of {i.items_desc}"
-        for i in items_db if (i.items_fa_type == 'qty' and float(i.items_fa_qty or 0) > 0 and (i.items_release_category or "").upper() in ("UNDER DUTY", "UNDER OS", "RF", "REF"))
-    ]
     qty_fa_str = " & ".join(qty_fa_list)
-
-    total_liable_value = sum(max(0, float(i.items_value or 0) - _eff_fa(float(i.items_value or 0), i)) for i in items_db if (i.items_release_category or "").upper() in LIABLE_CATS)
     total_items_value = total_liable_value if total_liable_value > 0 else float(os_obj.total_items_value or 0)
 
     # ── Adjudication Case Values (Prioritize Master Record) ──────────────────
@@ -766,11 +785,6 @@ def print_os_pdf(
     master_redeemed = float(os_obj.redeemed_value or 0)
     master_re_export = float(os_obj.re_export_value or 0)
     master_confs = float(os_obj.confiscated_value or 0)
-
-    # Fallback: sum items if they have explicit legacy string categories
-    rf_val_items = sum(max(0, float(i.items_value or 0) - _eff_fa(float(i.items_value or 0), i)) for i in items_db if (i.items_release_category or "UNDER OS").upper() == "RF")
-    ref_val_items  = sum(max(0, float(i.items_value or 0) - _eff_fa(float(i.items_value or 0), i)) for i in items_db if (i.items_release_category or "UNDER OS").upper() == "REF")
-    confs_val_items = sum(max(0, float(i.items_value or 0) - _eff_fa(float(i.items_value or 0), i)) for i in items_db if (i.items_release_category or "UNDER OS").upper() == "CONFS")
 
     # Serial numbers grouped by disposal category (for ORDER paragraph)
     rf_slnos = [str(idx + 1) for idx, i in enumerate(items_db) if (i.items_release_category or "Under OS") == "RF"]

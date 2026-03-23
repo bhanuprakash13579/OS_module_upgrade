@@ -34,7 +34,7 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
     os_pending = db.query(func.count(CopsMaster.id)).filter(
         CopsMaster.os_date == today,
         CopsMaster.entry_deleted == 'N',
-        CopsMaster.adjudication_date == None,
+        CopsMaster.adjudication_date.is_(None),
     ).scalar() or 0
 
     # 3. DR active today — one count query

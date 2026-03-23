@@ -220,7 +220,7 @@ def search_os_cases(
         pair_filter = or_(*[and_(CopsItems.os_no == no, CopsItems.os_year == yr) for no, yr in keys])
         all_items = db.query(CopsItems).filter(
             pair_filter,
-            or_(CopsItems.entry_deleted == None, CopsItems.entry_deleted != "Y")
+            or_(CopsItems.entry_deleted.is_(None), CopsItems.entry_deleted != "Y")
         ).order_by(CopsItems.os_no, CopsItems.os_year, CopsItems.items_sno).all()
         for item in all_items:
             items_map[(item.os_no, item.os_year)].append(item)

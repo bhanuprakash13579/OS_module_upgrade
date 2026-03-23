@@ -31,24 +31,18 @@ class DutyCalculator:
         # Legacy duty logic approximations: Custom rules applied here
         # E.g. BCD = dutiable * bcd_adv_rate
         # For full accuracy, we apply ad-valorem rates from DB.
-        bcd = dutiable_value * category.bcd_adv_rate
-        cvd = (dutiable_value + bcd) * category.cvd_adv_rate
-        
-        # Assume Standard 10% Surcharge/Cess on BCD (if applicable based on legacy rules)
-        # Note: Actual rules in implementation plan dictate exact formulas depending on period.
-        # This encapsulates the base structure.
-        cess = bcd * 0.10
-        hec = bcd * 0.03
+        bcd  = round(dutiable_value * category.bcd_adv_rate, 2)
+        cvd  = round((dutiable_value + bcd) * category.cvd_adv_rate, 2)
+        cess = round(bcd * 0.10, 2)
+        hec  = round(bcd * 0.03, 2)
+        total_duty = round(bcd + cvd + cess + hec, 2)
 
-        # Exact computation depends on BR category (e.g., Gold concessional vs Merit)
-        total_duty = bcd + cvd + cess + hec
-        
         return {
-            "bcd": round(bcd, 2),
-            "cvd": round(cvd, 2),
-            "cess": round(cess, 2),
-            "hec": round(hec, 2),
-            "duty": round(total_duty, 2)
+            "bcd": bcd,
+            "cvd": cvd,
+            "cess": cess,
+            "hec": hec,
+            "duty": total_duty,
         }
 
     def process_br_items(self, items: List[dict]) -> tuple[float, float, float, List[dict]]:

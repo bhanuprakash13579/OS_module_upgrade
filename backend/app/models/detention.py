@@ -31,7 +31,7 @@ class DrMaster(Base):
 
     # ── Travel ──
     port_of_departure = Column(String(200))
-    flight_no = Column(String(20))
+    flight_no = Column(String(20), index=True)
     flight_date = Column(Date)
 
     # ── Values ──
