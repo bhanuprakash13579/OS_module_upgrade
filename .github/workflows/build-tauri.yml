@@ -125,13 +125,13 @@ jobs:
           echo "Sidecar PID: $SIDECAR_PID"
           for i in $(seq 1 30); do
             if curl -sf http://127.0.0.1:8000/api/mode > /dev/null 2>&1; then
-              echo "✓ Sidecar responded on port 8000 after ${i}s"
+              echo "OK Sidecar responded on port 8000 after ${i}s"
               kill $SIDECAR_PID 2>/dev/null || true
               exit 0
             fi
             sleep 1
           done
-          echo "✗ Sidecar did not respond within 30 seconds"
+          echo "FAIL Sidecar did not respond within 30 seconds"
           kill $SIDECAR_PID 2>/dev/null || true
           exit 1
 
@@ -147,7 +147,7 @@ jobs:
             try {
               $r = Invoke-WebRequest -Uri "http://127.0.0.1:8000/api/mode" -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
               if ($r.StatusCode -eq 200) {
-                Write-Host "✓ Sidecar responded on port 8000 after ${i}s"
+                Write-Host "OK Sidecar responded on port 8000 after ${i}s"
                 $ok = $true
                 break
               }
@@ -155,7 +155,7 @@ jobs:
           }
           Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
           if (-not $ok) {
-            Write-Error "✗ Sidecar did not respond within 30 seconds"
+            Write-Error "FAIL Sidecar did not respond within 30 seconds"
             exit 1
           }
 
