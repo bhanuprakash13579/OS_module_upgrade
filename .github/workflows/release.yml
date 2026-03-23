@@ -143,11 +143,19 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: powershell
         run: |
-          $proc = Start-Process -FilePath "${{ matrix.binary_src }}" -PassThru
+          # PyInstaller onefile EXEs extract to %TEMP%\_MEIxxxxxx on first run.
+          # Windows Defender scans every extracted DLL before execution — on a
+          # large bundle (Cairo/Pango) this alone can take 30-60 s on CI runners.
+          # Allow 120 s so Defender finishes before we declare failure.
+          $proc = Start-Process -FilePath "${{ matrix.binary_src }}" -WindowStyle Hidden -PassThru
           Write-Host "Sidecar PID: $($proc.Id)"
           $ok = $false
-          for ($i = 1; $i -le 30; $i++) {
+          for ($i = 1; $i -le 120; $i++) {
             Start-Sleep -Seconds 1
+            if ($proc.HasExited) {
+              Write-Error "FAIL Sidecar process exited early (code $($proc.ExitCode)) after ${i}s"
+              exit 1
+            }
             try {
               $r = Invoke-WebRequest -Uri "http://127.0.0.1:8000/api/mode" -UseBasicParsing -TimeoutSec 2 -ErrorAction Stop
               if ($r.StatusCode -eq 200) {
@@ -159,7 +167,7 @@ jobs:
           }
           Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
           if (-not $ok) {
-            Write-Error "FAIL Sidecar did not respond within 30 seconds"
+            Write-Error "FAIL Sidecar did not respond within 120 seconds"
             exit 1
           }
 
