@@ -248,7 +248,7 @@ def create_os(
         item_value = float(c_item.items_value or 0.0)
         fa = _eff_fa(item_value, c_item)
         rate = float(c_item.cumulative_duty_rate or 0.0)
-        duty = max(0.0, (item_value - fa)) * rate / 100.0
+        duty = round(max(0.0, (item_value - fa)) * rate / 100.0, 2)
 
         db_item = CopsItems(
             os_no=os_no,
@@ -559,7 +559,7 @@ def update_os(
         item_value = float(c_item.items_value or 0.0)
         fa = _eff_fa(item_value, c_item)
         rate = float(c_item.cumulative_duty_rate or 0.0)
-        duty = max(0.0, (item_value - fa)) * rate / 100.0
+        duty = round(max(0.0, (item_value - fa)) * rate / 100.0, 2)
 
         db_item = CopsItems(
             os_no=os_no,
