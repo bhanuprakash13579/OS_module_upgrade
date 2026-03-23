@@ -76,15 +76,17 @@ def apply_sqlite_migrations():
         try:
             # ── Legacy columns for cops_master tables ─────────────────────────
             for table in TABLES_TO_MIGRATE:
-                exists = conn.execute(text(
-                    f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table}'"
-                )).fetchone()
+                exists = conn.execute(
+                    text("SELECT name FROM sqlite_master WHERE type='table' AND name=:t"),
+                    {"t": table}
+                ).fetchone()
                 if not exists:
                     continue
                 cols = conn.execute(text(f"PRAGMA table_info({table})")).fetchall()
                 col_names = {c[1] for c in cols}
                 for col_name, col_type in LEGACY_COLS:
                     if col_name not in col_names:
+                        # table and col_type come from hardcoded LEGACY_COLS — safe to interpolate
                         conn.execute(text(
                             f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}"
                         ))

@@ -66,9 +66,14 @@ class SyncWorker:
                 if res.status_code == 200:
                     remote_events = res.json()
                     new_events = 0
+                    # Bulk-check which IDs already exist — one query instead of one per event
+                    incoming_ids = [evt["id"] for evt in remote_events]
+                    existing_ids = {
+                        row[0] for row in
+                        db.query(AuditEvent.id).filter(AuditEvent.id.in_(incoming_ids)).all()
+                    } if incoming_ids else set()
                     for evt in remote_events:
-                        existing = db.query(AuditEvent).filter(AuditEvent.id == evt["id"]).first()
-                        if not existing:
+                        if evt["id"] not in existing_ids:
                             new_evt = AuditEvent(
                                 id=evt["id"],
                                 entity_id=evt["entity_id"],

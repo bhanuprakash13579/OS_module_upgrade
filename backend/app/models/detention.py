@@ -18,8 +18,8 @@ class DrMaster(Base):
     # ── Identifiers ──
     dr_no = Column(Integer, nullable=False, index=True)
     dr_date = Column(Date, nullable=False, index=True)
-    dr_year = Column(Integer)
-    dr_type = Column(String(20), nullable=False)  # Bagg / AIU / MHB / Other
+    dr_year = Column(Integer, index=True)
+    dr_type = Column(String(20), nullable=False, index=True)  # Bagg / AIU / MHB / Other
 
     # ── Passenger ──
     pax_name = Column(String(200))
