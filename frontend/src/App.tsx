@@ -208,11 +208,23 @@ function BackendGate({ children }: { children: React.ReactNode }) {
   const [fadeOut, setFadeOut] = useState(false);
   const [dots, setDots] = useState('');
   const [slowStart, setSlowStart] = useState(false);
+  const [startupError, setStartupError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     let dotTimer: ReturnType<typeof setInterval>;
     const slowTimer = setTimeout(() => { if (!cancelled) setSlowStart(true); }, 15000);
+
+    // Listen for the Tauri "sidecar-startup-failed" event emitted by lib.rs
+    // when the backend crashes 4+ times in quick succession.
+    let unlistenFn: (() => void) | undefined;
+    if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+      import('@tauri-apps/api/event').then(({ listen }) => {
+        listen<string>('sidecar-startup-failed', (event) => {
+          if (!cancelled) setStartupError(event.payload);
+        }).then(fn => { unlistenFn = fn; });
+      });
+    }
 
     const poll = async () => {
       // Fast path: if backend is already up (e.g. app restart), skip splash entirely
@@ -243,10 +255,29 @@ function BackendGate({ children }: { children: React.ReactNode }) {
       cancelled = true;
       clearInterval(dotTimer);
       clearTimeout(slowTimer);
+      unlistenFn?.();
     };
   }, []);
 
   if (!ready) {
+    if (startupError) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center" style={SPLASH_BG}>
+          <img src="/cops_logo.png" alt="COPS" className="w-20 h-20 object-contain mb-4 opacity-70" />
+          <p className="text-white text-lg font-semibold tracking-widest mb-4">COPS</p>
+          <div className="bg-red-900/60 border border-red-500 rounded-lg px-6 py-4 max-w-lg mx-4 text-center">
+            <p className="text-red-300 font-semibold mb-2">Backend failed to start</p>
+            <p className="text-red-200 text-sm leading-relaxed">{startupError}</p>
+          </div>
+          <button
+            className="mt-6 px-4 py-2 bg-blue-700 hover:bg-blue-600 text-white text-sm rounded"
+            onClick={() => window.location.reload()}
+          >
+            Retry
+          </button>
+        </div>
+      );
+    }
     return (
       <div
         className="min-h-screen flex flex-col items-center justify-center"

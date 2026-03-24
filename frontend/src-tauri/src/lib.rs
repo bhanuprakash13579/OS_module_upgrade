@@ -1,5 +1,5 @@
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use tauri::Manager;
 #[cfg(not(debug_assertions))]
 use tauri_plugin_shell::ShellExt;
@@ -12,6 +12,10 @@ struct PythonSidecar(Mutex<Option<CommandChild>>);
 
 /// Set to false on app shutdown so the restart loop stops looping.
 struct SidecarRestartEnabled(AtomicBool);
+
+/// Counts consecutive fast crashes (sidecar exits within a few seconds of starting).
+/// Emits a "sidecar-startup-failed" event to the frontend after too many.
+struct FastCrashCount(AtomicU32);
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -67,6 +71,7 @@ pub fn run() {
       // Register managed state (empty initially; filled by the restart loop below)
       app.manage(PythonSidecar(Mutex::new(None)));
       app.manage(SidecarRestartEnabled(AtomicBool::new(true)));
+      app.manage(FastCrashCount(AtomicU32::new(0)));
 
       let app_handle = app.handle().clone();
       let db_path_owned = db_path_str;
@@ -99,6 +104,8 @@ pub fn run() {
             Ok(c) => c,
             Err(e) => {
               eprintln!("[cops] Failed to build sidecar command: {e}");
+              let _ = app_handle.emit("sidecar-startup-failed",
+                format!("Cannot locate python-server binary: {e}. Try reinstalling the app."));
               break;
             }
           };
@@ -113,6 +120,7 @@ pub fn run() {
           };
 
           eprintln!("[cops] Python server started.");
+          let spawn_time = std::time::Instant::now();
 
           // Store child so on_window_event can kill it on shutdown
           if let Some(state) = app_handle.try_state::<PythonSidecar>() {
@@ -146,6 +154,34 @@ pub fn run() {
             if !flag.0.load(Ordering::SeqCst) {
               eprintln!("[cops] App is shutting down — not restarting sidecar.");
               break;
+            }
+          }
+
+          // Fast-crash detection: if the sidecar exits within 5 seconds of
+          // starting, count it. After 4 consecutive fast crashes, tell the
+          // frontend so it can show an actionable error instead of spinning forever.
+          let uptime = spawn_time.elapsed().as_secs();
+          if uptime < 5 {
+            let crashes = if let Some(c) = app_handle.try_state::<FastCrashCount>() {
+              c.0.fetch_add(1, Ordering::SeqCst) + 1
+            } else { 1 };
+            eprintln!("[cops] Sidecar fast-crash #{crashes} (up for {uptime}s).");
+            if crashes >= 4 {
+              let _ = app_handle.emit("sidecar-startup-failed",
+                "The backend server crashed on startup. This is often caused by \
+                 Windows Defender blocking the server binary. \
+                 Please check Windows Security → Virus & threat protection → \
+                 Protection history and restore/allow 'python-server.exe'. \
+                 Then restart COPS.");
+              // Keep the restart loop running in case the user fixes it
+              if let Some(c) = app_handle.try_state::<FastCrashCount>() {
+                c.0.store(0, Ordering::SeqCst); // reset so we alert again after another 4
+              }
+            }
+          } else {
+            // Sidecar ran normally for a while — reset the fast-crash counter
+            if let Some(c) = app_handle.try_state::<FastCrashCount>() {
+              c.0.store(0, Ordering::SeqCst);
             }
           }
 
