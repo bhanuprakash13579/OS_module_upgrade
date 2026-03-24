@@ -25,16 +25,19 @@ jobs:
             binary_src: "backend/dist/python-server.exe"
             binary_dest: "frontend/src-tauri/binaries/python-server-x86_64-pc-windows-msvc.exe"
             tauri_args: "--bundles msi,nsis"
+            rust_targets: ""
 
           - os: ubuntu-22.04
             binary_src: "backend/dist/python-server"
             binary_dest: "frontend/src-tauri/binaries/python-server-x86_64-unknown-linux-gnu"
             tauri_args: "--bundles deb,appimage"
+            rust_targets: ""
 
-          - os: macos-latest   # arm64 Apple Silicon (macos-13 Intel no longer available)
+          - os: macos-14        # arm64 Apple Silicon; macos-latest (=15) breaks bundle_dmg.sh
             binary_src: "backend/dist/python-server"
             binary_dest: "frontend/src-tauri/binaries/python-server-aarch64-apple-darwin"
             tauri_args: "--bundles app,dmg --target aarch64-apple-darwin"
+            rust_targets: "aarch64-apple-darwin"
 
     steps:
       - name: Checkout Code
@@ -77,7 +80,7 @@ jobs:
           cache: "pip"
 
       - name: Install native dependencies (macOS — pyodbc + WeasyPrint Cairo/Pango)
-        if: matrix.os == 'macos-latest'
+        if: runner.os == 'macOS'
         run: brew install unixodbc pango cairo fontconfig
 
       - name: Install Python Dependencies
@@ -195,7 +198,7 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin
+          targets: ${{ matrix.rust_targets }}
 
       # ── Build Tauri App ──────────────────────────────────────────────────────
       - name: Build Tauri App
@@ -229,7 +232,7 @@ jobs:
           retention-days: 7
 
       - name: Upload macOS DMG
-        if: matrix.os == 'macos-latest'
+        if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
           name: cops-desktop-macos
