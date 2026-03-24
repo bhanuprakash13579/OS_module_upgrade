@@ -814,8 +814,15 @@ def print_os_pdf(
         all_abs_conf_slnos = confs_slnos
 
     # ── Logo path (absolute file:// URL for WeasyPrint) ──────────────────────
-    frontend_public = Path(__file__).parent.parent.parent.parent / "frontend" / "public"
-    logo_file = frontend_public / "customs-logo.jpg"
+    # In a frozen PyInstaller EXE sys._MEIPASS is the temp extraction dir;
+    # the spec bundles ../frontend/dist → frontend_dist inside _MEIPASS.
+    # In dev, fall back to the source tree (frontend/public or frontend/dist).
+    import sys as _sys
+    if getattr(_sys, 'frozen', False):
+        _base = Path(getattr(_sys, '_MEIPASS', '')) / "frontend_dist"
+    else:
+        _base = Path(__file__).parent.parent.parent.parent / "frontend" / "dist"
+    logo_file = _base / "customs-logo.jpg"
     logo_path = logo_file.as_uri() if logo_file.exists() else ""
 
     # ── Render template ───────────────────────────────────────────────────────
