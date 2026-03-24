@@ -1,6 +1,6 @@
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use tauri::Manager;
+use tauri::{Manager, Emitter};
 #[cfg(not(debug_assertions))]
 use tauri_plugin_shell::ShellExt;
 use tauri_plugin_shell::process::CommandChild;
