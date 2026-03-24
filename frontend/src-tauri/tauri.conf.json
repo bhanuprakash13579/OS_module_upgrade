@@ -34,6 +34,11 @@
       "binaries/python-server"
     ],
     "resources": {},
+    "windows": {
+      "nsis": {
+        "installerHooks": "./nsis/installer_hooks.nsh"
+      }
+    },
     "linux": {
       "deb": {
         "depends": [
