@@ -179,7 +179,7 @@ pub fn run() {
           // starting, count it. After 4 consecutive fast crashes, tell the
           // frontend so it can show an actionable error instead of spinning forever.
           let uptime = spawn_time.elapsed().as_secs();
-          if uptime < 5 {
+          if uptime < 60 {
             let crashes = if let Some(c) = app_handle.try_state::<FastCrashCount>() {
               c.0.fetch_add(1, Ordering::SeqCst) + 1
             } else { 1 };
