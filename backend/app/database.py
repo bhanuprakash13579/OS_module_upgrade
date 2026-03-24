@@ -33,9 +33,9 @@ if settings.DATABASE_URL.startswith("sqlite"):
         cursor.execute("PRAGMA synchronous=NORMAL")
         # 32 MB page cache (default is ~2000 pages ≈ 8 MB)
         cursor.execute("PRAGMA cache_size=-32000")
-        # Memory-mapped I/O: 256 MB — lets SQLite read directly from OS page
-        # cache, skipping an extra buffer copy on every read
-        cursor.execute("PRAGMA mmap_size=268435456")
+        # Memory-mapped I/O: disabled for Windows compatibility (causes C-level segfaults
+        # with PyInstaller + Uvicorn + Windows Defender interfering with page locks)
+        # cursor.execute("PRAGMA mmap_size=268435456")
         cursor.close()
 
 

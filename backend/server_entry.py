@@ -119,19 +119,20 @@ try:
         sys.stdin = open(os.devnull, "r")
 
     if __name__ == "__main__":
-        # Bind to all interfaces so LAN clients (other PCs on the same network)
-        # can access the app via browser. The LAN-only middleware in main.py still
-        # blocks any non-private IP, so this is safe on an internal network.
-        #
-        # access_log=False: suppresses per-request stdout writes so a transient
-        # broken pipe (SIGPIPE) from Tauri's stdout reader never kills the server.
-        uvicorn.run(
-            app,
-            host="0.0.0.0",
-            port=8000,
-            log_level="warning",
-            access_log=False,
-        )
+        import logging
+        # Force all logging to stderr (which we just redirected to the file)
+        logging.basicConfig(stream=sys.stderr, level=logging.INFO, force=True)
+        _slog("Entering uvicorn.run()...")
+        try:
+            uvicorn.run(
+                app,
+                host="0.0.0.0",
+                port=8000,
+                log_level="info",
+                access_log=False,
+            )
+        finally:
+            _slog("uvicorn.run() finished and returned gracefully!")
 
 except BaseException as e:
     _slog(f"FATAL STARTUP ERROR ({type(e).__name__} - {e}):\n" + traceback.format_exc())
