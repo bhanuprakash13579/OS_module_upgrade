@@ -115,6 +115,9 @@ try:
     if sys.stderr is None:
         sys.stderr = sys.stdout
 
+    if sys.stdin is None:
+        sys.stdin = open(os.devnull, "r")
+
     if __name__ == "__main__":
         # Bind to all interfaces so LAN clients (other PCs on the same network)
         # can access the app via browser. The LAN-only middleware in main.py still
@@ -130,6 +133,6 @@ try:
             access_log=False,
         )
 
-except Exception:
-    _slog("FATAL STARTUP ERROR:\n" + traceback.format_exc())
+except BaseException as e:
+    _slog(f"FATAL STARTUP ERROR ({type(e).__name__} - {e}):\n" + traceback.format_exc())
     raise
