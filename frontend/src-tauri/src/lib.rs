@@ -114,6 +114,22 @@ pub fn run() {
             Ok(r) => r,
             Err(e) => {
               eprintln!("[cops] Failed to spawn python sidecar: {e}. Retrying in 5s...");
+              // Spawn failures (binary not found, Defender quarantine, etc.)
+              // also count toward the crash threshold so the frontend gets notified.
+              let spawn_fails = if let Some(c) = app_handle.try_state::<FastCrashCount>() {
+                c.0.fetch_add(1, Ordering::SeqCst) + 1
+              } else { 1 };
+              if spawn_fails >= 4 {
+                let _ = app_handle.emit("sidecar-startup-failed",
+                  format!("Cannot start the backend server: {e}. \
+                    Windows Defender may have quarantined python-server.exe. \
+                    Go to Windows Security → Virus & threat protection → \
+                    Protection history, find python-server.exe and click Allow. \
+                    Then restart COPS."));
+                if let Some(c) = app_handle.try_state::<FastCrashCount>() {
+                  c.0.store(0, Ordering::SeqCst);
+                }
+              }
               tokio::time::sleep(std::time::Duration::from_secs(5)).await;
               continue;
             }
