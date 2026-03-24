@@ -66,7 +66,9 @@ pub fn run() {
         }
       }
 
-      let db_path_str = db_path.to_string_lossy().to_string();
+      // Normalise to forward slashes so the Python side builds a valid
+      // sqlite:///C:/Users/... URL regardless of platform.
+      let db_path_str = db_path.to_string_lossy().replace('\\', "/");
 
       // Register managed state (empty initially; filled by the restart loop below)
       app.manage(PythonSidecar(Mutex::new(None)));

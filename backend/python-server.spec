@@ -50,6 +50,21 @@ a = Analysis(
         'cryptography',
         'cryptography.hazmat.backends',
         'cryptography.hazmat.primitives',
+        # WeasyPrint + PDF rendering dependencies
+        # These are loaded lazily inside the /print endpoint but PyInstaller
+        # must bundle them — PIL was previously in 'excludes' which broke PDF.
+        'weasyprint',
+        'weasyprint.text.fonts',
+        'weasyprint.text.ffi',
+        'cssselect2',
+        'tinycss2',
+        'tinycss2.color3',
+        'pydyf',
+        'fontTools',
+        'fontTools.ttLib',
+        'PIL',
+        'PIL.Image',
+        'PIL.ImageFile',
         # charset detection (fixes requests warning)
         'charset_normalizer',
         'charset_normalizer.md__mypyc',
@@ -77,7 +92,7 @@ a = Analysis(
         'matplotlib',
         'numpy',
         'pandas',
-        'PIL',
+        # NOTE: do NOT exclude PIL/Pillow — WeasyPrint uses it for image rendering in PDFs
     ],
     noarchive=False,
     optimize=0,  # 0 = keep docstrings — pydantic v2 uses introspection that breaks with optimize=2
