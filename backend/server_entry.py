@@ -116,7 +116,13 @@ try:
         sys.stderr = sys.stdout
 
     if sys.stdin is None:
-        sys.stdin = open(os.devnull, "r")
+        class DummyStdin:
+            def isatty(self): return False
+            def fileno(self): raise OSError("No console, headless execution")
+            def read(self, *args, **kwargs):
+                import time
+                while True: time.sleep(86400)
+        sys.stdin = DummyStdin()
 
     if __name__ == "__main__":
         import logging
