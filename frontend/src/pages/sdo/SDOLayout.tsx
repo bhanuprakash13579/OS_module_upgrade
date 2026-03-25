@@ -112,7 +112,7 @@ export default function SDOLayout() {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
-        <div className="flex-1 overflow-y-auto" style={{ willChange: 'scroll-position' }}>
+        <div className="flex-1 overflow-y-auto">
           {user?.user_status === 'TEMP' && !location.pathname.endsWith('/users') ? (
             <Navigate to="/sdo/users" replace />
           ) : (
