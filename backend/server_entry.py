@@ -41,21 +41,22 @@ try:
         import threading
         ppid = os.getppid()
         def _watch():
-            # Check if parent is alive using ctypes to avoid Windows os.kill() quirks
-            import ctypes
+            import subprocess
             while True:
                 try:
-                    kernel32 = ctypes.windll.kernel32
-                    SYNCHRONIZE = 0x00100000
-                    process = kernel32.OpenProcess(SYNCHRONIZE, False, ppid)
-                    if process:
-                        kernel32.CloseHandle(process)
-                    else:
+                    # Use tasklist to bypass strict OpenProcess privilege blocks on Windows 11
+                    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+                    output = subprocess.check_output(
+                        f'tasklist /FI "PID eq {ppid}" /NH',
+                        shell=True,
+                        creationflags=flags
+                    ).decode('utf-8', errors='ignore')
+                    if str(ppid) not in output:
                         raise Exception("Parent dead")
                 except Exception:
                     os.kill(os.getpid(), signal.SIGTERM)
                     break
-                time.sleep(3)
+                time.sleep(5)
         threading.Thread(target=_watch, daemon=True).start()
 
     if sys.platform == "win32":
@@ -106,10 +107,15 @@ try:
     _free_port(8000)
     _slog("port 8000 free")
 
-    if sys.stdout is None:
+    # Always redirect stdout/stderr to the log file with UTF-8 encoding.
+    # On Windows, sys.stdout may be set to a cp1252 console handle even in
+    # windowed (console=False) PyInstaller builds — printing any emoji or
+    # non-Latin character raises UnicodeEncodeError and crashes the lifespan.
+    try:
         sys.stdout = open(_LOG_PATH, "a", encoding="utf-8", buffering=1)
-    if sys.stderr is None:
         sys.stderr = sys.stdout
+    except Exception as _e:
+        _slog(f"Warning: could not redirect stdout/stderr: {_e}")
 
     # Redirect stdin to a never-closing pipe so uvicorn on Windows
     # cannot exit due to EOF polling, while keeping fileno() functional.

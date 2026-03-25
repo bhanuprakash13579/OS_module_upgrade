@@ -52,7 +52,7 @@ class BusinessRulesEngine:
             else:
                 raise HTTPException(
                     status_code=400, 
-                    detail=f"Passenger can only avail ₹{diff} F.A. Limit now."
+                    detail=f"Passenger can only avail Rs.{diff} F.A. Limit now."
                 )
         return True, current_fa_claim
 

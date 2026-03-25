@@ -205,7 +205,7 @@ def apply_sqlite_migrations():
                 conn.execute(text("ALTER TABLE cops_items_new RENAME TO cops_items"))
                 conn.execute(text("PRAGMA foreign_keys=ON"))
                 conn.commit()
-                print("✅ cops_items.os_date NOT NULL constraint removed")
+                print("cops_items.os_date NOT NULL constraint removed")
         except Exception as e:
             conn.rollback()
             print(f"cops_items migration error: {e}")
@@ -359,7 +359,7 @@ def _seed_legal_statutes():
         if new_entries:
             db.bulk_save_objects(new_entries)
             db.commit()
-            print(f"✅ Seeded {len(new_entries)} legal statutes")
+            print(f"Seeded {len(new_entries)} legal statutes")
     except Exception as e:
         db.rollback()
         print(f"Legal statutes seed error: {e}")
@@ -455,7 +455,7 @@ def _seed_print_template_config():
         if new_entries:
             db.bulk_save_objects(new_entries)
             db.commit()
-            print(f"✅ Seeded {len(new_entries)} print template fields")
+            print(f"Seeded {len(new_entries)} print template fields")
     except Exception as e:
         db.rollback()
         print(f"Print template seed error: {e}")
@@ -479,38 +479,57 @@ def _load_state_from_db():
         devices = db.query(AllowedDevice).filter(AllowedDevice.is_active == True).all()
         state.allowed_ips = {d.ip_address for d in devices if d.ip_address}
         mode_label = "PRODUCTION" if state.prod_mode else "DEVELOPMENT"
-        print(f"✅ App mode: {mode_label} | Whitelisted IPs: {len(state.allowed_ips)}")
+        print(f"App mode: {mode_label} | Whitelisted IPs: {len(state.allowed_ips)}")
     except Exception as e:
         print(f"State load error: {e}")
     finally:
         db.close()
 
 
+def _llog(msg: str) -> None:
+    """Direct file write to cops_startup.log — bypasses logging/stdout so it
+    always appears even in windowed PyInstaller builds."""
+    import pathlib, datetime, traceback
+    _p = pathlib.Path(
+        os.environ.get("RUNNER_TEMP") or os.environ.get("TEMP") or "."
+    ) / "cops_startup.log"
+    ts = datetime.datetime.now().isoformat(timespec="milliseconds")
+    try:
+        with open(_p, "a", encoding="utf-8") as f:
+            f.write(f"[{ts}] [LIFESPAN] {msg}\n")
+    except Exception:
+        pass
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Create all tables and seed data on startup."""
-    # Create all 68 tables
-    Base.metadata.create_all(bind=engine)
-    print(f"✅ Created {len(Base.metadata.tables)} database tables")
+    import traceback
+    try:
+        _llog("create_all starting...")
+        Base.metadata.create_all(bind=engine)
+        _llog(f"create_all done — {len(Base.metadata.tables)} tables")
 
-    # Apply lightweight migrations (SQLite)
-    apply_sqlite_migrations()
+        _llog("apply_sqlite_migrations starting...")
+        apply_sqlite_migrations()
+        _llog("apply_sqlite_migrations done")
 
-    # Seed default data
-    seed_initial_data()
-    print("✅ Seed data loaded (test users, shift timing, margins)")
+        _llog("seed_initial_data starting...")
+        seed_initial_data()
+        _llog("seed_initial_data done")
 
-    # Populate runtime state from DB
-    _load_state_from_db()
+        _llog("_load_state_from_db starting...")
+        _load_state_from_db()
+        _llog("_load_state_from_db done")
 
-    # mDNS LAN Replication Engine disabled — conflicts with uvicorn's event loop.
-    # LAN access works via 0.0.0.0 binding without mDNS discovery.
-    print("✅ LAN access ready (mDNS sync engine disabled)")
+        _llog("lifespan startup complete — yielding")
+    except BaseException as e:
+        _llog(f"LIFESPAN STARTUP EXCEPTION: {type(e).__name__}: {e}\n{traceback.format_exc()}")
+        raise
 
     yield  # Application runs here
 
-    # Shutdown
-    print("🛑 COPS Application shutting down")
+    _llog("lifespan shutdown")
 
 
 # ── Create App ───────────────────────────────────────────────────

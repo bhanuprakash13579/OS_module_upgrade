@@ -57,9 +57,9 @@ def _name_score(apis_name: str, cops_name: str) -> float:
     Score = |intersection| / |shorter token-set|
 
     Examples:
-      "JOHN SMITH"           vs "SMITH JOHN"            → 2/2 = 1.0  ✓ (reversed)
-      "JOHN FATHER SMITH"    vs "JOHN SMITH"             → 2/2 = 1.0  ✓ (extra token)
-      "DHANAGOPALAN K"       vs "KALYANASUNDARAM D"      → 0/1 = 0.0  ✗ (abbreviation)
+      "JOHN SMITH"           vs "SMITH JOHN"            -> 2/2 = 1.0  [OK] (reversed)
+      "JOHN FATHER SMITH"    vs "JOHN SMITH"             -> 2/2 = 1.0  [OK] (extra token)
+      "DHANAGOPALAN K"       vs "KALYANASUNDARAM D"      -> 0/1 = 0.0  [NO] (abbreviation)
       "DHANAGOPALAN KUMAR"   vs "DHANAGOPALAN KALYAN"    → 1/2 = 0.5  borderline
     """
     t1 = _normalize_tokens(apis_name)

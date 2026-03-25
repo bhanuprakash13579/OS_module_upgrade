@@ -1,6 +1,6 @@
 import requests
 
-print("Testing Online Adjudication ₹5L Rule")
+print("Testing Online Adjudication Rs.5L Rule")
 # Login
 login_res = requests.post("http://127.0.0.1:8000/api/auth/login", data={"username": "bhanu@gmail.com", "password": "bhanu"})
 if login_res.status_code != 200:
