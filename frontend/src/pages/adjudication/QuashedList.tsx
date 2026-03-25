@@ -22,6 +22,7 @@ export default function QuashedList() {
   const [showFilter, setShowFilter] = useState(false);
   const [filterYear, setFilterYear] = useState('');
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(searchDebounce.current), []);
 
   const fetchCases = useCallback(async (page: number, search: string, year = filterYear) => {
     setLoading(true);

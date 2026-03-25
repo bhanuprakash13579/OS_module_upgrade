@@ -28,6 +28,7 @@ export default function OffenceList() {
   const [filterStatus, setFilterStatus] = useState('');
 
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(searchDebounce.current), []);
 
   const fetchCases = useCallback(async (page: number, search: string, year = filterYear, status = filterStatus) => {
     setLoading(true);

@@ -24,6 +24,7 @@ export default function AdjudicationList() {
   const [filterYear, setFilterYear] = useState('');
   const [filterStatus, setFilterStatus] = useState('pending');
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(searchDebounce.current), []);
 
   const fetchCases = useCallback(async (page: number, search: string, year = filterYear, status = filterStatus) => {
     setLoading(true);

@@ -66,33 +66,33 @@ def get_item_descriptions(db: Session = Depends(get_db)):
     """
     global _item_desc_cache, _item_desc_cache_ts
     now = _time.time()
+    # Fast path (no lock): return cached value if fresh
+    if _item_desc_cache and (now - _item_desc_cache_ts) < 300:
+        return _item_desc_cache
+    # Slow path: acquire lock, re-check under lock to prevent thundering herd
     with _item_desc_lock:
-        if _item_desc_cache and (now - _item_desc_cache_ts) < 300:
+        if _item_desc_cache and (_time.time() - _item_desc_cache_ts) < 300:
             return _item_desc_cache
-
-    rows = (
-        db.query(
-            CopsItems.items_desc,
-            func.count(CopsItems.items_desc).label("cnt")
+        rows = (
+            db.query(
+                CopsItems.items_desc,
+                func.count(CopsItems.items_desc).label("cnt")
+            )
+            .filter(CopsItems.items_desc.isnot(None), CopsItems.items_desc != '')
+            .group_by(func.upper(CopsItems.items_desc))
+            .order_by(func.count(CopsItems.items_desc).desc())
+            .limit(300)
+            .all()
         )
-        .filter(CopsItems.items_desc.isnot(None), CopsItems.items_desc != '')
-        .group_by(func.upper(CopsItems.items_desc))
-        .order_by(func.count(CopsItems.items_desc).desc())
-        .limit(300)
-        .all()
-    )
-
-    seen: set[str] = set()
-    result: list[str] = []
-    for row in rows:
-        val = (row[0] or '').strip().upper()
-        if val and val not in seen:
-            seen.add(val)
-            result.append(val)
-
-    with _item_desc_lock:
+        seen: set[str] = set()
+        result: list[str] = []
+        for row in rows:
+            val = (row[0] or '').strip().upper()
+            if val and val not in seen:
+                seen.add(val)
+                result.append(val)
         _item_desc_cache = result
-        _item_desc_cache_ts = now
+        _item_desc_cache_ts = _time.time()
     return result
 
 
@@ -718,6 +718,9 @@ def print_os_pdf(
     ref_val_items = 0.0
     confs_val_items = 0.0
     qty_fa_list = []
+    rf_slnos: list[str] = []
+    ref_slnos: list[str] = []
+    confs_slnos: list[str] = []
     for idx, item in enumerate(items_db):
         cat = (item.items_release_category or "UNDER OS").upper()
         # "Liable" = Under OS + RF + REF + CONFS
@@ -748,10 +751,13 @@ def print_os_pdf(
             total_liable_value += dutiable
         if cat == "RF":
             rf_val_items += dutiable
+            rf_slnos.append(str(idx + 1))
         elif cat == "REF":
             ref_val_items += dutiable
+            ref_slnos.append(str(idx + 1))
         elif cat == "CONFS":
             confs_val_items += dutiable
+            confs_slnos.append(str(idx + 1))
 
         # FA display: show for Under Duty and Under OS/RF/REF items (but not CONFS)
         show_fa = is_duty or (is_liable and not is_confs)
@@ -786,10 +792,7 @@ def print_os_pdf(
     master_re_export = float(os_obj.re_export_value or 0)
     master_confs = float(os_obj.confiscated_value or 0)
 
-    # Serial numbers grouped by disposal category (for ORDER paragraph)
-    rf_slnos = [str(idx + 1) for idx, i in enumerate(items_db) if (i.items_release_category or "Under OS") == "RF"]
-    ref_slnos = [str(idx + 1) for idx, i in enumerate(items_db) if (i.items_release_category or "Under OS") == "REF"]
-    confs_slnos = [str(idx + 1) for idx, i in enumerate(items_db) if (i.items_release_category or "Under OS") == "CONFS"]
+    # Serial numbers grouped by disposal category — accumulated in the main loop above
 
     # Use master values if they exist, else fallback to item summation (for old un-migrated data)
     has_item_data = len(items_db) > 0
