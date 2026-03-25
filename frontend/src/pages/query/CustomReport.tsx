@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { FileText, Download, RefreshCw, CheckSquare, Square } from 'lucide-react';
 import api from '@/lib/api';
 import DatePicker from '@/components/DatePicker';
+import { showDownloadToast } from '@/components/DownloadToast';
 
 // ── Column definitions ────────────────────────────────────────────────────────
 
@@ -119,7 +120,7 @@ const ITEM_GROUP: { group: string; cols: ColDef[] } = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function exportCsv(columns: string[], rows: Record<string, string>[], colLabels: Record<string, string>) {
+async function exportCsv(columns: string[], rows: Record<string, string>[], colLabels: Record<string, string>) {
   const header = columns.map(c => colLabels[c] ?? c).join(',');
   const body = rows.map(r =>
     columns.map(c => {
@@ -128,13 +129,25 @@ function exportCsv(columns: string[], rows: Record<string, string>[], colLabels:
         ? `"${v.replace(/"/g, '""')}"` : v;
     }).join(',')
   ).join('\n');
-  const blob = new Blob([header + '\n' + body], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `cops_report_${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  const csvString = header + '\n' + body;
+  const defaultName = `cops_report_${new Date().toISOString().slice(0, 10)}.csv`;
+
+  try {
+    const { save } = await import('@tauri-apps/plugin-dialog');
+    const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+    const savePath = await save({ title: 'Save Report CSV', defaultPath: defaultName, filters: [{ name: 'CSV', extensions: ['csv'] }] });
+    if (savePath) {
+      await writeTextFile(savePath, csvString);
+      showDownloadToast(`Report saved to ${savePath}`);
+    }
+  } catch {
+    const blob = new Blob([csvString], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = defaultName; a.click();
+    URL.revokeObjectURL(url);
+    showDownloadToast(`Report downloaded as ${defaultName}`);
+  }
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────

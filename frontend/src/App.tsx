@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect, lazy, Suspense } from 'react';
 import api from './lib/api';
 import DevModeBanner from './components/DevModeBanner';
+import DownloadToast from './components/DownloadToast';
 import ErrorBoundary from './components/ErrorBoundary';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './pages/auth/Login';
@@ -303,6 +304,7 @@ export default function App() {
         <BackendGate>
           <AutoUpdater />
           <DevModeBanner />
+          <DownloadToast />
           <BrowserRouter>
             <AppRoutes />
           </BrowserRouter>

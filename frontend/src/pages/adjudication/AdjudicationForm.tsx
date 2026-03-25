@@ -4,6 +4,7 @@ import { Gavel, ArrowLeft, Save, XCircle, User, Package, FileText, AlertCircle, 
 import DatePicker from '@/components/DatePicker';
 import api from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { showDownloadToast } from '@/components/DownloadToast';
 import { useRemarksGenerator, detectContextualQuestions, ContextualAnswers, ContextualQuestion } from '@/hooks/useRemarksGenerator';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -271,7 +272,7 @@ const ItemsPanel = memo(function ItemsPanel({ osCase }: { osCase: OSCase }) {
         </h2>
         <span className="ml-auto text-xs text-slate-500">{osCase.total_items} item(s)</span>
       </div>
-      <div className="overflow-x-auto">
+      <div className="overflow-auto">
         <table className="w-full text-sm">
           <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
             <tr>
@@ -507,6 +508,7 @@ export default function AdjudicationForm() {
         });
         if (savePath) {
           await writeFile(savePath, new Uint8Array(pdfData));
+          showDownloadToast(`PDF saved to ${savePath}`);
         }
       } catch {
         const blob = new Blob([pdfData], { type: 'application/pdf' });
@@ -518,6 +520,7 @@ export default function AdjudicationForm() {
         a.click();
         document.body.removeChild(a);
         setTimeout(() => URL.revokeObjectURL(url), 5000);
+        showDownloadToast(`PDF downloaded as OS_${os_no}_${os_year}.pdf`);
       }
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to download OS PDF.');

@@ -19,10 +19,10 @@ export default function SDOLayout() {
   };
 
   return (
-    <div className="flex h-screen w-full overflow-hidden" style={{ background: '#f0f4f8' }}>
+    <div className="flex h-screen w-full overflow-hidden print:h-auto print:overflow-visible" style={{ background: '#f0f4f8' }}>
       {/* Sidebar */}
       <aside
-        className={`${isCollapsed ? 'w-16' : 'w-64'} flex flex-col h-full shadow-xl transition-[width] duration-200 z-50 shrink-0`}
+        className={`${isCollapsed ? 'w-16' : 'w-64'} flex flex-col h-full shadow-xl transition-[width] duration-200 z-50 shrink-0 print:!hidden`}
         style={{ background: 'linear-gradient(180deg, #1e3a5f 0%, #0f2340 100%)' }}
       >
         {/* Logo Area & Toggle */}
@@ -111,8 +111,8 @@ export default function SDOLayout() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden">
-        <div className="flex-1 overflow-y-auto">
+      <main className="flex-1 flex flex-col h-screen overflow-hidden print:h-auto print:overflow-visible">
+        <div className="flex-1 overflow-y-auto print:overflow-visible">
           {user?.user_status === 'TEMP' && !location.pathname.endsWith('/users') ? (
             <Navigate to="/sdo/users" replace />
           ) : (

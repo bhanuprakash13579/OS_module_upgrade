@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Printer } from 'lucide-react';
 import api from '../../lib/api';
+import { showDownloadToast } from '@/components/DownloadToast';
 
 export default function OSPrintView() {
   const { os_no, os_year } = useParams();
@@ -178,6 +179,7 @@ export default function OSPrintView() {
 
       if (savePath) {
         await writeFile(savePath, new Uint8Array(pdfData));
+        showDownloadToast(`PDF saved to ${savePath}`);
       }
     } catch {
       // Fallback: browser download (non-Tauri / web mode)
@@ -192,6 +194,7 @@ export default function OSPrintView() {
         a.click();
         document.body.removeChild(a);
         setTimeout(() => URL.revokeObjectURL(url), 5000);
+        showDownloadToast(`PDF downloaded as OS_${os_no}_${os_year}.pdf`);
       } catch (e) {
         import.meta.env.DEV && console.error('Failed to generate PDF:', e);
         setPdfError('Could not generate PDF. Please try again.');

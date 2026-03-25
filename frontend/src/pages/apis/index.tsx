@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, useMemo, Component, ReactNode } from 'react';
+import { useState, useRef, useCallback, useMemo, Component, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ScanLine, LogOut, Upload, FileSpreadsheet, Download,
@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import api from '../../lib/api';
+import { showDownloadToast } from '@/components/DownloadToast';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface ItemRow {
@@ -328,7 +329,7 @@ function CaseCard({ match, apisName }: { match: CopsMatch; apisName: string }) {
 
             // New-format records — individual values present; show structured table.
             return (
-              <div className="overflow-x-auto rounded-lg border border-inherit">
+              <div className="overflow-auto rounded-lg border border-inherit">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="bg-white/50">
@@ -458,12 +459,10 @@ function ApisModuleInner() {
   const [currentFile, setCurrentFile] = useState<File | null>(null);
   const [exporting, setExporting] = useState(false);
   const [filterText, setFilterText] = useState('');
-  const [downloadMsg, setDownloadMsg] = useState<string | null>(null);
-  const downloadMsgTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const handleLogout = () => { logout(); navigate('/modules'); };
 
-  useEffect(() => () => clearTimeout(downloadMsgTimer.current), []);
+
 
 
   const runMatch = useCallback(async (file: File) => {
@@ -503,15 +502,25 @@ function ApisModuleInner() {
         responseType: 'blob',
       });
 
-      const url  = URL.createObjectURL(res.data);
-      const a    = document.createElement('a');
       const cd   = res.headers['content-disposition'] || '';
       const name = cd.match(/filename="([^"]+)"/)?.[1] || 'COPS_APIS_Match.xlsx';
-      a.href = url; a.download = name; a.click();
-      URL.revokeObjectURL(url);
-      setDownloadMsg(`"${name}" has been saved to your Downloads folder`);
-      clearTimeout(downloadMsgTimer.current);
-      downloadMsgTimer.current = setTimeout(() => setDownloadMsg(null), 6000);
+
+      try {
+        const { save } = await import('@tauri-apps/plugin-dialog');
+        const { writeFile } = await import('@tauri-apps/plugin-fs');
+        const savePath = await save({ title: 'Save Report', defaultPath: name, filters: [{ name: 'Excel', extensions: ['xlsx'] }] });
+        if (savePath) {
+          const arrayBuf = await (res.data as Blob).arrayBuffer();
+          await writeFile(savePath, new Uint8Array(arrayBuf));
+          showDownloadToast(`Report saved to ${savePath}`);
+        }
+      } catch {
+        const url  = URL.createObjectURL(res.data);
+        const a    = document.createElement('a');
+        a.href = url; a.download = name; a.click();
+        URL.revokeObjectURL(url);
+        showDownloadToast(`Report downloaded as ${name}`);
+      }
     } catch (e: any) {
       setError(e.response?.data?.detail || e.message || 'Export failed');
     } finally {
@@ -620,13 +629,7 @@ function ApisModuleInner() {
               </button>
             </div>
 
-            {/* Download success toast */}
-            {downloadMsg && (
-              <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-4 py-3 mb-4 text-sm">
-                <CheckCircle2 size={16} className="shrink-0 text-emerald-600" />
-                {downloadMsg}
-              </div>
-            )}
+
 
             {/* Legend */}
             <div className="flex flex-wrap gap-4 mb-4 text-xs text-slate-500">

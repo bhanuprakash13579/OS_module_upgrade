@@ -224,7 +224,7 @@ export default function OffenceList() {
 
       {/* Table */}
       <div className="bg-white rounded-xl flex-1 overflow-hidden flex flex-col border border-slate-200 relative">
-        <div className="overflow-x-auto flex-1">
+        <div className="overflow-auto flex-1">
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
               <tr>

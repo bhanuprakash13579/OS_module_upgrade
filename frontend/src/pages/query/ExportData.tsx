@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Download, Database } from 'lucide-react';
 import api from '@/lib/api';
+import { showDownloadToast } from '@/components/DownloadToast';
 
 export default function ExportData() {
   const [csvLoading, setCsvLoading] = useState(false);
@@ -17,13 +18,26 @@ export default function ExportData() {
     try {
       const res = await api.get('/backup/export/csv', { responseType: 'blob' });
       const today = new Date().toISOString().slice(0, 10);
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/zip' }));
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `cops_full_backup_${today}.zip`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-      setCsvMsg(`Saved as cops_full_backup_${today}.zip`);
+      const defaultName = `cops_full_backup_${today}.zip`;
+
+      try {
+        const { save } = await import('@tauri-apps/plugin-dialog');
+        const { writeFile } = await import('@tauri-apps/plugin-fs');
+        const savePath = await save({ title: 'Save CSV Backup', defaultPath: defaultName, filters: [{ name: 'ZIP', extensions: ['zip'] }] });
+        if (savePath) {
+          const arrayBuf = await (res.data as Blob).arrayBuffer();
+          await writeFile(savePath, new Uint8Array(arrayBuf));
+          setCsvMsg(`Backup saved successfully.`);
+          showDownloadToast(`Backup saved to ${savePath}`);
+        }
+      } catch {
+        const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/zip' }));
+        const a = document.createElement('a');
+        a.href = url; a.download = defaultName; a.click();
+        window.URL.revokeObjectURL(url);
+        setCsvMsg(`Downloaded successfully.`);
+        showDownloadToast(`Downloaded as ${defaultName}`);
+      }
     } catch (err: any) {
       setCsvError(err.response?.data?.detail || 'Download failed.');
     } finally {
@@ -37,13 +51,26 @@ export default function ExportData() {
     try {
       const res = await api.get('/backup/export/db', { responseType: 'blob' });
       const today = new Date().toISOString().slice(0, 10);
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/octet-stream' }));
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `cops_fulldb_${today}.db`;
-      a.click();
-      window.URL.revokeObjectURL(url);
-      setDbMsg(`Saved as cops_fulldb_${today}.db — upload this in the admin panel to fully restore on a new machine.`);
+      const defaultName = `cops_fulldb_${today}.db`;
+
+      try {
+        const { save } = await import('@tauri-apps/plugin-dialog');
+        const { writeFile } = await import('@tauri-apps/plugin-fs');
+        const savePath = await save({ title: 'Save Database Backup', defaultPath: defaultName, filters: [{ name: 'Database', extensions: ['db'] }] });
+        if (savePath) {
+          const arrayBuf = await (res.data as Blob).arrayBuffer();
+          await writeFile(savePath, new Uint8Array(arrayBuf));
+          setDbMsg(`Database saved successfully.`);
+          showDownloadToast(`Database saved to ${savePath}`);
+        }
+      } catch {
+        const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/octet-stream' }));
+        const a = document.createElement('a');
+        a.href = url; a.download = defaultName; a.click();
+        window.URL.revokeObjectURL(url);
+        setDbMsg(`Downloaded successfully.`);
+        showDownloadToast(`Downloaded as ${defaultName}`);
+      }
     } catch (err: any) {
       setDbError(err.response?.data?.detail || 'Download failed.');
     } finally {

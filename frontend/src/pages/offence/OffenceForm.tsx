@@ -1432,7 +1432,7 @@ export default function OffenceForm() {
                 </button>
             </div>
             
-            <div className="overflow-x-auto">
+            <div className="overflow-auto">
                 <table className="w-full text-sm text-left whitespace-nowrap">
                     <thead className="text-[10px] text-slate-500 uppercase bg-slate-100 border-b border-slate-200 tracking-wider">
                         <tr>

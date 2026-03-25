@@ -30,9 +30,7 @@
     --foreground: var(--color-text-primary);
   }
 
-  html {
-    scroll-behavior: smooth;
-  }
+  /* scroll-behavior: smooth removed — causes janky/delayed scrolling in\n     nested overflow containers on Windows WebView2 */
 
   body {
     background-color: var(--background);
@@ -66,11 +64,8 @@
     transition: background-color 0.12s ease, color 0.12s ease;
   }
 
-  /* Subtle press feedback — transform is GPU-composited, no layout cost */
-  button:not(:disabled):active {
-    transform: scale(0.97);
-    transition: transform 0.08s ease;
-  }
+  /* Press feedback removed — transform on :active causes layout thrashing
+     and interferes with scroll momentum on Windows WebView2 */
 }
 
 @media print {
@@ -111,4 +106,9 @@
     -moz-appearance: textfield;
     appearance: textfield;
   }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(100%); }
+  to   { opacity: 1; transform: translateX(0); }
 }

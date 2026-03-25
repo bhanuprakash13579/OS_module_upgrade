@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     # Set COPS_ENV=production in the environment (or .env file) to enable prod mode.
     # Anything else (including the default) is treated as development.
-    COPS_ENV: str = "development"
+    COPS_ENV: str = "production"
     DEBUG: bool = True  # corrected after instantiation based on COPS_ENV
     SECRET_KEY: str = "cops-customs-secret-key-change-in-production"  # overridden at runtime by derive_secret_key()
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480  # 8 hour shift

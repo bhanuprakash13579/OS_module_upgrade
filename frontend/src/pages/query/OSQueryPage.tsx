@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, Loader2, Printer, ChevronDown, ChevronUp, FileText, FileDown } from 'lucide-react';
 import api from '../../lib/api';
 import DatePicker from '@/components/DatePicker';
+import { showDownloadToast } from '@/components/DownloadToast';
 
 // Interface matching the backend OSQueryResponse schema
 interface OSItem {
@@ -116,32 +117,93 @@ export default function OSQueryPage() {
     setExpandedRow(prev => prev === id ? null : id);
   };
 
-  const downloadCSV = () => {
+  const downloadCSV = async () => {
     const headers = ['OS No', 'OS Year', 'OS Date', 'Passenger Name', 'Passport No', 'Flight No', 'Total Value (Rs)', 'Total Due (Rs)', 'Status', 'Adjudicated'];
-    
     const rows = results.map(r => [
-      r.os_no,
-      r.os_year,
-      r.os_date,
+      r.os_no, r.os_year, r.os_date,
       `"${(r.pax_name || '').replace(/"/g, '""')}"`,
-      r.passport_no || '',
-      r.flight_no || '',
-      r.total_items_value || 0,
-      r.total_payable || 0,
+      r.passport_no || '', r.flight_no || '',
+      r.total_items_value || 0, r.total_payable || 0,
       r.is_draft === 'N' ? 'Submitted' : 'Draft',
       r.adjudication_date || 'No'
     ]);
+    const csvString = [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const defaultName = `OS_Query_Results_${new Date().toISOString().split('T')[0]}.csv`;
 
-    const csvContent = "data:text/csv;charset=utf-8," 
-      + [headers.join(','), ...rows.map(e => e.join(','))].join("\n");
+    try {
+      const { save } = await import('@tauri-apps/plugin-dialog');
+      const { writeTextFile } = await import('@tauri-apps/plugin-fs');
+      const savePath = await save({ title: 'Save CSV', defaultPath: defaultName, filters: [{ name: 'CSV', extensions: ['csv'] }] });
+      if (savePath) {
+        await writeTextFile(savePath, csvString);
+        showDownloadToast(`CSV saved to ${savePath}`);
+      }
+    } catch {
+      // Fallback: browser download
+      const blob = new Blob([csvString], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = defaultName;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      showDownloadToast(`CSV downloaded as ${defaultName}`);
+    }
+  };
 
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `OS_Query_Results_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const downloadPDF = () => {
+    // Build a clean standalone HTML page with just the results table
+    const today = new Date().toLocaleDateString('en-GB');
+    const tableRows = results.map(r =>
+      `<tr>
+        <td>${r.os_no}</td><td>${r.os_year}</td><td>${r.os_date ? new Date(r.os_date).toLocaleDateString('en-GB') : ''}</td>
+        <td>${r.pax_name || ''}</td><td>${r.passport_no || ''}</td><td>${r.flight_no || ''}</td>
+        <td style="text-align:right">${(r.total_items_value || 0).toLocaleString('en-IN')}</td>
+        <td style="text-align:right">${(r.total_payable || 0).toLocaleString('en-IN')}</td>
+        <td>${r.is_draft === 'N' ? 'Submitted' : 'Draft'}</td>
+        <td>${r.adjudication_date ? new Date(r.adjudication_date).toLocaleDateString('en-GB') : 'No'}</td>
+      </tr>`
+    ).join('');
+
+    const html = `<!DOCTYPE html>
+<html><head><title>OS Query Results</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; font-size: 11px; padding: 20px; }
+  h2 { font-size: 16px; margin-bottom: 4px; }
+  .meta { color: #666; font-size: 10px; margin-bottom: 12px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { border: 1px solid #ccc; padding: 5px 8px; text-align: left; }
+  th { background: #f0f0f0; font-weight: bold; font-size: 10px; }
+  tr:nth-child(even) { background: #fafafa; }
+  @media print { body { padding: 0; } }
+</style></head><body>
+<h2>OS Query Results</h2>
+<p class="meta">Generated on ${today} — ${results.length} record(s)</p>
+<table>
+  <thead><tr>
+    <th>OS No</th><th>Year</th><th>OS Date</th><th>Passenger</th><th>Passport</th>
+    <th>Flight</th><th>Value (₹)</th><th>Due (₹)</th><th>Status</th><th>Adjudicated</th>
+  </tr></thead>
+  <tbody>${tableRows}</tbody>
+</table>
+</body></html>`;
+
+    // Use a hidden iframe (works in Tauri WebView2 where window.open is blocked)
+    const iframe = document.createElement('iframe');
+    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:900px;height:700px;border:none;';
+    document.body.appendChild(iframe);
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (iframeDoc) {
+      iframeDoc.open();
+      iframeDoc.write(html);
+      iframeDoc.close();
+      // Give the iframe a moment to render, then print
+      setTimeout(() => {
+        iframe.contentWindow?.print();
+        // Clean up after printing
+        setTimeout(() => document.body.removeChild(iframe), 1000);
+      }, 300);
+    }
   };
 
   return (
@@ -232,6 +294,7 @@ export default function OSQueryPage() {
         </form>
       </div>
 
+
       {/* Inline search error */}
       {searchError && (
         <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 flex items-center gap-2">
@@ -257,7 +320,7 @@ export default function OSQueryPage() {
             {results.length > 0 && (
               <div className="flex items-center gap-2">
                 <button 
-                  onClick={() => window.print()} 
+                  onClick={downloadPDF} 
                   className="flex items-center gap-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-300 px-3 py-1.5 rounded hover:bg-slate-50 transition-colors"
                 >
                   <Printer className="w-3.5 h-3.5" /> Download PDF
@@ -278,7 +341,7 @@ export default function OSQueryPage() {
               <p>No records found matching your query criteria.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-auto">
               <table className="min-w-full divide-y divide-slate-200">
                 <thead className="bg-slate-50">
                   <tr>

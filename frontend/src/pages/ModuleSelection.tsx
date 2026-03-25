@@ -167,23 +167,12 @@ export default function ModuleSelection() {
           </button>}
         </div>
 
-        {/* Secret backup trigger - bottom-left corner, above footer */}
-        <button
-          type="button"
+        {/* Secret backup trigger - invisible, no visual clues */}
+        <div
           onClick={handleSecretClick}
-          className="absolute bottom-10 left-0 w-16 h-16 bg-transparent z-20"
-          aria-label="hidden-backup-trigger"
+          className="absolute bottom-10 left-0 w-16 h-16 z-20"
+          style={{ cursor: 'default' }}
         />
-        {secretClicks > 0 && (
-          <div className="absolute bottom-4 left-4 flex gap-1 pointer-events-none">
-            {[...Array(4)].map((_, i) => (
-              <div
-                key={i}
-                className={`w-2 h-2 rounded-full transition-colors ${i < secretClicks ? 'bg-white/60' : 'bg-white/15'}`}
-              />
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Footer */}

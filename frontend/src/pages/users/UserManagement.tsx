@@ -142,7 +142,7 @@ export default function UserManagement({ moduleType }: { moduleType: 'sdo' | 'ad
 
         {/* Existing Users Table */}
         <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4">Active Module Users</h2>
-        <div className="overflow-x-auto border border-slate-200 rounded-lg">
+        <div className="overflow-auto border border-slate-200 rounded-lg">
           <table className="w-full text-left text-sm text-slate-600">
             <thead className="bg-slate-100 text-slate-700 uppercase font-semibold text-xs">
               <tr>

@@ -179,7 +179,7 @@ export default function AdjudicationList() {
 
       {/* Table */}
       <div className="bg-white rounded-xl flex-1 overflow-hidden flex flex-col border border-slate-200">
-        <div className="overflow-x-auto flex-1">
+        <div className="overflow-auto flex-1">
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-amber-800 uppercase bg-amber-50 border-b border-amber-200 sticky top-0 z-10">
               <tr>

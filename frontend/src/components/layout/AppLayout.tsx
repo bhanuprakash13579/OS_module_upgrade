@@ -46,10 +46,10 @@ export default function AppLayout() {
   };
 
   return (
-    <div className="flex h-screen w-full bg-slate-50 overflow-hidden text-slate-800">
+    <div className="flex h-screen w-full bg-slate-50 overflow-hidden text-slate-800 print:h-auto print:overflow-visible">
       
       {/* Sidebar Navigation */}
-      <aside className="w-64 glass-header flex flex-col justify-between hidden md:flex">
+      <aside className="w-64 glass-header flex flex-col justify-between hidden md:flex print:!hidden">
         <div>
           <div className="p-5 flex items-center space-x-3 border-b border-white/20">
             <div className="bg-white/20 p-2 rounded-lg">
@@ -98,8 +98,8 @@ export default function AppLayout() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden">
-        <div className="flex-1 overflow-auto p-4 md:p-8">
+      <main className="flex-1 flex flex-col h-screen overflow-hidden print:h-auto print:overflow-visible">
+        <div className="flex-1 overflow-auto p-4 md:p-8 print:overflow-visible">
           <Outlet />
         </div>
       </main>

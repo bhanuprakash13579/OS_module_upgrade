@@ -7,6 +7,7 @@ import {
   Wifi, Plus, AlertTriangle, Monitor, Settings, Scale
 } from 'lucide-react';
 import api from '@/lib/api';
+import { showDownloadToast } from '@/components/DownloadToast';
 import StatutesAdmin from './StatutesAdmin';
 import OSTemplateEditor from './OSTemplateEditor';
 
@@ -313,13 +314,25 @@ export default function RestoreBackup() {
         headers: adminHeaders(adminToken),
         responseType: 'blob',
       });
-      const url = URL.createObjectURL(res.data);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `cops_backup_${new Date().toISOString().slice(0, 10)}.zip`;
-      a.click();
-      URL.revokeObjectURL(url);
-      setBackupMsg('Backup downloaded successfully.');
+      const defaultName = `cops_backup_${new Date().toISOString().slice(0, 10)}.zip`;
+      try {
+        const { save } = await import('@tauri-apps/plugin-dialog');
+        const { writeFile } = await import('@tauri-apps/plugin-fs');
+        const savePath = await save({ title: 'Save Backup', defaultPath: defaultName, filters: [{ name: 'ZIP', extensions: ['zip'] }] });
+        if (savePath) {
+          const arrayBuf = await (res.data as Blob).arrayBuffer();
+          await writeFile(savePath, new Uint8Array(arrayBuf));
+          setBackupMsg('Backup saved successfully.');
+          showDownloadToast(`Backup saved to ${savePath}`);
+        }
+      } catch {
+        const url = URL.createObjectURL(res.data);
+        const a = document.createElement('a');
+        a.href = url; a.download = defaultName; a.click();
+        URL.revokeObjectURL(url);
+        setBackupMsg('Backup downloaded successfully.');
+        showDownloadToast(`Backup downloaded as ${defaultName}`);
+      }
     } catch {
       setBackupMsg('Download failed. Try again.');
     } finally {
@@ -336,13 +349,25 @@ export default function RestoreBackup() {
         headers: adminHeaders(adminToken),
         responseType: 'blob',
       });
-      const url = URL.createObjectURL(res.data);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `cops_fulldb_${new Date().toISOString().slice(0, 10)}.db`;
-      a.click();
-      URL.revokeObjectURL(url);
-      setFullDbMsg('Full database backup downloaded.');
+      const defaultName = `cops_fulldb_${new Date().toISOString().slice(0, 10)}.db`;
+      try {
+        const { save } = await import('@tauri-apps/plugin-dialog');
+        const { writeFile } = await import('@tauri-apps/plugin-fs');
+        const savePath = await save({ title: 'Save Database', defaultPath: defaultName, filters: [{ name: 'Database', extensions: ['db'] }] });
+        if (savePath) {
+          const arrayBuf = await (res.data as Blob).arrayBuffer();
+          await writeFile(savePath, new Uint8Array(arrayBuf));
+          setFullDbMsg('Full database backup saved.');
+          showDownloadToast(`Database saved to ${savePath}`);
+        }
+      } catch {
+        const url = URL.createObjectURL(res.data);
+        const a = document.createElement('a');
+        a.href = url; a.download = defaultName; a.click();
+        URL.revokeObjectURL(url);
+        setFullDbMsg('Full database backup downloaded.');
+        showDownloadToast(`Database downloaded as ${defaultName}`);
+      }
     } catch {
       setFullDbMsg('Download failed. Try again.');
     } finally {
@@ -698,7 +723,7 @@ export default function RestoreBackup() {
             ) : devices.length === 0 ? (
               <p className="text-xs text-slate-400 italic">No devices whitelisted yet. In Production mode, all LAN clients except this terminal will be blocked.</p>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-auto">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-slate-200 text-slate-500 text-left">
@@ -816,7 +841,7 @@ export default function RestoreBackup() {
           ) : users.length === 0 ? (
             <p className="text-xs text-slate-400 italic">No users yet.</p>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-slate-100">
