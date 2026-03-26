@@ -8,16 +8,24 @@ import tempfile
 import zipfile
 from typing import List, Optional, Set, Tuple
 
+try:
+    import pyzipper as _pyzipper   # AES-256 encrypted ZIPs
+    _PYZIPPER_AVAILABLE = True
+except ImportError:
+    _pyzipper = None               # type: ignore[assignment]
+    _PYZIPPER_AVAILABLE = False
+
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from sqlalchemy import text, or_, and_
+from sqlalchemy import text, or_, and_, func
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.database import get_db
+from app.database import get_db, get_cipher_module, get_db_key, get_db_path
 from app.models.offence import CopsMaster, CopsItems
 from app.models.auth import User
+from app.security.admin_auth import require_admin
 from app.services.auth import get_adjn_user, get_current_active_user
 
 
@@ -344,6 +352,10 @@ _MASTER_COLS = [
     # Workflow exits
     "quashed", "quashed_by", "quash_reason", "quash_date",
     "rejected", "reject_reason",
+    # Post-adjudication receipts
+    "post_adj_br_entries", "post_adj_dr_no", "post_adj_dr_date",
+    # Soft-delete audit trail
+    "deleted_by", "deleted_reason", "deleted_on",
 ]
 
 # All cops_items columns to export (excludes 'id')
@@ -354,6 +366,7 @@ _ITEMS_COLS = [
     "cumulative_duty_rate", "items_duty", "items_duty_type",
     "items_category", "items_sub_category", "items_release_category",
     "items_dr_no", "items_dr_year",
+    "items_fa_type", "items_fa_qty", "items_fa_uqc",
     "unique_no", "entry_deleted", "bkup_taken",
 ]
 
@@ -403,7 +416,18 @@ def export_csv(
         iw.writerow([_val(getattr(it, col, None)) for col in _ITEMS_COLS])
 
     zip_buf = io.BytesIO()
-    with zipfile.ZipFile(zip_buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+    if _PYZIPPER_AVAILABLE:
+        from app.security.device import get_zip_password
+        zf_ctx = _pyzipper.AESZipFile(
+            zip_buf, mode="w",
+            compression=_pyzipper.ZIP_DEFLATED,
+            encryption=_pyzipper.WZ_AES,
+        )
+        zf_ctx.setpassword(get_zip_password())
+    else:
+        zf_ctx = zipfile.ZipFile(zip_buf, mode="w", compression=zipfile.ZIP_DEFLATED)
+
+    with zf_ctx as zf:
         zf.writestr("cops_master.csv", master_buf.getvalue())
         zf.writestr("cops_items.csv", items_buf.getvalue())
     zip_buf.seek(0)
@@ -427,25 +451,47 @@ def export_db(
 ):
     """
     Stream a consistent binary copy of the entire SQLite database.
-    Uses sqlite3.backup() into a temp file so the snapshot is crash-safe
-    and WAL-flushed. Restoring this file on a new machine gives the complete
-    state: OS cases, users, settings, print template history, statutes, masters.
+
+    Uses sqlite3.backup() (or sqlcipher3.backup() when encryption is active)
+    into a temp file so the snapshot is WAL-flushed and crash-safe.
+
+    If SQLCipher encryption is enabled (the default), the exported file is also
+    encrypted with the same AES-256 key.  To open it manually use DB Browser
+    for SQLite with the SQLCipher plugin and the hex key from GET /db-cipher-key
+    (admin auth required).
     """
     if not settings.DATABASE_URL.startswith("sqlite"):
         raise HTTPException(status_code=400, detail="SQLite export is only available for SQLite deployments.")
 
-    db_path = settings.DATABASE_URL.replace("sqlite:///", "").replace("sqlite://", "")
-    if not os.path.isabs(db_path):
-        db_path = os.path.abspath(db_path)
+    db_path = get_db_path()
+    if not db_path:
+        raise HTTPException(status_code=500, detail="Could not resolve database path.")
+
+    cipher = get_cipher_module()
+    db_key = get_db_key()
 
     tmp_fd, tmp_path = tempfile.mkstemp(suffix=".db")
     try:
         os.close(tmp_fd)
-        src = sqlite3.connect(db_path)
-        dst = sqlite3.connect(tmp_path)
-        src.backup(dst)
-        src.close()
-        dst.close()
+
+        if cipher and db_key:
+            # ── Encrypted path — use sqlcipher3 for both src and dst ──────────
+            hex_pragma = f"PRAGMA key = \"x'{db_key}'\""
+            src = cipher.connect(db_path)
+            src.execute(hex_pragma)
+            dst = cipher.connect(tmp_path)
+            dst.execute(hex_pragma)
+            src.backup(dst)
+            src.close()
+            dst.close()
+        else:
+            # ── Plaintext fallback ────────────────────────────────────────────
+            src = sqlite3.connect(db_path)
+            dst = sqlite3.connect(tmp_path)
+            src.backup(dst)
+            src.close()
+            dst.close()
+
         with open(tmp_path, "rb") as f:
             data = f.read()
     finally:
@@ -455,11 +501,47 @@ def export_db(
             pass
 
     today = date.today().isoformat()
+    suffix = "_enc" if (cipher and db_key) else ""
     return StreamingResponse(
         iter([data]),
         media_type="application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="cops_fulldb_{today}.db"'},
+        headers={"Content-Disposition": f'attachment; filename="cops_fulldb_{today}{suffix}.db"'},
     )
+
+
+@router.get("/db-cipher-key")
+def get_db_cipher_key(
+    _admin=Depends(require_admin),
+):
+    """
+    Return the AES-256 SQLCipher hex key used to encrypt the database.
+
+    This endpoint is admin-only.  Use this key to manually open a copied
+    .db file in DB Browser for SQLite (with SQLCipher plugin):
+      1. Open Database → select the .db file
+      2. Choose "SQLCipher 4 defaults" cipher settings
+      3. Key format → "Raw key / Hex key"
+      4. Paste the 64-char hex string returned here → OK
+
+    If encryption is not active (sqlcipher3 not installed), returns null.
+    """
+    from app.security.device import get_zip_password
+    db_key = get_db_key()
+    zip_pw = get_zip_password().decode()
+    return {
+        "encrypted": db_key is not None,
+        "key": db_key,          # 64-char hex AES-256 key, or null
+        "algorithm": "AES-256-CBC (SQLCipher 4)" if db_key else None,
+        "key_format": "raw hex" if db_key else None,
+        "zip_password": zip_pw,
+        "zip_password_note": (
+            "Type this string in 7-Zip / WinRAR when opening an exported backup ZIP."
+        ),
+        "note": (
+            "Keep these secrets. Anyone with the DB key AND the database file "
+            "can read all data. The ZIP password protects exported CSV backups."
+        ) if db_key else "Database is not encrypted.",
+    }
 
 
 # ── Custom Report ─────────────────────────────────────────────────────────────
@@ -479,6 +561,7 @@ _REPORT_MASTER_COLS: Set[str] = {
     "br_no_num", "br_date_str", "br_amount_str", "br_no_str",
     "adjudication_date", "adj_offr_name", "adj_offr_designation", "adjn_offr_remarks",
     "online_adjn", "dr_no", "dr_year", "seizure_date", "supdts_remarks",
+    "post_adj_br_entries", "post_adj_dr_no", "post_adj_dr_date",
 }
 
 _REPORT_ITEM_COLS: Set[str] = {
@@ -566,3 +649,257 @@ def custom_report(
             rows.append(master_data)
 
     return {"columns": all_cols, "rows": rows, "total": len(rows)}
+
+
+# ── Adjudication Officers Summary PDF ────────────────────────────────────────
+
+class AdjudicationSummaryRequest(BaseModel):
+    from_date: date
+    to_date: date
+
+
+@router.post("/adjudication-summary-pdf")
+def adjudication_summary_pdf(
+    body: AdjudicationSummaryRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Aggregate all adjudicated cases (by adjudication_date) in the given period,
+    group by officer name, and return a landscape A4 PDF report.
+    """
+    from weasyprint import HTML as WeasyHTML
+    from fastapi.responses import Response
+
+    data = (
+        db.query(
+            CopsMaster.adj_offr_name,
+            func.max(CopsMaster.adj_offr_designation).label("designation"),
+            func.count(CopsMaster.id).label("cases"),
+            func.coalesce(func.sum(CopsMaster.total_items_value), 0.0).label("total_value"),
+            func.coalesce(func.sum(CopsMaster.dutiable_value), 0.0).label("dutiable_value"),
+            func.coalesce(func.sum(CopsMaster.redeemed_value), 0.0).label("redeemed_value"),
+            func.coalesce(func.sum(CopsMaster.re_export_value), 0.0).label("re_export_value"),
+            func.coalesce(func.sum(CopsMaster.confiscated_value), 0.0).label("confiscated_value"),
+            func.coalesce(func.sum(CopsMaster.total_duty_amount), 0.0).label("duty_levied"),
+            func.coalesce(func.sum(CopsMaster.rf_amount), 0.0).label("rf_levied"),
+            func.coalesce(func.sum(CopsMaster.ref_amount), 0.0).label("ref_levied"),
+            func.coalesce(func.sum(CopsMaster.pp_amount), 0.0).label("pp_levied"),
+        )
+        .filter(
+            CopsMaster.entry_deleted == "N",
+            CopsMaster.adj_offr_name.isnot(None),
+            CopsMaster.adj_offr_name != "",
+            CopsMaster.adjudication_date >= body.from_date,
+            CopsMaster.adjudication_date <= body.to_date,
+        )
+        .group_by(CopsMaster.adj_offr_name)
+        .order_by(CopsMaster.adj_offr_name)
+        .all()
+    )
+
+    if not data:
+        raise HTTPException(
+            status_code=404,
+            detail="No adjudicated cases found for the selected date range.",
+        )
+
+    def fmt(n) -> str:
+        """Indian-style comma formatting. Returns — for zero/null."""
+        val = float(n or 0)
+        if val == 0:
+            return "\u2014"
+        n_int = int(round(abs(val)))
+        s = str(n_int)
+        if len(s) <= 3:
+            result = s
+        else:
+            result = s[-3:]
+            s = s[:-3]
+            parts = []
+            while len(s) > 2:
+                parts.append(s[-2:])
+                s = s[:-2]
+            if s:
+                parts.append(s)
+            result = ",".join(reversed(parts)) + "," + result
+        return result
+
+    totals = {
+        "cases": sum(r.cases for r in data),
+        "total_value":      sum(float(r.total_value or 0)      for r in data),
+        "dutiable_value":   sum(float(r.dutiable_value or 0)   for r in data),
+        "redeemed_value":   sum(float(r.redeemed_value or 0)   for r in data),
+        "re_export_value":  sum(float(r.re_export_value or 0)  for r in data),
+        "confiscated_value":sum(float(r.confiscated_value or 0)for r in data),
+        "duty_levied":      sum(float(r.duty_levied or 0)      for r in data),
+        "rf_levied":        sum(float(r.rf_levied or 0)        for r in data),
+        "ref_levied":       sum(float(r.ref_levied or 0)       for r in data),
+        "pp_levied":        sum(float(r.pp_levied or 0)        for r in data),
+    }
+
+    from_str = body.from_date.strftime("%d/%m/%Y")
+    to_str   = body.to_date.strftime("%d/%m/%Y")
+    gen_dt   = datetime.now().strftime("%d/%m/%Y %H:%M")
+
+    rows_html = ""
+    for i, r in enumerate(data, 1):
+        desig = r.designation or ""
+        rows_html += f"""
+        <tr>
+          <td class="ctr">{i}</td>
+          <td class="name">{r.adj_offr_name or ""}{"<br><span class='desig'>" + desig + "</span>" if desig else ""}</td>
+          <td class="num">{r.cases}</td>
+          <td class="num">{fmt(r.total_value)}</td>
+          <td class="num">{fmt(r.dutiable_value)}</td>
+          <td class="num">{fmt(r.redeemed_value)}</td>
+          <td class="num">{fmt(r.re_export_value)}</td>
+          <td class="num">{fmt(r.confiscated_value)}</td>
+          <td class="num">{fmt(r.duty_levied)}</td>
+          <td class="num">{fmt(r.rf_levied)}</td>
+          <td class="num">{fmt(r.ref_levied)}</td>
+          <td class="num">{fmt(r.pp_levied)}</td>
+        </tr>"""
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  @page {{
+    size: A4 landscape;
+    margin: 10mm 8mm 14mm 8mm;
+  }}
+  body {{
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 8pt;
+    color: #111;
+    margin: 0;
+  }}
+  .report-header {{
+    text-align: center;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid #1e4a72;
+  }}
+  .report-header .title {{
+    font-size: 11pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }}
+  .report-header .subtitle {{
+    font-size: 9pt;
+    font-weight: bold;
+    margin-top: 3px;
+    color: #1e4a72;
+  }}
+  .report-header .meta {{
+    font-size: 7.5pt;
+    color: #555;
+    margin-top: 2px;
+  }}
+  table {{
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 4px;
+  }}
+  th {{
+    background-color: #1e4a72;
+    color: #fff;
+    font-weight: bold;
+    font-size: 7pt;
+    text-align: center;
+    padding: 5px 3px;
+    border: 1px solid #163d60;
+    line-height: 1.3;
+  }}
+  td {{
+    border: 1px solid #c8d4e0;
+    padding: 3.5px 4px;
+    font-size: 7.5pt;
+    vertical-align: middle;
+  }}
+  td.ctr  {{ text-align: center; color: #555; }}
+  td.name {{ text-align: left; font-weight: 600; line-height: 1.35; }}
+  td.num  {{ text-align: right; font-variant-numeric: tabular-nums; }}
+  .desig  {{ font-size: 6.5pt; color: #666; font-weight: normal; }}
+  tr:nth-child(even) {{ background-color: #f2f7fc; }}
+  tr:hover {{ background-color: #e8f1fa; }}
+  .total-row td {{
+    background-color: #1e4a72 !important;
+    color: #fff !important;
+    font-weight: bold;
+    font-size: 7.5pt;
+    border-color: #163d60;
+  }}
+  .footer {{
+    margin-top: 8px;
+    font-size: 6.5pt;
+    color: #666;
+    display: flex;
+    justify-content: space-between;
+    border-top: 1px solid #ccc;
+    padding-top: 4px;
+  }}
+</style>
+</head>
+<body>
+  <div class="report-header">
+    <div class="title">Adjudicating Officers — Performance Summary Report</div>
+    <div class="subtitle">Period : {from_str} &nbsp;to&nbsp; {to_str}</div>
+    <div class="meta">Filtered by adjudication date &nbsp;|&nbsp; All amounts in Indian Rupees (₹), rounded to nearest rupee &nbsp;|&nbsp; &mdash; denotes zero</div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:3%">S.<br>No.</th>
+        <th style="width:13%">Officer Name /<br>Designation</th>
+        <th style="width:5%">No. of<br>Cases</th>
+        <th style="width:8%">Total Value<br>Under OS (₹)</th>
+        <th style="width:8%">Dutiable<br>Value (₹)</th>
+        <th style="width:8%">Redeemed<br>Value (₹)</th>
+        <th style="width:8%">Re-export<br>Value (₹)</th>
+        <th style="width:8%">Abs. Confiscated<br>Value (₹)</th>
+        <th style="width:8%">Duty<br>Levied (₹)</th>
+        <th style="width:8%">R.F.<br>Levied (₹)</th>
+        <th style="width:8%">R.E.F.<br>Levied (₹)</th>
+        <th style="width:8%">Personal<br>Penalty (₹)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {rows_html}
+      <tr class="total-row">
+        <td class="ctr" colspan="2">GRAND TOTAL</td>
+        <td class="num">{totals["cases"]}</td>
+        <td class="num">{fmt(totals["total_value"])}</td>
+        <td class="num">{fmt(totals["dutiable_value"])}</td>
+        <td class="num">{fmt(totals["redeemed_value"])}</td>
+        <td class="num">{fmt(totals["re_export_value"])}</td>
+        <td class="num">{fmt(totals["confiscated_value"])}</td>
+        <td class="num">{fmt(totals["duty_levied"])}</td>
+        <td class="num">{fmt(totals["rf_levied"])}</td>
+        <td class="num">{fmt(totals["ref_levied"])}</td>
+        <td class="num">{fmt(totals["pp_levied"])}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <span>COPS &mdash; Internal Use Only</span>
+    <span>Generated on {gen_dt}</span>
+  </div>
+</body>
+</html>"""
+
+    pdf_bytes = WeasyHTML(string=html).write_pdf()
+    from_label = body.from_date.strftime("%Y%m%d")
+    to_label   = body.to_date.strftime("%Y%m%d")
+    filename   = f"adjn_summary_{from_label}_to_{to_label}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

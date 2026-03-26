@@ -124,6 +124,11 @@ class CopsMasterOut(CopsMasterBase):
     os_printed: str = 'N'
     entry_deleted: str = 'N'
     closure_ind: Optional[str] = None
+
+    # Post-adjudication metadata (BR/DR receipts — never touched by adjudication workflow)
+    post_adj_br_entries: Optional[str] = None   # JSON string
+    post_adj_dr_no:      Optional[str] = None
+    post_adj_dr_date:    Optional[date] = None
     
     quashed: str = 'N'
     quashed_by: Optional[str] = None
@@ -180,4 +185,21 @@ class AdjudicationCreate(BaseModel):
                 f"Please Use the Option of 'Print Adjn. Order On Legal Size Blank Paper' From the Print Menu."
             )
         return v
+
+
+class PostAdjBrEntry(BaseModel):
+    """A single Bank Receipt entry linked to a post-adjudication payment."""
+    no:   str
+    date: Optional[date] = None
+
+
+class PostAdjUpdate(BaseModel):
+    """
+    Payload for PATCH /os/{os_no}/{os_year}/post-adj.
+    Strictly limited to post-adjudication BR/DR metadata.
+    No adjudication fields are touched.
+    """
+    br_entries: List[PostAdjBrEntry] = []
+    dr_no:      Optional[str]  = None
+    dr_date:    Optional[date] = None
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Loader2, Printer, ChevronDown, ChevronUp, FileText, FileDown } from 'lucide-react';
+import { Search, Loader2, Printer, ChevronDown, ChevronUp, FileText, FileDown, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import api from '../../lib/api';
 import DatePicker from '@/components/DatePicker';
 import { showDownloadToast } from '@/components/DownloadToast';
@@ -28,7 +28,17 @@ interface OSResult {
   total_payable: number;
   adjudication_date: string | null;
   is_draft: string;
+  post_adj_br_entries: string | null;
+  post_adj_dr_no: string | null;
+  post_adj_dr_date: string | null;
   items: OSItem[];
+}
+
+function SortIcon({ col, sortBy, sortDir }: { col: string; sortBy: string; sortDir: string }) {
+  if (sortBy !== col) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-30" />;
+  return sortDir === 'desc'
+    ? <ArrowDown className="w-3 h-3 ml-1 text-emerald-600" />
+    : <ArrowUp className="w-3 h-3 ml-1 text-emerald-600" />;
 }
 
 export default function OSQueryPage() {
@@ -44,6 +54,8 @@ export default function OSQueryPage() {
   const [hasSearched, setHasSearched] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<string>('os_year');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const navigate = useNavigate();
 
   // Form State
@@ -66,7 +78,7 @@ export default function OSQueryPage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const executeSearch = async (targetPage: number = 1) => {
+  const executeSearch = async (targetPage: number = 1, overrideSortBy?: string, overrideSortDir?: 'asc' | 'desc') => {
     setLoading(true);
     setHasSearched(false);
     setSearchError(null);
@@ -85,7 +97,9 @@ export default function OSQueryPage() {
       }
     });
 
-    // Pagination params
+    // Sort + Pagination params
+    payload['sort_by'] = overrideSortBy ?? sortBy;
+    payload['sort_dir'] = overrideSortDir ?? sortDir;
     payload['page'] = targetPage;
     payload['limit'] = 100;
 
@@ -116,6 +130,17 @@ export default function OSQueryPage() {
   const toggleExpand = (id: string) => {
     setExpandedRow(prev => prev === id ? null : id);
   };
+
+  const handleSort = (col: string) => {
+    const newDir = sortBy === col && sortDir === 'desc' ? 'asc' : 'desc';
+    setSortBy(col);
+    setSortDir(newDir);
+    // Re-fetch page 1 with new sort values passed directly (avoids stale closure)
+    if (hasSearched) {
+      executeSearch(1, col, newDir);
+    }
+  };
+
 
   const downloadCSV = async () => {
     const headers = ['OS No', 'OS Year', 'OS Date', 'Passenger Name', 'Passport No', 'Flight No', 'Total Value (Rs)', 'Total Due (Rs)', 'Status', 'Adjudicated'];
@@ -346,11 +371,31 @@ export default function OSQueryPage() {
                 <thead className="bg-slate-50">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Expand</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">OS Details</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Passenger</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">Flight</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">Values (₹)</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                      <button onClick={() => handleSort('os_year')} className="flex items-center hover:text-slate-900 transition-colors">
+                        OS Details <SortIcon col="os_year" sortBy={sortBy} sortDir={sortDir} />
+                      </button>
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                      <button onClick={() => handleSort('pax_name')} className="flex items-center hover:text-slate-900 transition-colors">
+                        Passenger <SortIcon col="pax_name" sortBy={sortBy} sortDir={sortDir} />
+                      </button>
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                      <button onClick={() => handleSort('flight_date')} className="flex items-center hover:text-slate-900 transition-colors">
+                        Flight <SortIcon col="flight_date" sortBy={sortBy} sortDir={sortDir} />
+                      </button>
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                      <button onClick={() => handleSort('total_items_value')} className="flex items-center ml-auto hover:text-slate-900 transition-colors">
+                        Values (₹) <SortIcon col="total_items_value" sortBy={sortBy} sortDir={sortDir} />
+                      </button>
+                    </th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                      <button onClick={() => handleSort('adjudication_date')} className="flex items-center mx-auto hover:text-slate-900 transition-colors">
+                        Status <SortIcon col="adjudication_date" sortBy={sortBy} sortDir={sortDir} />
+                      </button>
+                    </th>
                     <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider print:hidden">Action</th>
                   </tr>
                 </thead>
@@ -445,6 +490,38 @@ export default function OSQueryPage() {
                                   </table>
                                 )}
                               </div>
+
+                              {/* Post-Adjudication BR/DR metadata */}
+                              {(r.post_adj_br_entries || r.post_adj_dr_no) && (
+                                <div className="mt-3 border border-amber-200 rounded bg-amber-50/50 overflow-hidden">
+                                  <div className="bg-amber-100 border-b border-amber-200 px-3 py-1.5 font-bold text-amber-800 text-[10px] uppercase tracking-wider">
+                                    Post-Adjudication Receipts
+                                  </div>
+                                  <div className="px-3 py-2 text-xs text-slate-700 space-y-1 font-sans">
+                                    {r.post_adj_br_entries && (() => {
+                                      try {
+                                        const brs: { no: string; date: string | null }[] = JSON.parse(r.post_adj_br_entries);
+                                        return brs.map((b, i) => (
+                                          <div key={i}>
+                                            <span className="font-semibold text-amber-800">BR No.:</span>{' '}
+                                            {b.no}
+                                            {b.date && <span className="text-slate-500 ml-2">({b.date.split('-').reverse().join('-')})</span>}
+                                          </div>
+                                        ));
+                                      } catch { return null; }
+                                    })()}
+                                    {r.post_adj_dr_no && (
+                                      <div>
+                                        <span className="font-semibold text-amber-800">DR No.:</span>{' '}
+                                        {r.post_adj_dr_no}
+                                        {r.post_adj_dr_date && (
+                                          <span className="text-slate-500 ml-2">({r.post_adj_dr_date.split('-').reverse().join('-')})</span>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
                             </td>
                           </tr>
                         )}
@@ -459,14 +536,14 @@ export default function OSQueryPage() {
                 <div className="flex items-center justify-between px-4 py-3 bg-white border-t border-slate-200 sm:px-6 print:hidden">
                   <div className="flex flex-1 justify-between sm:hidden">
                     <button
-                      onClick={() => executeSearch(pagination.page - 1)}
+                      onClick={() => executeSearch(pagination.page - 1, sortBy, sortDir)}
                       disabled={!pagination.has_prev}
                       className="relative inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                     >
                       Previous
                     </button>
                     <button
-                      onClick={() => executeSearch(pagination.page + 1)}
+                      onClick={() => executeSearch(pagination.page + 1, sortBy, sortDir)}
                       disabled={!pagination.has_next}
                       className="relative ml-3 inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                     >
@@ -482,7 +559,7 @@ export default function OSQueryPage() {
                     <div>
                       <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
                         <button
-                          onClick={() => executeSearch(pagination.page - 1)}
+                          onClick={() => executeSearch(pagination.page - 1, sortBy, sortDir)}
                           disabled={!pagination.has_prev}
                           className="relative inline-flex items-center rounded-l-md px-2 py-2 text-slate-400 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
                         >
@@ -490,7 +567,7 @@ export default function OSQueryPage() {
                           <span className="text-sm font-medium px-2">Previous</span>
                         </button>
                         <button
-                          onClick={() => executeSearch(pagination.page + 1)}
+                          onClick={() => executeSearch(pagination.page + 1, sortBy, sortDir)}
                           disabled={!pagination.has_next}
                           className="relative inline-flex items-center rounded-r-md px-2 py-2 text-slate-400 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
                         >

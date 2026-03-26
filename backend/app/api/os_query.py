@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, desc, func, and_, cast, Integer
+from sqlalchemy import or_, desc, asc, func, and_, cast, Integer
 from collections import defaultdict
 from typing import List, Optional
 from datetime import date
@@ -42,6 +42,10 @@ class OSQueryRequest(BaseModel):
     # Goods
     item_desc: Optional[str] = None
     
+    # Sorting
+    sort_by: str = "os_year"
+    sort_dir: str = "desc"
+
     # Pagination
     page: int = 1
     limit: int = 100
@@ -106,6 +110,11 @@ class OSQueryResponse(BaseModel):
     adjn_offr_remarks: Optional[str] = None
     adj_offr_name: Optional[str] = None
     adj_offr_designation: Optional[str] = None
+
+    # Post-adjudication metadata
+    post_adj_br_entries: Optional[str] = None
+    post_adj_dr_no:      Optional[str] = None
+    post_adj_dr_date:    Optional[date] = None
 
     items: List[OSQueryItemResponse] = []
 
@@ -200,8 +209,26 @@ def search_os_cases(
     if query.item_desc:
         q = q.distinct()
 
-    # Order by newest first
-    q = q.order_by(desc(CopsMaster.os_year), desc(CopsMaster.os_no))
+    # Dynamic sort — allowlisted columns only
+    # os_no is VARCHAR so cast to Integer for correct numeric ordering (not "1","10","2")
+    _os_no_int = cast(CopsMaster.os_no, Integer)
+    _SORTABLE = {
+        "os_no":             _os_no_int,
+        "os_year":           CopsMaster.os_year,
+        "os_date":           CopsMaster.os_date,
+        "pax_name":          CopsMaster.pax_name,
+        "total_items_value": CopsMaster.total_items_value,
+        "total_payable":     CopsMaster.total_payable,
+        "adjudication_date": CopsMaster.adjudication_date,
+        "flight_date":       CopsMaster.flight_date,
+    }
+    sort_col = _SORTABLE.get(query.sort_by, CopsMaster.os_year)
+    sort_fn = desc if query.sort_dir.lower() == "desc" else asc
+    # Tie-break: always newest first (desc year, desc no) regardless of primary sort direction
+    if query.sort_by in ("os_no", "os_year"):
+        q = q.order_by(sort_fn(CopsMaster.os_year), sort_fn(_os_no_int))
+    else:
+        q = q.order_by(sort_fn(sort_col), desc(CopsMaster.os_year), desc(_os_no_int))
     
     # Pagination calculations
     total_count = q.count()

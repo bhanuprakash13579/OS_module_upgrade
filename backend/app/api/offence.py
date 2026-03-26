@@ -315,6 +315,7 @@ def get_all_os(
     search: str = Query('', max_length=200),
     year: int = Query(None),
     status: str = Query(None),
+    br_dr_pending: bool = Query(False),
 ):
     """All active users: OS case list with server-side pagination, search, and filters."""
     q = db.query(CopsMaster).filter(CopsMaster.entry_deleted == "N")
@@ -369,6 +370,13 @@ def get_all_os(
             )
         elif sl == 'quashed':
             q = q.filter(or_(CopsMaster.quashed == 'Y', CopsMaster.rejected == 'Y'))
+    # BR/DR pending: adjudicated cases where no post-adj receipt data has been entered yet
+    if br_dr_pending:
+        q = q.filter(
+            CopsMaster.adjudication_date.isnot(None),
+            CopsMaster.post_adj_br_entries.is_(None),
+            CopsMaster.post_adj_dr_no.is_(None),
+        )
     total = q.count()
     records = q.order_by(
         CopsMaster.os_year.desc(),
@@ -378,6 +386,46 @@ def get_all_os(
     for r in records:
         r.items = []
     return {"total": total, "page": page, "per_page": per_page, "items": records}
+
+
+# ── SDO: Update post-adjudication BR/DR receipt metadata ─────────────────────
+@router.patch("/{os_no}/{os_year}/post-adj")
+def update_post_adj(
+    os_no: str,
+    os_year: int,
+    data: schemas.PostAdjUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_sdo_user),
+):
+    """
+    SDO: Record BR/DR receipt details after the adjudication order is issued.
+    Strictly limited to post_adj_br_entries, post_adj_dr_no, post_adj_dr_date.
+    No adjudication field (officer, amounts, dates) is ever touched.
+    """
+    import json as _json
+
+    case = db.query(CopsMaster).filter(
+        CopsMaster.os_no == os_no,
+        CopsMaster.os_year == os_year,
+        CopsMaster.entry_deleted == "N",
+    ).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="O.S. case not found.")
+    if not case.adjudication_date:
+        raise HTTPException(
+            status_code=400,
+            detail="BR/DR details can only be added after the adjudication order is issued.",
+        )
+
+    # Serialize BR entries to JSON (empty list → NULL to keep DB clean)
+    entries = [{"no": e.no, "date": e.date.isoformat() if e.date else None}
+               for e in data.br_entries if e.no.strip()]
+    case.post_adj_br_entries = _json.dumps(entries) if entries else None
+    case.post_adj_dr_no      = data.dr_no.strip() if data.dr_no and data.dr_no.strip() else None
+    case.post_adj_dr_date    = data.dr_date or None
+
+    db.commit()
+    return {"status": "ok"}
 
 
 # ── Adjudication Module: Pending Count (lightweight — sidebar badge) ─────────
@@ -584,6 +632,7 @@ def mark_printed(
     os_no: str,
     os_year: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Mark an O/S case as printed, locking it from further SDO modification."""
     os_obj = db.query(CopsMaster).filter(

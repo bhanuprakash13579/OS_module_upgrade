@@ -7,11 +7,19 @@ import csv
 import io
 import os
 import shutil
+import sqlite3 as _stdlib_sqlite3
 import tempfile
 import threading
 import time
 import zipfile
 from datetime import date, datetime, timezone
+
+try:
+    import pyzipper as _pyzipper   # AES-256 encrypted ZIPs
+    _PYZIPPER_AVAILABLE = True
+except ImportError:
+    _pyzipper = None               # type: ignore[assignment]
+    _PYZIPPER_AVAILABLE = False
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
 from fastapi.responses import StreamingResponse, Response
@@ -58,7 +66,9 @@ from app.security.device import (
     is_device_registered,
     register_device,
     get_device_info,
+    get_zip_password,
 )
+from app.database import get_cipher_module, get_db_key, get_db_path, migrate_plaintext_to_encrypted
 from app.security.passwords import pwd_context
 
 # ── Generic table registry ────────────────────────────────────────────────────
@@ -548,7 +558,17 @@ def admin_export_full(db: Session = Depends(get_db), _=Depends(require_admin)):
         uw.writerow([_val(getattr(u, col, None)) for col in _USER_COLS])
 
     zip_buf = io.BytesIO()
-    with zipfile.ZipFile(zip_buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+    if _PYZIPPER_AVAILABLE:
+        zf_ctx = _pyzipper.AESZipFile(
+            zip_buf, mode="w",
+            compression=_pyzipper.ZIP_DEFLATED,
+            encryption=_pyzipper.WZ_AES,
+        )
+        zf_ctx.setpassword(get_zip_password())
+    else:
+        zf_ctx = zipfile.ZipFile(zip_buf, mode="w", compression=zipfile.ZIP_DEFLATED)
+
+    with zf_ctx as zf:
         zf.writestr("cops_master.csv", master_buf.getvalue())
         zf.writestr("cops_items.csv", items_buf.getvalue())
         zf.writestr("legal_statutes.csv", statutes_buf.getvalue())
@@ -607,9 +627,27 @@ def admin_restore_backup(
                 pass
         raise HTTPException(status_code=400, detail="Cannot read uploaded file.")
 
-    try:
-        zf = zipfile.ZipFile(_zip_tmp)
-    except zipfile.BadZipFile:
+    zf = None
+    if _PYZIPPER_AVAILABLE:
+        try:
+            _zf = _pyzipper.AESZipFile(_zip_tmp)
+            _zf.setpassword(get_zip_password())
+            # Test-read the first file to verify the password works
+            _zf.read(_zf.namelist()[0])
+            zf = _zf
+        except Exception:
+            # Old unencrypted backup — fall back to plain zipfile
+            try:
+                zf = zipfile.ZipFile(_zip_tmp)
+            except zipfile.BadZipFile:
+                pass
+    else:
+        try:
+            zf = zipfile.ZipFile(_zip_tmp)
+        except zipfile.BadZipFile:
+            pass
+
+    if zf is None:
         try:
             os.unlink(_zip_tmp)
         except OSError:
@@ -1035,6 +1073,12 @@ def admin_upload_legacy(
         except ValueError:
             invalid += 1
             continue
+        if not (1990 <= os_year <= date.today().year + 1):
+            os_date_parsed = _parse_date(row.get("os_date")) if row.get("os_date") else None
+            os_year = os_date_parsed.year if os_date_parsed else None
+        if not os_year:
+            invalid += 1
+            continue
         location_code = (row.get("location_code") or "").strip()
         key = (os_no, os_year, location_code)
         if key in existing:
@@ -1125,6 +1169,12 @@ def admin_upload_legacy_items(
             os_year   = int(float(row.get("os_year")   or 0))
             items_sno = int(float(row.get("items_sno") or 0))
         except (ValueError, TypeError):
+            invalid += 1
+            continue
+        if not (1990 <= os_year <= date.today().year + 1):
+            os_date_parsed = _parse_date(row.get("os_date")) if row.get("os_date") else None
+            os_year = os_date_parsed.year if os_date_parsed else None
+        if not os_year:
             invalid += 1
             continue
 
@@ -1525,30 +1575,39 @@ def _get_sqlite_path() -> str:
 def admin_export_fulldb(_=Depends(require_admin)):
     """
     Download a complete binary copy of the SQLite database.
-    Uses sqlite3.backup() to create a consistent, WAL-flushed snapshot —
+    Uses backup() to create a consistent, WAL-flushed snapshot —
     safe to download while the server is running.
+    If SQLCipher encryption is active the exported file is also encrypted
+    with the same AES-256 key (open with DB Browser + SQLCipher plugin).
     Every table, every row, every setting is included.
     """
-    import os
-    import sqlite3
-    import tempfile
-
     db_path = _get_sqlite_path()
     if not os.path.exists(db_path):
         raise HTTPException(status_code=404, detail="Database file not found on disk.")
 
-    # Create a clean, defragmented snapshot in a temp file.
-    # PRAGMA wal_checkpoint(TRUNCATE) flushes the WAL so the backup file is
-    # self-contained — no companion -wal/-shm files needed for restoration.
+    cipher = get_cipher_module()
+    db_key = get_db_key()
+    hex_pragma = f"PRAGMA key = \"x'{db_key}'\"" if db_key else None
+
     tmp_fd, tmp_path = tempfile.mkstemp(suffix=".db")
     os.close(tmp_fd)
     try:
-        src = sqlite3.connect(db_path)
-        src.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-        dst = sqlite3.connect(tmp_path)
-        src.backup(dst)
-        src.close()
-        dst.close()
+        if cipher and db_key:
+            src = cipher.connect(db_path)
+            src.execute(hex_pragma)
+            src.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            dst = cipher.connect(tmp_path)
+            dst.execute(hex_pragma)
+            src.backup(dst)
+            src.close()
+            dst.close()
+        else:
+            src = _stdlib_sqlite3.connect(db_path)
+            src.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            dst = _stdlib_sqlite3.connect(tmp_path)
+            src.backup(dst)
+            src.close()
+            dst.close()
         with open(tmp_path, "rb") as f:
             data = f.read()
     finally:
@@ -1557,7 +1616,8 @@ def admin_export_fulldb(_=Depends(require_admin)):
         except OSError:
             pass
 
-    filename = f"cops_fulldb_{date.today().isoformat()}.db"
+    suffix = "_enc" if (cipher and db_key) else ""
+    filename = f"cops_fulldb_{date.today().isoformat()}{suffix}.db"
     return Response(
         content=data,
         media_type="application/octet-stream",
@@ -1569,39 +1629,78 @@ def admin_export_fulldb(_=Depends(require_admin)):
 def admin_restore_fulldb(file: UploadFile = File(...), _=Depends(require_admin)):
     """
     Restore the complete database from a full-DB backup (.db file).
+    Accepts both encrypted (SQLCipher) and plaintext SQLite backups.
     Overwrites ALL tables — use with care.
     The server remains operational; connections are recycled automatically
     after the restore completes.
     """
-    import sqlite3
     from app.database import engine
 
     db_path = _get_sqlite_path()
+    cipher = get_cipher_module()
+    db_key = get_db_key()
+    hex_pragma = f"PRAGMA key = \"x'{db_key}'\"" if db_key else None
 
-    # Peek at magic bytes without loading the whole file into RAM
-    header = file.file.read(16)
-    if not header.startswith(b"SQLite format 3"):
-        raise HTTPException(
-            status_code=400,
-            detail="Uploaded file is not a valid SQLite database.",
-        )
-
-    # Stream the rest of the upload to a temp file (header already read above)
+    # Stream the entire upload to a temp file
     tmp_fd, tmp_path = tempfile.mkstemp(suffix=".db")
     os.close(tmp_fd)
     try:
         with open(tmp_path, "wb") as f:
-            f.write(header)                    # write the 16 bytes already read
-            shutil.copyfileobj(file.file, f)   # stream the remainder
+            shutil.copyfileobj(file.file, f)
+
+        # Validate: try opening the uploaded file
+        # Accept either an encrypted SQLCipher file or a plaintext SQLite file.
+        opened_as_cipher = False
+        if cipher and db_key:
+            try:
+                chk = cipher.connect(tmp_path)
+                chk.execute(hex_pragma)
+                chk.execute("SELECT count(*) FROM sqlite_master")
+                chk.close()
+                opened_as_cipher = True
+            except Exception:
+                pass
+
+        if not opened_as_cipher:
+            try:
+                chk = _stdlib_sqlite3.connect(tmp_path)
+                chk.execute("SELECT count(*) FROM sqlite_master")
+                chk.close()
+            except Exception:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Uploaded file is not a valid SQLite database (plaintext or encrypted).",
+                )
 
         # Close all pooled connections before overwriting
         engine.dispose()
 
-        src = sqlite3.connect(tmp_path)
-        dst = sqlite3.connect(db_path)
-        src.backup(dst)
-        src.close()
-        dst.close()
+        if cipher and db_key:
+            if opened_as_cipher:
+                # Encrypted → encrypted (same key): direct cipher backup
+                src = cipher.connect(tmp_path)
+                src.execute(hex_pragma)
+                dst = cipher.connect(db_path)
+                dst.execute(hex_pragma)
+                src.backup(dst)
+                src.close()
+                dst.close()
+            else:
+                # Plaintext → encrypted:
+                # 1. Copy plaintext to db_path via stdlib (known-good method)
+                # 2. Encrypt in-place via sqlcipher_export (same path as startup migration)
+                src = _stdlib_sqlite3.connect(tmp_path)
+                dst = _stdlib_sqlite3.connect(db_path)
+                src.backup(dst)
+                src.close()
+                dst.close()
+                migrate_plaintext_to_encrypted(db_path, db_key)
+        else:
+            src = _stdlib_sqlite3.connect(tmp_path)
+            dst = _stdlib_sqlite3.connect(db_path)
+            src.backup(dst)
+            src.close()
+            dst.close()
     finally:
         try:
             os.unlink(tmp_path)

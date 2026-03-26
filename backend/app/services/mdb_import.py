@@ -20,10 +20,13 @@ Column name differences between MDB and new schema:
 
 import csv
 import io
+import logging
 import subprocess
 import sys
 from datetime import datetime, date as _date
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 from sqlalchemy.orm import Session
 
@@ -155,8 +158,19 @@ def _export_table_pyodbc(mdb_path: str, table: str) -> list:
             "version of the redistributable that matches your Office installation.)"
         )
 
-    conn_str = f"Driver={{{driver}}};Dbq={mdb_path};Exclusive=No;ReadOnly=True;"
-    conn = pyodbc.connect(conn_str)
+    conn_str = f"Driver={{{driver}}};Dbq={mdb_path};Exclusive=No;ReadOnly=1;"
+    try:
+        conn = pyodbc.connect(conn_str)
+    except pyodbc.Error as e:
+        raise RuntimeError(
+            f"Could not open the .mdb file with the Access ODBC driver.\n"
+            f"Error: {e}\n\n"
+            f"Common causes:\n"
+            f"  • 32-bit/64-bit mismatch: if Microsoft Office is 32-bit, install the\n"
+            f"    32-bit Access Database Engine (or vice versa for 64-bit Python).\n"
+            f"  • The file may be damaged or in an unsupported Access format.\n"
+            f"  • Try opening the file in Microsoft Access first to verify it opens."
+        )
     try:
         cursor = conn.cursor()
         cursor.execute(f"SELECT * FROM [{table}]")
@@ -167,6 +181,8 @@ def _export_table_pyodbc(mdb_path: str, table: str) -> list:
             # work identically to the mdbtools CSV path.
             rows.append(dict(zip(columns, [str(v) if v is not None else "" for v in row])))
         return rows
+    except pyodbc.Error as e:
+        raise RuntimeError(f"Error reading table '{table}' from .mdb file: {e}")
     finally:
         conn.close()
 
@@ -493,7 +509,7 @@ def import_from_mdb(mdb_path: str, db: Session) -> dict:
     except Exception as e:
         db.rollback()
         # cops_master_deleted table may not exist in all MDB versions — that's OK
-        print(f"cops_master_deleted import skipped: {e}")
+        logger.info("cops_master_deleted import skipped: %s", e)
 
     # ── cops_items ─────────────────────────────────────────────────────────────
     for row in _export_table(mdb_path, "cops_items"):

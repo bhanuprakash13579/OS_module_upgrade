@@ -68,6 +68,10 @@ def apply_sqlite_migrations():
         ("deleted_by", "TEXT"),
         ("deleted_reason", "TEXT"),
         ("deleted_on", "DATE"),
+        # Post-adjudication BR/DR receipts (2026 modernisation)
+        ("post_adj_br_entries", "TEXT"),
+        ("post_adj_dr_no", "TEXT"),
+        ("post_adj_dr_date", "DATE"),
     ]
 
     TABLES_TO_MIGRATE = ["cops_master", "cops_master_deleted", "cops_master_temp"]
@@ -162,7 +166,7 @@ def apply_sqlite_migrations():
             conn.commit()
         except Exception as e:
             conn.rollback()
-            print(f"SQLite migration error: {e}")
+            logger.warning("SQLite migration error: %s", e)
 
     # ── cops_items.os_date: drop NOT NULL constraint (SQLite table rebuild) ──
     # Kept separate — requires PRAGMA foreign_keys toggle and a full table copy.
@@ -197,18 +201,44 @@ def apply_sqlite_migrations():
                         items_dr_year INTEGER DEFAULT 0,
                         unique_no INTEGER,
                         entry_deleted VARCHAR(5) DEFAULT 'N',
-                        bkup_taken VARCHAR(5) DEFAULT 'N'
+                        bkup_taken VARCHAR(5) DEFAULT 'N',
+                        items_fa_type VARCHAR(10) DEFAULT 'value',
+                        items_fa_qty REAL,
+                        items_fa_uqc VARCHAR(20)
                     )
                 """))
-                conn.execute(text("INSERT INTO cops_items_new SELECT * FROM cops_items"))
+                # Explicit column list — immune to column count mismatches from
+                # other migrations adding columns to cops_items before this block runs.
+                conn.execute(text("""
+                    INSERT INTO cops_items_new (
+                        id, os_no, os_date, os_year, location_code,
+                        items_sno, items_desc, items_qty, items_uqc,
+                        value_per_piece, items_value, items_fa,
+                        cumulative_duty_rate, items_duty, items_duty_type,
+                        items_category, items_release_category, items_sub_category,
+                        items_dr_no, items_dr_year, unique_no,
+                        entry_deleted, bkup_taken,
+                        items_fa_type, items_fa_qty, items_fa_uqc
+                    )
+                    SELECT
+                        id, os_no, os_date, os_year, location_code,
+                        items_sno, items_desc, items_qty, items_uqc,
+                        value_per_piece, items_value, items_fa,
+                        cumulative_duty_rate, items_duty, items_duty_type,
+                        items_category, items_release_category, items_sub_category,
+                        items_dr_no, items_dr_year, unique_no,
+                        entry_deleted, bkup_taken,
+                        COALESCE(items_fa_type, 'value'), items_fa_qty, items_fa_uqc
+                    FROM cops_items
+                """))
                 conn.execute(text("DROP TABLE cops_items"))
                 conn.execute(text("ALTER TABLE cops_items_new RENAME TO cops_items"))
                 conn.execute(text("PRAGMA foreign_keys=ON"))
                 conn.commit()
-                print("cops_items.os_date NOT NULL constraint removed")
+                logger.info("cops_items.os_date NOT NULL constraint removed")
         except Exception as e:
             conn.rollback()
-            print(f"cops_items migration error: {e}")
+            logger.warning("cops_items migration error: %s", e)
 
 
 def seed_initial_data():
@@ -333,7 +363,7 @@ def seed_initial_data():
         db.commit()
     except Exception as e:
         db.rollback()
-        print(f"Seed error: {e}")
+        logger.warning("Seed error: %s", e)
     finally:
         db.close()
 
@@ -359,10 +389,10 @@ def _seed_legal_statutes():
         if new_entries:
             db.bulk_save_objects(new_entries)
             db.commit()
-            print(f"Seeded {len(new_entries)} legal statutes")
+            logger.info("Seeded %d legal statutes", len(new_entries))
     except Exception as e:
         db.rollback()
-        print(f"Legal statutes seed error: {e}")
+        logger.warning("Legal statutes seed error: %s", e)
     finally:
         db.close()
 
@@ -455,10 +485,10 @@ def _seed_print_template_config():
         if new_entries:
             db.bulk_save_objects(new_entries)
             db.commit()
-            print(f"Seeded {len(new_entries)} print template fields")
+            logger.info("Seeded %d print template fields", len(new_entries))
     except Exception as e:
         db.rollback()
-        print(f"Print template seed error: {e}")
+        logger.warning("Print template seed error: %s", e)
     finally:
         db.close()
 
@@ -479,9 +509,9 @@ def _load_state_from_db():
         devices = db.query(AllowedDevice).filter(AllowedDevice.is_active == True).all()
         state.allowed_ips = {d.ip_address for d in devices if d.ip_address}
         mode_label = "PRODUCTION" if state.prod_mode else "DEVELOPMENT"
-        print(f"App mode: {mode_label} | Whitelisted IPs: {len(state.allowed_ips)}")
+        logger.info("App mode: %s | Whitelisted IPs: %d", mode_label, len(state.allowed_ips))
     except Exception as e:
-        print(f"State load error: {e}")
+        logger.warning("State load error: %s", e)
     finally:
         db.close()
 

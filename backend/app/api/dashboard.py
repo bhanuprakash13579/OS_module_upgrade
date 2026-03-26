@@ -7,11 +7,13 @@ from app.database import get_db
 from app.models.baggage import BrMaster
 from app.models.detention import DrMaster
 from app.models.offence import CopsMaster
+from app.models.auth import User
+from app.services.auth import get_current_user
 
 router = APIRouter()
 
 @router.get("/stats")
-def get_dashboard_stats(db: Session = Depends(get_db)):
+def get_dashboard_stats(db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     """
     Aggregates realtime metrics for the application Dashboard.
     Uses SQL aggregation — no full-table loads into Python memory.

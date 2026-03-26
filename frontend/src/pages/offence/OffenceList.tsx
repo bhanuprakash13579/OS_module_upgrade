@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Filter, AlertCircle, RefreshCw, Trash2, X, FileText } from 'lucide-react';
+import { Plus, Search, Filter, AlertCircle, RefreshCw, Trash2, X, FileText, CreditCard, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
+import DatePicker from '@/components/DatePicker';
 
 const PER_PAGE = 20;
 
@@ -12,6 +13,15 @@ const fmtDate = (d: string | null | undefined): string => {
   if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`;
   return d;
 };
+
+interface BrEntry { no: string; date: string; }
+interface BrDrData { brEntries: BrEntry[]; drNo: string; drDate: string; }
+
+// Parse stored BR JSON string from backend into display-friendly list
+function parseBrEntries(raw: string | null | undefined): BrEntry[] {
+  if (!raw) return [];
+  try { return JSON.parse(raw); } catch { return []; }
+}
 
 export default function OffenceList() {
   const navigate = useNavigate();
@@ -26,17 +36,31 @@ export default function OffenceList() {
   const [showFilter, setShowFilter] = useState(false);
   const [filterYear, setFilterYear] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterBrDrPending, setFilterBrDrPending] = useState(false);
+
+  // BR/DR inline edit state
+  const [expandedBrDr, setExpandedBrDr] = useState<string | null>(null);
+  const [brDrData, setBrDrData] = useState<BrDrData>({ brEntries: [{ no: '', date: '' }], drNo: '', drDate: '' });
+  const [brDrSaving, setBrDrSaving] = useState(false);
+  const [brDrError, setBrDrError] = useState('');
 
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(searchDebounce.current), []);
 
-  const fetchCases = useCallback(async (page: number, search: string, year = filterYear, status = filterStatus) => {
+  const fetchCases = useCallback(async (
+    page: number,
+    search: string,
+    year = filterYear,
+    status = filterStatus,
+    brDrPending = filterBrDrPending,
+  ) => {
     setLoading(true);
     setErrorMsg('');
     try {
       const params: Record<string, any> = { page, per_page: PER_PAGE, search: search.trim() };
       if (year) params.year = year;
       if (status) params.status = status;
+      if (brDrPending) params.br_dr_pending = true;
       const res = await api.get('/os/', { params });
       setCases(res.data.items);
       setTotal(res.data.total);
@@ -46,7 +70,7 @@ export default function OffenceList() {
       setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterYear, filterStatus]);
+  }, [filterYear, filterStatus, filterBrDrPending]);
 
   // Initial load + re-load on login/logout
   useEffect(() => {
@@ -72,15 +96,16 @@ export default function OffenceList() {
 
   const handleApplyFilter = () => {
     setCurrentPage(1);
-    fetchCases(1, searchTerm, filterYear, filterStatus);
+    fetchCases(1, searchTerm, filterYear, filterStatus, filterBrDrPending);
     setShowFilter(false);
   };
 
   const handleClearFilter = () => {
     setFilterYear('');
     setFilterStatus('');
+    setFilterBrDrPending(false);
     setCurrentPage(1);
-    fetchCases(1, searchTerm, '', '');
+    fetchCases(1, searchTerm, '', '', false);
     setShowFilter(false);
   };
 
@@ -109,11 +134,56 @@ export default function OffenceList() {
     }
   };
 
+  // Open BR/DR edit panel for a row, pre-populating from existing data
+  const openBrDr = (row: any) => {
+    const key = `${row.os_no}-${row.os_year}`;
+    if (expandedBrDr === key) {
+      setExpandedBrDr(null);
+      return;
+    }
+    const stored = parseBrEntries(row.post_adj_br_entries);
+    setBrDrData({
+      brEntries: stored.length ? stored : [{ no: '', date: '' }],
+      drNo: row.post_adj_dr_no || '',
+      drDate: row.post_adj_dr_date || '',
+    });
+    setBrDrError('');
+    setExpandedBrDr(key);
+  };
+
+  const addBrEntry = () => setBrDrData(d => ({ ...d, brEntries: [...d.brEntries, { no: '', date: '' }] }));
+  const removeBrEntry = (idx: number) => setBrDrData(d => ({ ...d, brEntries: d.brEntries.filter((_, i) => i !== idx) }));
+  const updateBrEntry = (idx: number, field: 'no' | 'date', val: string) =>
+    setBrDrData(d => ({ ...d, brEntries: d.brEntries.map((e, i) => i === idx ? { ...e, [field]: val } : e) }));
+
+  const saveBrDr = async (os_no: string, os_year: number) => {
+    setBrDrSaving(true);
+    setBrDrError('');
+    try {
+      const payload = {
+        br_entries: brDrData.brEntries
+          .filter(e => e.no.trim())
+          .map(e => ({ no: e.no.trim(), date: e.date || null })),
+        dr_no: brDrData.drNo.trim() || null,
+        dr_date: brDrData.drDate || null,
+      };
+      await api.patch(`/os/${os_no}/${os_year}/post-adj`, payload);
+      setExpandedBrDr(null);
+      fetchCases(currentPage, searchTerm);
+    } catch (err: any) {
+      setBrDrError(err.response?.data?.detail || err.message);
+    } finally {
+      setBrDrSaving(false);
+    }
+  };
+
   const totalPages = Math.ceil(total / PER_PAGE) || 1;
   const showing = {
     from: total === 0 ? 0 : (currentPage - 1) * PER_PAGE + 1,
     to: Math.min(currentPage * PER_PAGE, total),
   };
+
+  const activeFilterCount = [filterYear, filterStatus, filterBrDrPending ? 'br' : ''].filter(Boolean).length;
 
   return (
     <div className="space-y-6 h-full flex flex-col max-w-7xl mx-auto pt-2">
@@ -155,11 +225,11 @@ export default function OffenceList() {
             </button>
             <button
               onClick={() => setShowFilter(f => !f)}
-              className={`px-4 py-2 border rounded-lg font-medium flex items-center transition-colors ${(filterYear || filterStatus) ? 'border-brand-400 bg-brand-50 text-brand-700 hover:bg-brand-100' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
+              className={`px-4 py-2 border rounded-lg font-medium flex items-center transition-colors ${activeFilterCount > 0 ? 'border-brand-400 bg-brand-50 text-brand-700 hover:bg-brand-100' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'}`}
             >
               <Filter size={16} className="mr-2" /> Filter
-              {(filterYear || filterStatus) && <span className="ml-1.5 bg-brand-600 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">
-                {[filterYear, filterStatus].filter(Boolean).length}
+              {activeFilterCount > 0 && <span className="ml-1.5 bg-brand-600 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">
+                {activeFilterCount}
               </span>}
             </button>
           </div>
@@ -192,6 +262,22 @@ export default function OffenceList() {
                   <option value="pending">Pending</option>
                   <option value="adjudicated">Adjudicated</option>
                 </select>
+              </div>
+              {/* BR/DR Pending toggle */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">BR/DR</label>
+                <button
+                  type="button"
+                  onClick={() => setFilterBrDrPending(v => !v)}
+                  className={`px-3 py-2 border rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                    filterBrDrPending
+                      ? 'border-amber-400 bg-amber-50 text-amber-800'
+                      : 'border-slate-300 bg-slate-50 text-slate-600 hover:bg-white'
+                  }`}
+                >
+                  <CreditCard size={14} />
+                  {filterBrDrPending ? 'Pending Only ✓' : 'BR/DR Pending'}
+                </button>
               </div>
               <div className="flex gap-2">
                 <button
@@ -234,7 +320,7 @@ export default function OffenceList() {
                 <th className="px-5 py-4 font-bold tracking-wider">Flight / PPN</th>
                 <th className="px-5 py-4 font-bold tracking-wider text-right">Appraised Value (₹)</th>
                 <th className="px-5 py-4 font-bold tracking-wider text-center">Status</th>
-                <th className="px-5 py-4 font-bold tracking-wider text-center w-36">Actions</th>
+                <th className="px-5 py-4 font-bold tracking-wider text-center w-44">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -261,66 +347,199 @@ export default function OffenceList() {
                 cases.map((row, idx) => {
                   const isAdjudicated = !!row.adjudication_date;
                   const totalValue = row.total_items_value || 0;
+                  const rowKey = `${row.os_no}-${row.os_year}`;
+                  const isExpanded = expandedBrDr === rowKey;
+                  const hasBrDr = !!(row.post_adj_br_entries || row.post_adj_dr_no);
                   return (
-                    <tr key={`${row.os_no}-${row.os_year}-${idx}`} className="hover:bg-slate-50 group">
-                      <td className="px-5 py-3 align-middle">
-                        <div className="font-bold text-brand-700">{row.os_no}/{row.os_year}</div>
-                        <div className="text-xs text-slate-400 mt-0.5">{row.location_code || 'CHN'}</div>
-                      </td>
-                      <td className="px-5 py-3 align-middle font-medium text-slate-600">{fmtDate(row.os_date)}</td>
-                      <td className="px-5 py-3 align-middle">
-                        <div className="font-bold text-slate-800">{row.pax_name || 'UNKNOWN'}</div>
-                        <div className="text-xs text-slate-500 mt-0.5">{row.pax_nationality}</div>
-                      </td>
-                      <td className="px-5 py-3 align-middle">
-                        <div className="text-slate-700 font-medium">{row.flight_no || 'N/A'}</div>
-                        <div className="text-xs text-slate-500 mt-0.5 font-mono">{row.passport_no || 'N/A'}</div>
-                      </td>
-                      <td className="px-5 py-3 align-middle text-right">
-                        <div className="font-bold text-slate-800">{totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                        <div className="text-xs text-slate-400 mt-0.5">{row.total_items || row.items?.length || 0} item(s)</div>
-                      </td>
-                      <td className="px-5 py-3 align-middle text-center">
-                        <span className={`inline-flex items-center px-2.5 py-1 text-xs font-bold rounded-md border ${
-                          isAdjudicated
-                            ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
-                            : row.is_draft === 'Y'
-                              ? 'text-slate-600 bg-slate-100 border-slate-300'
-                              : 'text-blue-700 bg-blue-50 border-blue-200'
-                        }`}>
-                          {isAdjudicated ? 'ADJUDICATED' : (row.is_draft === 'Y' ? 'DRAFT' : 'PENDING')}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3 align-middle text-center">
-                        <div className="flex justify-center items-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
-                          {isAdjudicated ? (
-                            <button
-                              onClick={() => navigate(`/sdo/offence/${row.os_no}/${row.os_year}/view`)}
-                              className="px-4 py-1.5 text-xs font-bold text-white bg-slate-600 hover:bg-slate-700 rounded-md transition-colors"
-                            >
-                              View
-                            </button>
-                          ) : (
-                            <div className="flex items-center gap-1.5">
-                              <button
-                                onClick={() => navigate(`/sdo/offence/${row.os_no}/${row.os_year}/edit`)}
-                                title={row.is_draft === 'Y' ? 'Edit Draft' : 'Edit Pending Case'}
-                                className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-brand-700 hover:bg-brand-50 border border-slate-200 hover:border-brand-200 rounded-md transition-colors"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => handleDelete(row.os_no, row.os_year, row.is_draft)}
-                                title={row.is_draft === 'Y' ? 'Delete Draft' : 'Delete Pending Case'}
-                                className="px-3 py-1.5 text-xs font-bold text-red-600 hover:text-red-800 hover:bg-red-50 border border-slate-200 hover:border-red-200 rounded-md transition-colors flex items-center"
-                              >
-                                <Trash2 size={14} className="mr-1" /> Delete
-                              </button>
+                    <>
+                      <tr key={`${rowKey}-${idx}`} className={`hover:bg-slate-50 group ${isExpanded ? 'bg-amber-50/40' : ''}`}>
+                        <td className="px-5 py-3 align-middle">
+                          <div className="font-bold text-brand-700">{row.os_no}/{row.os_year}</div>
+                          <div className="text-xs text-slate-400 mt-0.5">{row.location_code || 'CHN'}</div>
+                        </td>
+                        <td className="px-5 py-3 align-middle font-medium text-slate-600">{fmtDate(row.os_date)}</td>
+                        <td className="px-5 py-3 align-middle">
+                          <div className="font-bold text-slate-800">{row.pax_name || 'UNKNOWN'}</div>
+                          <div className="text-xs text-slate-500 mt-0.5">{row.pax_nationality}</div>
+                        </td>
+                        <td className="px-5 py-3 align-middle">
+                          <div className="text-slate-700 font-medium">{row.flight_no || 'N/A'}</div>
+                          <div className="text-xs text-slate-500 mt-0.5 font-mono">{row.passport_no || 'N/A'}</div>
+                        </td>
+                        <td className="px-5 py-3 align-middle text-right">
+                          <div className="font-bold text-slate-800">{totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                          <div className="text-xs text-slate-400 mt-0.5">{row.total_items || row.items?.length || 0} item(s)</div>
+                        </td>
+                        <td className="px-5 py-3 align-middle text-center">
+                          <span className={`inline-flex items-center px-2.5 py-1 text-xs font-bold rounded-md border ${
+                            isAdjudicated
+                              ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                              : row.is_draft === 'Y'
+                                ? 'text-slate-600 bg-slate-100 border-slate-300'
+                                : 'text-blue-700 bg-blue-50 border-blue-200'
+                          }`}>
+                            {isAdjudicated ? 'ADJUDICATED' : (row.is_draft === 'Y' ? 'DRAFT' : 'PENDING')}
+                          </span>
+                          {isAdjudicated && hasBrDr && (
+                            <div className="mt-1">
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded">
+                                <CreditCard size={9} /> BR/DR
+                              </span>
                             </div>
                           )}
-                        </div>
-                      </td>
-                    </tr>
+                        </td>
+                        <td className="px-5 py-3 align-middle text-center">
+                          <div className="flex justify-center items-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                            {isAdjudicated ? (
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  onClick={() => navigate(`/sdo/offence/${row.os_no}/${row.os_year}/view`)}
+                                  className="px-3 py-1.5 text-xs font-bold text-white bg-slate-600 hover:bg-slate-700 rounded-md transition-colors"
+                                >
+                                  View
+                                </button>
+                                <button
+                                  onClick={() => openBrDr(row)}
+                                  title="Add / Edit BR & DR Receipt Details"
+                                  className={`px-2.5 py-1.5 text-xs font-bold rounded-md transition-colors flex items-center gap-1 ${
+                                    isExpanded
+                                      ? 'text-amber-800 bg-amber-100 border border-amber-300'
+                                      : 'text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100'
+                                  }`}
+                                >
+                                  <CreditCard size={12} />
+                                  BR/DR
+                                  {isExpanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  onClick={() => navigate(`/sdo/offence/${row.os_no}/${row.os_year}/edit`)}
+                                  title={row.is_draft === 'Y' ? 'Edit Draft' : 'Edit Pending Case'}
+                                  className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-brand-700 hover:bg-brand-50 border border-slate-200 hover:border-brand-200 rounded-md transition-colors"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(row.os_no, row.os_year, row.is_draft)}
+                                  title={row.is_draft === 'Y' ? 'Delete Draft' : 'Delete Pending Case'}
+                                  className="px-3 py-1.5 text-xs font-bold text-red-600 hover:text-red-800 hover:bg-red-50 border border-slate-200 hover:border-red-200 rounded-md transition-colors flex items-center"
+                                >
+                                  <Trash2 size={14} className="mr-1" /> Delete
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* BR/DR inline edit sub-row */}
+                      {isExpanded && (
+                        <tr key={`${rowKey}-brdr`} className="bg-amber-50/60">
+                          <td colSpan={7} className="px-6 py-4">
+                            <div className="border border-amber-200 rounded-lg bg-white p-4 space-y-4">
+                              <div className="flex items-center justify-between">
+                                <h3 className="text-sm font-bold text-amber-900 flex items-center gap-2">
+                                  <CreditCard size={15} />
+                                  Post-Adjudication Receipt Details — {row.os_no}/{row.os_year}
+                                </h3>
+                                <button type="button" onClick={() => setExpandedBrDr(null)} className="text-slate-400 hover:text-slate-600">
+                                  <X size={16} />
+                                </button>
+                              </div>
+
+                              {/* Bank Receipt entries */}
+                              <div>
+                                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2 block">
+                                  Bank Receipt(s) (BR)
+                                </label>
+                                <div className="space-y-2">
+                                  {brDrData.brEntries.map((entry, i) => (
+                                    <div key={i} className="flex items-center gap-2">
+                                      <input
+                                        type="text"
+                                        placeholder="BR No."
+                                        value={entry.no}
+                                        onChange={e => updateBrEntry(i, 'no', e.target.value)}
+                                        className="w-44 px-2.5 py-1.5 border border-slate-300 rounded-md text-sm bg-slate-50 focus:bg-white focus:ring-1 focus:ring-amber-400 focus:border-amber-400"
+                                      />
+                                      <div className="w-44">
+                                        <DatePicker
+                                          value={entry.date}
+                                          onChange={val => updateBrEntry(i, 'date', val)}
+                                          placeholder="BR Date"
+                                          inputClassName="w-full px-2.5 py-1.5 border border-slate-300 rounded-md text-sm bg-slate-50 focus:bg-white focus:ring-1 focus:ring-amber-400 focus:border-amber-400"
+                                        />
+                                      </div>
+                                      {brDrData.brEntries.length > 1 && (
+                                        <button type="button" onClick={() => removeBrEntry(i)} className="text-red-400 hover:text-red-600 p-1">
+                                          <X size={14} />
+                                        </button>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={addBrEntry}
+                                  className="mt-2 text-xs text-amber-700 hover:text-amber-900 font-medium flex items-center gap-1"
+                                >
+                                  <Plus size={12} /> Add another BR
+                                </button>
+                              </div>
+
+                              {/* DR entry */}
+                              <div>
+                                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2 block">
+                                  Detention Receipt (DR)
+                                </label>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="text"
+                                    placeholder="DR No."
+                                    value={brDrData.drNo}
+                                    onChange={e => setBrDrData(d => ({ ...d, drNo: e.target.value }))}
+                                    className="w-44 px-2.5 py-1.5 border border-slate-300 rounded-md text-sm bg-slate-50 focus:bg-white focus:ring-1 focus:ring-amber-400 focus:border-amber-400"
+                                  />
+                                  <div className="w-44">
+                                    <DatePicker
+                                      value={brDrData.drDate}
+                                      onChange={val => setBrDrData(d => ({ ...d, drDate: val }))}
+                                      placeholder="DR Date"
+                                      inputClassName="w-full px-2.5 py-1.5 border border-slate-300 rounded-md text-sm bg-slate-50 focus:bg-white focus:ring-1 focus:ring-amber-400 focus:border-amber-400"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+
+                              {brDrError && (
+                                <p className="text-xs text-red-600 font-medium">{brDrError}</p>
+                              )}
+
+                              <div className="flex items-center gap-2 pt-1 border-t border-amber-100">
+                                <button
+                                  type="button"
+                                  onClick={() => saveBrDr(row.os_no, row.os_year)}
+                                  disabled={brDrSaving}
+                                  className="px-4 py-1.5 bg-amber-600 text-white text-xs font-bold rounded-md hover:bg-amber-700 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                                >
+                                  {brDrSaving ? <RefreshCw size={12} className="animate-spin" /> : null}
+                                  {brDrSaving ? 'Saving…' : 'Save'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedBrDr(null)}
+                                  className="px-4 py-1.5 border border-slate-300 bg-white text-slate-600 text-xs font-medium rounded-md hover:bg-slate-50 transition-colors"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
                   );
                 })
               )}

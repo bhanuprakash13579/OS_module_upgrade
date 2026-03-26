@@ -75,11 +75,19 @@ class Settings(BaseSettings):
     DEFAULT_NIGHT_SHIFT_TO: int = 7
 
     # ── CORS ─────────────────────────────────────────────────────
+    # Dev origins (Vite) are only included outside of production to avoid
+    # exposing the desktop app's backend to localhost web pages in production.
     CORS_ORIGINS: list = [
-        "http://localhost:5173",     # Vite dev (localhost)
-        "http://127.0.0.1:5173",    # Vite dev (explicit IPv4 — needed on Linux where localhost→::1)
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
+        *(
+            [
+                "http://localhost:5173",
+                "http://127.0.0.1:5173",
+                "http://localhost:3000",
+                "http://127.0.0.1:3000",
+            ]
+            if os.environ.get("COPS_ENV", "production").strip().lower() != "production"
+            else []
+        ),
         "tauri://localhost",         # Tauri v2 macOS/Linux
         "http://tauri.localhost",    # Tauri v2 fallback
         "https://tauri.localhost",   # Tauri v2 Windows (uses HTTPS custom protocol)

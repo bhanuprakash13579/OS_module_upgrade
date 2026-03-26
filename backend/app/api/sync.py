@@ -3,6 +3,8 @@ from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models.audit import AuditEvent
+from ..models.auth import User
+from ..services.auth import get_current_user
 from pydantic import BaseModel
 from datetime import datetime
 
@@ -21,7 +23,7 @@ class SyncEventResponse(BaseModel):
     timestamp: datetime
 
 @router.get("/pull", response_model=List[SyncEventResponse])
-def pull_events(last_sync: str, db: Session = Depends(get_db)):
+def pull_events(last_sync: str, db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     """
     SDO Clients hit this endpoint to pull all `AuditEvent`s that occurred 
     since their last known sync timestamp.
@@ -46,7 +48,7 @@ def pull_events(last_sync: str, db: Session = Depends(get_db)):
     ]
 
 @router.post("/push")
-def push_events(events: List[SyncEventResponse], db: Session = Depends(get_db)):
+def push_events(events: List[SyncEventResponse], db: Session = Depends(get_db), _: User = Depends(get_current_user)):
     """
     SDO Clients hit this endpoint to push their locally-generated 
     append-only events to the Primary Server.

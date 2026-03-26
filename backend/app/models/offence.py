@@ -118,6 +118,13 @@ class CopsMaster(Base):
     supdt_remarks2 = Column(String(200))            # Legacy: extra supdt remarks
     closure_ind = Column(String(5))
 
+    # ── Post-Adjudication Metadata (BR / DR receipts) ──
+    # Set by SDO AFTER the adjudication order is issued.
+    # Never auto-filled; never modified by the adjudication workflow.
+    post_adj_br_entries = Column(Text, nullable=True)   # JSON: [{"no":"123","date":"2026-03-15"},…]
+    post_adj_dr_no      = Column(String(50), nullable=True)
+    post_adj_dr_date    = Column(Date, nullable=True)
+
     # ── Workflow Exits (Quash/Reject) ──
     quashed = Column(String(1), default='N')
     quashed_by = Column(String(255))

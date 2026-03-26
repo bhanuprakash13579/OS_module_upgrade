@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { FileText, Download, RefreshCw, CheckSquare, Square } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { FileText, Download, RefreshCw, CheckSquare, Square, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import api from '@/lib/api';
 import DatePicker from '@/components/DatePicker';
 import { showDownloadToast } from '@/components/DownloadToast';
@@ -92,6 +92,14 @@ const MASTER_GROUPS: { group: string; cols: ColDef[] }[] = [
     ],
   },
   {
+    group: 'Post-Adjudication',
+    cols: [
+      { key: 'post_adj_br_entries', label: 'BR No(s) with Dates' },
+      { key: 'post_adj_dr_no',      label: 'Post-Adj DR No.' },
+      { key: 'post_adj_dr_date',    label: 'Post-Adj DR Date' },
+    ],
+  },
+  {
     group: 'Other',
     cols: [
       { key: 'seizure_date',   label: 'Seizure Date' },
@@ -150,6 +158,15 @@ async function exportCsv(columns: string[], rows: Record<string, string>[], colL
   }
 }
 
+// ── Sort icon (defined outside component to avoid remount on every render) ────
+
+function ColSortIcon({ col, sortCol, sortDir }: { col: string; sortCol: string | null; sortDir: string }) {
+  if (sortCol !== col) return <ArrowUpDown size={10} className="ml-1 opacity-30" />;
+  return sortDir === 'asc'
+    ? <ArrowUp size={10} className="ml-1 text-emerald-600" />
+    : <ArrowDown size={10} className="ml-1 text-emerald-600" />;
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function CustomReport() {
@@ -160,6 +177,31 @@ export default function CustomReport() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ columns: string[]; rows: Record<string, string>[]; total: number } | null>(null);
   const [error, setError] = useState('');
+  const [sortCol, setSortCol] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  // Sort all rows first, then slice to 500 — ensures top 500 after sort, not sort of first 500
+  const sortedRows = useMemo(() => {
+    if (!result) return [];
+    if (!sortCol) return result.rows.slice(0, 500);
+    return [...result.rows].sort((a, b) => {
+      const av = a[sortCol] ?? '';
+      const bv = b[sortCol] ?? '';
+      const an = parseFloat(av);
+      const bn = parseFloat(bv);
+      const cmp = !isNaN(an) && !isNaN(bn) ? an - bn : av.localeCompare(bv, undefined, { sensitivity: 'base' });
+      return sortDir === 'asc' ? cmp : -cmp;
+    }).slice(0, 500);
+  }, [result, sortCol, sortDir]);
+
+  const handleColSort = (col: string) => {
+    if (sortCol === col) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortCol(col);
+      setSortDir('asc');
+    }
+  };
 
   // Build label lookup
   const labelOf: Record<string, string> = {};
@@ -171,6 +213,7 @@ export default function CustomReport() {
     const setter = which === 'master' ? setSelectedMaster : setSelectedItems;
     set.has(key) ? set.delete(key) : set.add(key);
     setter(set);
+    setResult(null);
   };
 
   const toggleGroup = (cols: ColDef[], which: 'master' | 'item') => {
@@ -179,13 +222,14 @@ export default function CustomReport() {
     const allSelected = cols.every(c => set.has(c.key));
     cols.forEach(c => allSelected ? set.delete(c.key) : set.add(c.key));
     setter(set);
+    setResult(null);
   };
 
   const generate = async () => {
     if (selectedMaster.size === 0 && selectedItems.size === 0) {
       setError('Select at least one column.'); return;
     }
-    setError(''); setLoading(true); setResult(null);
+    setError(''); setLoading(true); setResult(null); setSortCol(null); setSortDir('asc');
     try {
       const res = await api.post('/backup/custom-report', {
         master_cols: [...selectedMaster],
@@ -236,15 +280,14 @@ export default function CustomReport() {
                 </div>
                 <div className="p-2 space-y-0.5">
                   {g.cols.map(c => (
-                    <label key={c.key} className="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-slate-50 cursor-pointer">
+                    <button key={c.key} type="button"
+                      onClick={() => toggle(c.key, 'master')}
+                      className="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-slate-50 cursor-pointer w-full text-left focus:outline-none">
                       <span className="text-emerald-600 shrink-0">
                         {selectedMaster.has(c.key) ? <CheckSquare size={13} /> : <Square size={13} className="text-slate-300" />}
                       </span>
-                      <input type="checkbox" className="sr-only"
-                        checked={selectedMaster.has(c.key)}
-                        onChange={() => toggle(c.key, 'master')} />
                       <span className="text-xs text-slate-700">{c.label}</span>
-                    </label>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -267,15 +310,14 @@ export default function CustomReport() {
                 </div>
                 <div className="p-2 space-y-0.5">
                   {ITEM_GROUP.cols.map(c => (
-                    <label key={c.key} className="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-amber-50 cursor-pointer">
+                    <button key={c.key} type="button"
+                      onClick={() => toggle(c.key, 'item')}
+                      className="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-amber-50 cursor-pointer w-full text-left focus:outline-none">
                       <span className="text-amber-500 shrink-0">
                         {selectedItems.has(c.key) ? <CheckSquare size={13} /> : <Square size={13} className="text-slate-300" />}
                       </span>
-                      <input type="checkbox" className="sr-only"
-                        checked={selectedItems.has(c.key)}
-                        onChange={() => toggle(c.key, 'item')} />
                       <span className="text-xs text-slate-700">{c.label}</span>
-                    </label>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -343,18 +385,22 @@ export default function CustomReport() {
                       <th className="text-left px-3 py-2 text-slate-500 font-medium border-b border-slate-100 whitespace-nowrap">#</th>
                       {result.columns.map(col => (
                         <th key={col}
-                          className={`text-left px-3 py-2 font-medium border-b border-slate-100 whitespace-nowrap ${
+                          onClick={() => handleColSort(col)}
+                          className={`text-left px-3 py-2 font-medium border-b border-slate-100 whitespace-nowrap cursor-pointer select-none hover:bg-slate-100 transition-colors ${
                             ITEM_GROUP.cols.some(c => c.key === col)
-                              ? 'text-amber-700 bg-amber-50'
+                              ? 'text-amber-700 bg-amber-50 hover:bg-amber-100'
                               : 'text-slate-600'
                           }`}>
-                          {labelOf[col] ?? col}
+                          <span className="flex items-center">
+                            {labelOf[col] ?? col}
+                            <ColSortIcon col={col} sortCol={sortCol} sortDir={sortDir} />
+                          </span>
                         </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {result.rows.slice(0, 500).map((row, i) => (
+                    {sortedRows.map((row, i) => (
                       <tr key={i} className={`border-b border-slate-50 ${i % 2 === 0 ? '' : 'bg-slate-50/50'} hover:bg-emerald-50/30`}>
                         <td className="px-3 py-1.5 text-slate-400 tabular-nums">{i + 1}</td>
                         {result.columns.map(col => (

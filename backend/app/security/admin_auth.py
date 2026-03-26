@@ -14,10 +14,13 @@ To change the admin password before a release build:
   2. Replace _ADMIN_PWD_HASH below with the printed output.
   3. Rebuild the binary (pyinstaller python-server.spec --noconfirm).
 """
+import logging
 import os
 from datetime import datetime, timedelta, timezone
 
 import bcrypt as _bcrypt
+
+_log = logging.getLogger(__name__)
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
@@ -27,6 +30,16 @@ from app.config import settings
 # ── Admin credentials (read from env or fallback to hardcoded hash) ─────────
 # In production builds via GitHub Actions, ADMIN_PWD_HASH is injected as an env var.
 _ADMIN_USERNAME = "sysadmin"
+
+# For local dev only: gracefully load .env file if running natively.
+# Skipped in production so a stray .env cannot override ADMIN_PWD_HASH.
+if os.environ.get("COPS_ENV", "production").strip().lower() != "production":
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except ImportError:
+        pass
+
 # CI bakes a literal bcrypt hash here at build time (see release.yml).
 # For local dev only: set ADMIN_PASSWORD env var (plaintext) and the hash
 # is generated on startup. Never use ADMIN_PASSWORD in production builds.
@@ -44,7 +57,8 @@ def verify_admin_credentials(username: str, password: str) -> bool:
         return False
     try:
         return _bcrypt.checkpw(password.encode("utf-8"), _ADMIN_PWD_HASH.encode("utf-8"))
-    except Exception:
+    except Exception as e:
+        _log.warning("bcrypt.checkpw failed (hash may be unconfigured): %s", e)
         return False
 
 
