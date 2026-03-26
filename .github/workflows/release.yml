@@ -239,4 +239,4 @@ jobs:
             **First install:** download and run the installer.
             **Existing install:** the app will auto-update — open the app and wait for the update banner.
           releaseDraft: false
-          prerelease: false
+          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') || contains(github.ref_name, 'rc') }}
