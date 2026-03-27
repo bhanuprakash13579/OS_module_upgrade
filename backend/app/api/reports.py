@@ -6,9 +6,11 @@ from io import StringIO
 from typing import Optional
 
 from app.database import get_db
+from app.models.auth import User
 from app.models.baggage import BrMaster
 from app.models.detention import DrMaster
 from app.models.offence import CopsMaster
+from app.services.auth import get_current_active_user
 
 router = APIRouter()
 
@@ -17,7 +19,8 @@ def generate_report(
     report_id: str = Query(...),
     start_date: date = Query(...),
     end_date: date = Query(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_active_user)
 ):
     """
     Generates CSV Reports for B.R., O.S., and D.R. Registers.

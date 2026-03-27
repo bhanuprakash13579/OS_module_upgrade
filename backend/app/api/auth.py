@@ -18,6 +18,44 @@ import app.state as state
 
 router = APIRouter()
 
+# ── Bootstrap check (first-run: no users in DB yet) ──────────────────────────
+
+_MODULE_ROLES: dict[str, set[str]] = {
+    "sdo":          {"SDO"},
+    "adjudication": {"DC", "AC"},
+    "query":        {"SDO", "DC", "AC"},
+    "apis":         {"SDO", "DC", "AC"},
+}
+
+@router.get("/bootstrap/{module_type}")
+def bootstrap_check(module_type: str, db: Session = Depends(get_db)):
+    """
+    Called by the login page on mount.
+    If no active users matching the module's roles exist, returns
+    bootstrap_needed=True so the UI can show first-time setup instructions.
+    """
+    required_roles = _MODULE_ROLES.get(module_type.lower(), {"SDO", "DC", "AC"})
+    has_users = db.query(User).filter(
+        User.user_status == "ACTIVE",
+        User.user_role.in_(required_roles),
+    ).first() is not None
+
+    if not has_users:
+        return {
+            "bootstrap_needed": True,
+            "credentials": {
+                "username": "sysadmin",
+                "password": "(your admin password)",
+                "message": (
+                    "No user accounts have been created yet. "
+                    "Click the lock icon (top-right) to open the Admin Panel, "
+                    "log in with your administrator credentials, then create at least one user."
+                ),
+            },
+        }
+    return {"bootstrap_needed": False}
+
+
 # ── Login rate limiting (in-memory, prod mode only) ───────────────────────────
 _login_attempts: dict[str, list[float]] = defaultdict(list)
 _RATE_WINDOW_SECONDS = 300   # 5-minute window
