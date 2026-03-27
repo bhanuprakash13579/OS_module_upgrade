@@ -31,13 +31,8 @@ import platform
 import uuid
 from pathlib import Path
 
-# ── Binding secret ────────────────────────────────────────────────────────────
-# Read from BINDING_SECRET env variable (set via GitHub Secret at build time).
-# Falls back to a local-dev placeholder — never used in production builds.
-_BINDING_SECRET: bytes = os.environ.get(
-    "BINDING_SECRET",
-    "cops-dev-only-fallback-do-not-use-in-prod",
-).encode("utf-8")
+# ── Binding secret (patched by bake_binding_secret.py at CI build time) ───────
+_BINDING_SECRET: bytes = b"cops-dev-only-fallback-do-not-use-in-prod"
 
 
 # ═══════════════════════════════════════════════════════════════════

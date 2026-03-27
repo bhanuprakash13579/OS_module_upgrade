@@ -89,8 +89,16 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install --prefer-binary -r requirements.txt
-          python -m pip install --prefer-binary sqlcipher3-binary || echo "sqlcipher3-binary not available on this platform — database encryption disabled"
           python -m pip install pyinstaller
+
+      - name: Install sqlcipher3-binary (Windows — DB encryption)
+        if: matrix.os == 'windows-latest'
+        working-directory: ./backend
+        shell: bash
+        run: |
+          python -m pip install --prefer-binary sqlcipher3-binary \
+            || python -m pip install --prefer-binary "sqlcipher3-binary==0.5.0.post1" \
+            || echo "sqlcipher3-binary not available — DB encryption disabled for this build"
 
       - name: Bake admin password hash into source
         working-directory: ./backend
@@ -99,6 +107,12 @@ jobs:
         run: |
           python -m pip install --prefer-binary bcrypt
           python bake_hash.py
+
+      - name: Bake binding secret into source
+        working-directory: ./backend
+        env:
+          BINDING_SECRET: ${{ secrets.BINDING_SECRET }}
+        run: python bake_binding_secret.py
 
       # WeasyPrint needs Cairo + Pango DLLs present when PyInstaller runs so the
       # hook can find and bundle them. Must come AFTER pip install — adding
