@@ -140,7 +140,7 @@ try:
     import uvicorn
     _slog("importing app.main...")
     from app.main import app
-    _slog("app imported — starting uvicorn on 0.0.0.0:8000")
+    _slog("app imported — starting uvicorn on 127.0.0.1:8000")
 
     # Pass log_config directly into uvicorn so its configure_logging() writes
     # to our file — uvicorn resets its own loggers on startup and would wipe
@@ -175,7 +175,7 @@ try:
         try:
             uvicorn.run(
                 app,
-                host="0.0.0.0",
+                host="127.0.0.1",
                 port=8000,
                 log_level="debug",
                 access_log=False,
