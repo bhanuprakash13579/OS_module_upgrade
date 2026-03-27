@@ -31,9 +31,13 @@ import platform
 import uuid
 from pathlib import Path
 
-# ── Binding secret (compiled into binary — never stored on disk) ──────────────
-# Change this string before your release build to make it unique to your org.
-_BINDING_SECRET = b"cops-chennai-customs-binding-2024-!@#secure"
+# ── Binding secret ────────────────────────────────────────────────────────────
+# Read from BINDING_SECRET env variable (set via GitHub Secret at build time).
+# Falls back to a local-dev placeholder — never used in production builds.
+_BINDING_SECRET: bytes = os.environb.get(
+    b"BINDING_SECRET",
+    b"cops-dev-only-fallback-do-not-use-in-prod",
+)
 
 
 # ═══════════════════════════════════════════════════════════════════

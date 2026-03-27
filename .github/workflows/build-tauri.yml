@@ -117,6 +117,8 @@ jobs:
 
       - name: Build Python Sidecar (PyInstaller)
         working-directory: ./backend
+        env:
+          BINDING_SECRET: ${{ secrets.BINDING_SECRET }}
         run: pyinstaller --clean python-server.spec
 
       # ── Smoke-test: verify the sidecar actually starts ───────────────────────
