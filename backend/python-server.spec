@@ -44,6 +44,9 @@ a = Analysis(
         'multipart',
         # aiosqlite
         'aiosqlite',
+        # sqlcipher3 — AES-256 SQLite encryption (must be explicit; loaded via importlib)
+        'sqlcipher3',
+        'sqlcipher3.dbapi2',
         # bcrypt + cffi (native extensions — must be explicit for PyInstaller hooks to fire)
         'bcrypt',
         '_cffi_backend',
