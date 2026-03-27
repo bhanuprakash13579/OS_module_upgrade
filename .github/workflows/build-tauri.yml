@@ -87,14 +87,16 @@ jobs:
         working-directory: ./backend
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
+          python -m pip install --prefer-binary -r requirements.txt
           python -m pip install pyinstaller
 
       - name: Bake admin password hash into source
         working-directory: ./backend
         env:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
-        run: python bake_hash.py
+        run: |
+          python -m pip install --prefer-binary bcrypt
+          python bake_hash.py
 
       # WeasyPrint needs Cairo + Pango DLLs present when PyInstaller runs so the
       # hook can find and bundle them. Must come AFTER pip install — adding
