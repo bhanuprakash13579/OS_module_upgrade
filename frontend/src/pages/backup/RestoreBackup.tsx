@@ -1010,7 +1010,7 @@ export default function RestoreBackup() {
               <Upload size={18} className="text-red-500" />
               <div>
                 <h2 className="text-sm font-semibold text-slate-700">Restore Full Database Backup</h2>
-                <p className="text-xs text-slate-500 mt-0.5">Upload a <code className="bg-slate-100 px-1 rounded">.db</code> file from a Full DB Backup above. <strong className="text-red-600">Replaces all data</strong> — use only to recover from data loss.</p>
+                <p className="text-xs text-slate-500 mt-0.5">Upload a <code className="bg-slate-100 px-1 rounded">.db</code> file — both encrypted (new app) and plain SQLite (old app) backups are accepted. <strong className="text-red-600">Replaces all data</strong> — use only to recover from data loss.</p>
               </div>
             </div>
             <form onSubmit={uploadFullDbRestore} className="space-y-3">
@@ -1053,7 +1053,7 @@ export default function RestoreBackup() {
               <h2 className="text-sm font-semibold text-slate-700">Restore from Backup ZIP</h2>
             </div>
             <p className="text-xs text-slate-500">
-              Upload a ZIP backup. Existing records are never overwritten — only missing rows are inserted.
+              Upload a ZIP backup — both encrypted (new app) and plain (old app) ZIPs are accepted. Existing records are never overwritten — only missing rows are inserted.
             </p>
             <form onSubmit={uploadRestore} className="space-y-3">
               <div className="flex items-center gap-3">

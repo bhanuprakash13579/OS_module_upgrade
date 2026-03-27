@@ -1010,6 +1010,12 @@ def admin_restore_backup(
 
     db.commit()
     post_import_optimise(db)
+    # Close the zip before unlinking — required on Windows (open handles block delete)
+    try:
+        if zf is not None:
+            zf.close()
+    except Exception:
+        pass
     try:
         os.unlink(_zip_tmp)
     except OSError:
