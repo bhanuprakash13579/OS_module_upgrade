@@ -324,6 +324,8 @@ export default function RestoreBackup() {
           await writeFile(savePath, new Uint8Array(arrayBuf));
           setBackupMsg('Backup saved successfully.');
           showDownloadToast(`Backup saved to ${savePath}`);
+        } else {
+          setBackupMsg('Save cancelled.');
         }
       } catch {
         const url = URL.createObjectURL(res.data);
@@ -333,8 +335,9 @@ export default function RestoreBackup() {
         setBackupMsg('Backup downloaded successfully.');
         showDownloadToast(`Backup downloaded as ${defaultName}`);
       }
-    } catch {
-      setBackupMsg('Download failed. Try again.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setBackupMsg(`Download failed: ${msg}`);
     } finally {
       setBackupLoading(false);
     }
@@ -359,6 +362,8 @@ export default function RestoreBackup() {
           await writeFile(savePath, new Uint8Array(arrayBuf));
           setFullDbMsg('Full database backup saved.');
           showDownloadToast(`Database saved to ${savePath}`);
+        } else {
+          setFullDbMsg('Save cancelled.');
         }
       } catch {
         const url = URL.createObjectURL(res.data);
@@ -368,8 +373,9 @@ export default function RestoreBackup() {
         setFullDbMsg('Full database backup downloaded.');
         showDownloadToast(`Database downloaded as ${defaultName}`);
       }
-    } catch {
-      setFullDbMsg('Download failed. Try again.');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setFullDbMsg(`Download failed: ${msg}`);
     } finally {
       setFullDbLoading(false);
     }
