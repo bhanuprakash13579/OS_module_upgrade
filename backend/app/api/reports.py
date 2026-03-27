@@ -65,13 +65,18 @@ def generate_report(
 
     else:
         # Default placeholder for unimplemented reports
+        records = []
         writer.writerow(["Report ID", "Start Date", "End Date", "Message"])
         writer.writerow([report_id, start_date, end_date, "This report is pending full data migration mapping."])
         filename = f"Report_{report_id}_{start_date}.csv"
 
     output.seek(0)
+    resp_headers: dict = {"Content-Disposition": f"attachment; filename={filename}"}
+    if len(records) == ROW_LIMIT:
+        resp_headers["X-Row-Truncated"] = "true"
+        resp_headers["X-Row-Limit"] = str(ROW_LIMIT)
     return Response(
         content=output.getvalue(),
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers=resp_headers
     )

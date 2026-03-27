@@ -635,12 +635,15 @@ def admin_restore_backup(
             # Test-read the first file to verify the password works
             _zf.read(_zf.namelist()[0])
             zf = _zf
-        except Exception:
-            # Old unencrypted backup — fall back to plain zipfile
+        except (RuntimeError, zipfile.BadZipFile):
+            # Wrong password or not AES-encrypted — try as plain ZIP
             try:
                 zf = zipfile.ZipFile(_zip_tmp)
             except zipfile.BadZipFile:
                 pass
+        except zipfile.BadZipFile:
+            pass
+        # Any other exception (IOError, MemoryError, etc.) propagates — it's a real error
     else:
         try:
             zf = zipfile.ZipFile(_zip_tmp)
@@ -1597,6 +1600,7 @@ def admin_export_fulldb(_=Depends(require_admin)):
 
     tmp_fd, tmp_path = tempfile.mkstemp(suffix=".db")
     os.close(tmp_fd)
+    src = dst = None
     try:
         if cipher and db_key:
             src = cipher.connect(db_path)
@@ -1605,18 +1609,24 @@ def admin_export_fulldb(_=Depends(require_admin)):
             dst = cipher.connect(tmp_path)
             dst.execute(hex_pragma)
             src.backup(dst)
-            src.close()
-            dst.close()
         else:
             src = _stdlib_sqlite3.connect(db_path)
             src.execute("PRAGMA wal_checkpoint(TRUNCATE)")
             dst = _stdlib_sqlite3.connect(tmp_path)
             src.backup(dst)
-            src.close()
-            dst.close()
+        # Close before reading so WAL is fully flushed to tmp_path
+        src.close(); src = None
+        dst.close(); dst = None
         with open(tmp_path, "rb") as f:
             data = f.read()
     finally:
+        # Always close connections before unlink — open handles block delete on Windows
+        for conn in (src, dst):
+            try:
+                if conn is not None:
+                    conn.close()
+            except Exception:
+                pass
         try:
             os.unlink(tmp_path)
         except OSError:
@@ -1713,6 +1723,7 @@ def admin_restore_fulldb(file: UploadFile = File(...), _=Depends(require_admin))
         except OSError:
             pass
 
+    bust_all_master_caches()  # full DB replaced — invalidate all in-memory caches
     return {
         "message": (
             "Database fully restored. "
