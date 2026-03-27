@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { FileText, Download, RefreshCw, CheckSquare, Square, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import api from '@/lib/api';
 import DatePicker from '@/components/DatePicker';
@@ -180,19 +180,23 @@ export default function CustomReport() {
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
+  // Reusable comparator — used for both the preview table and the CSV export
+  const sortComparator = useCallback((a: Record<string, string>, b: Record<string, string>) => {
+    if (!sortCol) return 0;
+    const av = a[sortCol] ?? '';
+    const bv = b[sortCol] ?? '';
+    const an = parseFloat(av);
+    const bn = parseFloat(bv);
+    const cmp = !isNaN(an) && !isNaN(bn) ? an - bn : av.localeCompare(bv, undefined, { sensitivity: 'base' });
+    return sortDir === 'asc' ? cmp : -cmp;
+  }, [sortCol, sortDir]);
+
   // Sort all rows first, then slice to 500 — ensures top 500 after sort, not sort of first 500
   const sortedRows = useMemo(() => {
     if (!result) return [];
     if (!sortCol) return result.rows.slice(0, 500);
-    return [...result.rows].sort((a, b) => {
-      const av = a[sortCol] ?? '';
-      const bv = b[sortCol] ?? '';
-      const an = parseFloat(av);
-      const bn = parseFloat(bv);
-      const cmp = !isNaN(an) && !isNaN(bn) ? an - bn : av.localeCompare(bv, undefined, { sensitivity: 'base' });
-      return sortDir === 'asc' ? cmp : -cmp;
-    }).slice(0, 500);
-  }, [result, sortCol, sortDir]);
+    return [...result.rows].sort(sortComparator).slice(0, 500);
+  }, [result, sortCol, sortDir, sortComparator]);
 
   const handleColSort = (col: string) => {
     if (sortCol === col) {
@@ -355,7 +359,7 @@ export default function CustomReport() {
                 {loading ? 'Generating…' : 'Generate Report'}
               </button>
               {result && result.rows.length > 0 && (
-                <button onClick={() => exportCsv(result.columns, result.rows, labelOf)}
+                <button onClick={() => exportCsv(result.columns, sortCol ? [...result.rows].sort(sortComparator) : result.rows, labelOf)}
                   className="flex items-center gap-2 px-4 py-2 text-xs rounded-lg bg-slate-700 text-white hover:bg-slate-800">
                   <Download size={12} />
                   Download CSV ({result.total.toLocaleString()} rows)
