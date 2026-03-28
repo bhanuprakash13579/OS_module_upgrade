@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.models.auth import User
-from app.schemas.auth import Token, UserOut, UserUpdatePassword
+from app.schemas.auth import Token, UserOut, UserCreate, UserUpdatePassword
 from app.services.auth import (
     verify_password, get_password_hash, create_access_token,
     get_current_active_user,
@@ -154,6 +154,68 @@ def change_password(
     current_user.user_pwd = get_password_hash(data.new_password)
     db.commit()
     return {"message": "Password updated successfully"}
+
+
+# ── List users ────────────────────────────────────────────────────────────────
+
+@router.get("/users", response_model=list[UserOut])
+def list_users(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Return all non-TEMP users. Frontend filters by role for the current module."""
+    return db.query(User).filter(User.user_status != "TEMP").all()
+
+
+# ── Create user ───────────────────────────────────────────────────────────────
+
+_VALID_ROLES = {"SDO", "DC", "AC"}
+
+@router.post("/users", response_model=UserOut, status_code=201)
+def create_user(
+    data: UserCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Any active user can create another user within their module's allowed roles."""
+    if data.user_role not in _VALID_ROLES:
+        raise HTTPException(status_code=400, detail=f"Invalid role '{data.user_role}'. Must be one of: {', '.join(sorted(_VALID_ROLES))}")
+    if db.query(User).filter(User.user_id == data.user_id).first():
+        raise HTTPException(status_code=409, detail=f"User ID '{data.user_id}' already exists.")
+    new_user = User(
+        user_id=data.user_id,
+        user_name=data.user_name,
+        user_desig=data.user_desig,
+        user_role=data.user_role,
+        user_pwd=get_password_hash(data.user_pwd),
+        user_status="ACTIVE",
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
+
+
+# ── Upgrade role (AC → DC) ────────────────────────────────────────────────────
+
+@router.put("/users/{user_id}/upgrade-role", response_model=UserOut)
+def upgrade_user_role(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Upgrade an AC user to DC. Only DC users can do this."""
+    if current_user.user_role != "DC":
+        raise HTTPException(status_code=403, detail="Only a DC can upgrade another user's role.")
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    if user.user_role != "AC":
+        raise HTTPException(status_code=400, detail=f"User is already '{user.user_role}' — can only upgrade from AC.")
+    user.user_role = "DC"
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 # ── Close own account ─────────────────────────────────────────────────────────
