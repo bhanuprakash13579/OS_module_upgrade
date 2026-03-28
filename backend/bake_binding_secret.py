@@ -5,9 +5,10 @@ Run via: python bake_binding_secret.py  (called from GitHub Actions before PyIns
 import os
 import re
 
-secret = os.environ.get("BINDING_SECRET", "")
+secret = os.environ.get("BINDING_SECRET", "").strip()
 if not secret:
     raise SystemExit("ERROR: BINDING_SECRET env var is not set.")
+print(f"[bake_binding_secret] Secret length: {len(secret)} chars")
 
 path = "app/security/device.py"
 try:
