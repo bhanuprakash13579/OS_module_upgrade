@@ -5,6 +5,7 @@ The login endpoint itself is always open (verified against the hardcoded hash).
 """
 import csv
 import io
+import logging
 import os
 import shutil
 import sqlite3 as _stdlib_sqlite3
@@ -12,6 +13,8 @@ import tempfile
 import threading
 import time
 import zipfile
+
+_log = logging.getLogger(__name__)
 from datetime import date, datetime, timezone
 
 try:
@@ -559,13 +562,16 @@ def admin_export_full(db: Session = Depends(get_db), _=Depends(require_admin)):
 
     zip_buf = io.BytesIO()
     if _PYZIPPER_AVAILABLE:
+        _pwd = get_zip_password()
+        _log.info("ZIP backup: AES-256 encrypted, password length=%d chars", len(_pwd))
         zf_ctx = _pyzipper.AESZipFile(
             zip_buf, mode="w",
             compression=_pyzipper.ZIP_DEFLATED,
             encryption=_pyzipper.WZ_AES,
         )
-        zf_ctx.setpassword(get_zip_password())
+        zf_ctx.setpassword(_pwd)
     else:
+        _log.warning("ZIP backup: pyzipper NOT available — backup is UNENCRYPTED plain ZIP")
         zf_ctx = zipfile.ZipFile(zip_buf, mode="w", compression=zipfile.ZIP_DEFLATED)
 
     with zf_ctx as zf:
