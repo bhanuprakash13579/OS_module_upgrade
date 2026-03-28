@@ -31,8 +31,15 @@ import platform
 import uuid
 from pathlib import Path
 
-# ── Binding secret (patched by bake_binding_secret.py at CI build time) ───────
-_BINDING_SECRET: bytes = b"cops-dev-only-fallback-do-not-use-in-prod"
+# ── Binding secret (XOR-obfuscated so plain text never appears in binary) ──────
+# bake_binding_secret.py replaces _ES at CI build time with an XOR-encoded
+# version of the real secret — the decode key _XK is never the password itself.
+def _xdec(enc: bytes, key: bytes) -> bytes:
+    return bytes(e ^ key[i % len(key)] for i, e in enumerate(enc))
+
+_XK = b"\xde\xad\xbe\xef\xca\xfe\xba\xbe\xde\xad\xbe\xef\xca\xfe"
+_ES = bytes.fromhex("9dc2ce9c8acc8a8ce88e")  # BAKE_TARGET
+_BINDING_SECRET: bytes = _xdec(_ES, _XK)
 
 
 # ═══════════════════════════════════════════════════════════════════
