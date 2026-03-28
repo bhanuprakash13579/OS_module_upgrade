@@ -623,8 +623,14 @@ def admin_restore_backup(
     try:
         tmp_fd, _zip_tmp = tempfile.mkstemp(suffix=".zip")
         os.close(tmp_fd)
+        _MAX_ZIP = 500 * 1024 * 1024  # 500 MB
+        _written = 0
         with open(_zip_tmp, "wb") as _f:
-            shutil.copyfileobj(file.file, _f)
+            for _chunk in iter(lambda: file.file.read(1024 * 1024), b""):
+                _written += len(_chunk)
+                if _written > _MAX_ZIP:
+                    raise HTTPException(status_code=413, detail="Upload too large (max 500 MB).")
+                _f.write(_chunk)
     except Exception:
         if _zip_tmp:
             try:
@@ -1667,8 +1673,14 @@ def admin_restore_fulldb(file: UploadFile = File(...), _=Depends(require_admin))
     tmp_fd, tmp_path = tempfile.mkstemp(suffix=".db")
     os.close(tmp_fd)
     try:
+        _MAX_DB = 500 * 1024 * 1024  # 500 MB
+        _written = 0
         with open(tmp_path, "wb") as f:
-            shutil.copyfileobj(file.file, f)
+            for _chunk in iter(lambda: file.file.read(1024 * 1024), b""):
+                _written += len(_chunk)
+                if _written > _MAX_DB:
+                    raise HTTPException(status_code=413, detail="Upload too large (max 500 MB).")
+                f.write(_chunk)
 
         # Validate: try opening the uploaded file
         # Accept either an encrypted SQLCipher file or a plaintext SQLite file.
