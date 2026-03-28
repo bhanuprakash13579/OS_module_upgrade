@@ -1700,29 +1700,45 @@ def admin_restore_fulldb(file: UploadFile = File(...), _=Depends(require_admin))
         if cipher and db_key:
             if opened_as_cipher:
                 # Encrypted → encrypted (same key): direct cipher backup
-                src = cipher.connect(tmp_path)
-                src.execute(hex_pragma)
-                dst = cipher.connect(db_path)
-                dst.execute(hex_pragma)
-                src.backup(dst)
-                src.close()
-                dst.close()
+                src = dst = None
+                try:
+                    src = cipher.connect(tmp_path)
+                    src.execute(hex_pragma)
+                    dst = cipher.connect(db_path)
+                    dst.execute(hex_pragma)
+                    src.backup(dst)
+                finally:
+                    for _c in (src, dst):
+                        try:
+                            if _c: _c.close()
+                        except Exception:
+                            pass
             else:
-                # Plaintext → encrypted:
-                # 1. Copy plaintext to db_path via stdlib (known-good method)
-                # 2. Encrypt in-place via sqlcipher_export (same path as startup migration)
+                # Plaintext → encrypted: copy then encrypt in-place
+                src = dst = None
+                try:
+                    src = _stdlib_sqlite3.connect(tmp_path)
+                    dst = _stdlib_sqlite3.connect(db_path)
+                    src.backup(dst)
+                finally:
+                    for _c in (src, dst):
+                        try:
+                            if _c: _c.close()
+                        except Exception:
+                            pass
+                migrate_plaintext_to_encrypted(db_path, db_key)
+        else:
+            src = dst = None
+            try:
                 src = _stdlib_sqlite3.connect(tmp_path)
                 dst = _stdlib_sqlite3.connect(db_path)
                 src.backup(dst)
-                src.close()
-                dst.close()
-                migrate_plaintext_to_encrypted(db_path, db_key)
-        else:
-            src = _stdlib_sqlite3.connect(tmp_path)
-            dst = _stdlib_sqlite3.connect(db_path)
-            src.backup(dst)
-            src.close()
-            dst.close()
+            finally:
+                for _c in (src, dst):
+                    try:
+                        if _c: _c.close()
+                    except Exception:
+                        pass
     finally:
         try:
             os.unlink(tmp_path)
