@@ -108,12 +108,6 @@ jobs:
           python -m pip install --prefer-binary bcrypt
           python bake_hash.py
 
-      - name: Bake binding secret into source
-        working-directory: ./backend
-        env:
-          BINDING_SECRET: ${{ secrets.BINDING_SECRET }}
-        run: python bake_binding_secret.py
-
       # WeasyPrint needs Cairo + Pango DLLs present when PyInstaller runs so the
       # hook can find and bundle them. Must come AFTER pip install — adding
       # C:\msys64\mingw64\bin to PATH before pip would shadow setup-python's python.exe.
@@ -131,8 +125,6 @@ jobs:
 
       - name: Build Python Sidecar (PyInstaller)
         working-directory: ./backend
-        env:
-          BINDING_SECRET: ${{ secrets.BINDING_SECRET }}
         run: pyinstaller --clean python-server.spec
 
       # ── Smoke-test: verify the sidecar actually starts ───────────────────────
