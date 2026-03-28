@@ -334,39 +334,20 @@ def get_all_os(
         if sl == 'draft':
             q = q.filter(CopsMaster.is_draft == 'Y')
         elif sl == 'adjudicated':
-            # Adjudicated = any case that officially has an adjudication_date, 
-            # OR (for legacy MDB cases) has no items awaiting adjudication.
-            pending_items_subq = exists().where(
-                and_(
-                    CopsItems.os_no == CopsMaster.os_no,
-                    CopsItems.os_year == CopsMaster.os_year,
-                    CopsItems.items_release_category.in_(['Under OS', 'Under Duty'])
-                )
-            )
+            # Adjudicated = adjudication_date is set (order has been issued)
             q = q.filter(
                 CopsMaster.is_draft == 'N',
                 CopsMaster.quashed != 'Y',
                 CopsMaster.rejected != 'Y',
-                or_(
-                    CopsMaster.adjudication_date.isnot(None),
-                    not_(pending_items_subq)
-                )
+                CopsMaster.adjudication_date.isnot(None),
             )
         elif sl == 'pending':
-            # Pending = NO adjudication date AND has items awaiting adjudication
-            pending_items_subq = exists().where(
-                and_(
-                    CopsItems.os_no == CopsMaster.os_no,
-                    CopsItems.os_year == CopsMaster.os_year,
-                    CopsItems.items_release_category.in_(['Under OS', 'Under Duty'])
-                )
-            )
+            # Pending = not adjudicated, not quashed/rejected, not a draft
             q = q.filter(
                 CopsMaster.is_draft == 'N',
                 CopsMaster.adjudication_date.is_(None),
                 CopsMaster.quashed != 'Y',
                 CopsMaster.rejected != 'Y',
-                pending_items_subq,
             )
         elif sl == 'quashed':
             q = q.filter(or_(CopsMaster.quashed == 'Y', CopsMaster.rejected == 'Y'))
