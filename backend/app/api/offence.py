@@ -1065,7 +1065,8 @@ def print_os_pdf(
             "(Airport), Anna International Airport, Chennai-600027"),
         page1_title=_ptc("page1_title",
             "Detention / Seizure of Passenger's Baggage"),
-        inventory_heading=_ptc("inventory_heading",
+        inventory_heading=_ptc(
+            "export_inventory_heading" if is_export else "inventory_heading",
             "INVENTORY OF THE GOODS DETAINED FOR EXPORT" if is_export else "INVENTORY OF THE GOODS IMPORTED"),
         col_duty_heading=_ptc("col_duty_heading",
             "Goods Passed On Duty"),
@@ -1075,7 +1076,8 @@ def print_os_pdf(
             "Office of the Deputy / Asst. Commissioner of Customs (Airport), Anna International airport, Chennai-600027."),
         p2_waiver_heading=_ptc("p2_waiver_heading",
             "WAIVER OF SHOW CAUSE NOTICE"),
-        waiver_text_1=_ptc("waiver_text_1",
+        waiver_text_1=_ptc(
+            "export_waiver_text_1" if is_export else "waiver_text_1",
             "The Charges have been orally communicated to me in respect of the goods mentioned overleaf and detained at the time of my departure. Orders in the case may please be passed without issue of Show Cause Notice. However I may kindly be given a Personal Hearing."
             if is_export else
             "The Charges have been orally communicated to me in respect of the goods mentioned overleaf and imported by me. Orders in the case may please be passed without issue of Show Cause Notice. However I may kindly be given a Personal Hearing."),
@@ -1087,11 +1089,13 @@ def print_os_pdf(
             "2. An Appeal against this Order shall lie before the Commissioner of Customs (Appeals), Custom House, Chennai-600 001 on payment of 7.5% of the duty demanded where duty or duty and penalty are in dispute, or penalty, where penalty alone is in dispute. The Appeal shall be filed within 60 days provided under Section 128 of the Customs Act, 1962 from the date of receipt of this Order."),
         note_scn_waived=_ptc("note_scn_waived",
             "Note: The issue of Show Cause Notice was waived at the instance of the Passenger."),
-        legal_para_1=_ptc("legal_para_1",
+        legal_para_1=_ptc(
+            "export_legal_para_1" if is_export else "legal_para_1",
             "In terms of Foreign Trade Policy notified by the Government in pursuance to Section 3(1) & 3(2) of the Foreign Trade (Development & Regulation) Act, 1992, export of goods without proper Customs declaration or in violation of applicable export regulations / restrictions is prohibited. Passengers are required to declare all goods carried at the time of departure as mandated under Section 40 of the Customs Act, 1962."
             if is_export else
             "In terms of Foreign Trade Policy notified by the Government in pursuance to Section 3(1) & 3(2) of the Foreign Trade (Development & Regulation) Act, 1992 read with the Rules framed thereunder, also read with Section 11(2)(u) of Customs Act, 1962, import of 'goods in commercial quantity / goods in the nature of non-bonafide baggage' is not permitted without a valid import licence, though exemption exists under clause 3(h) of the Foreign Trade (Exemption from application of Rules in certain cases) order 1993 for import of goods by a passenger from abroad only to the extent admissible under the Baggage Rules framed under Section 79 of the Customs Act, 1962."),
-        legal_para_2=_ptc("legal_para_2",
+        legal_para_2=_ptc(
+            "export_legal_para_2" if is_export else "legal_para_2",
             "Export of goods non-declared / misdeclared / concealed / in commercial quantity / contrary to any prohibition or export restriction is therefore liable for confiscation under Section 113 of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992."
             if is_export else
             "Import of goods non-declared / misdeclared / concealed / in trade and in commercial quantity / non-bonafide in excess of the baggage allowance is therefore liable for confiscation under Section 111(d), (i), (l), (m) & (o) of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992."),
@@ -1101,7 +1105,8 @@ def print_os_pdf(
             "ORDER"),
         # Pre-rendered ORDER paragraphs (template substitution done in Python)
         para_rf=_render_para(
-            _ptc("order_para_rf",
+            _ptc(
+                "export_order_para_rf" if is_export else "order_para_rf",
                 # Export: Section 113, no "Duty extra" (export violations don't attract inbound duty)
                 "I Order confiscation of the goods{rf_slnos_text} valued at Rs.{conf_value}/- under Section 113 of the Customs Act, 1962, but allow the passenger an option to redeem the goods valued at Rs.{conf_value}/- on a fine of Rs.{rf_amount}/- (Rupees {rf_words} Only) in lieu of confiscation under Section 125 of the Customs Act 1962 within 7 days from the date of receipt of this Order."
                 if is_export else
@@ -1122,7 +1127,8 @@ def print_os_pdf(
             ref_words=title_words(ref_amount),
         ) if (re_exp_value > 0 and int(ref_amount) > 0 and not is_export) else "",
         para_abs_conf=_render_para(
-            _ptc("order_para_abs_conf",
+            _ptc(
+                "export_order_para_abs_conf" if is_export else "order_para_abs_conf",
                 # Export: Section 113
                 "I {also_text}order absolute confiscation of the goods{abs_conf_slnos_text} valued at Rs.{abs_conf_value}/- under Section 113 of the Customs Act, 1962."
                 if is_export else
@@ -1132,7 +1138,8 @@ def print_os_pdf(
             abs_conf_value=int(abs_conf_value),
         ) if abs_conf_value > 0 else "",
         para_pp=_render_para(
-            _ptc("order_para_pp",
+            _ptc(
+                "export_order_para_pp" if is_export else "order_para_pp",
                 # Export: Section 114 (import equivalent is Section 112)
                 "I further impose a Personal Penalty of Rs.{pp_amount}/- (Rupees {pp_words} Only) under Section 114 of the Customs Act, 1962."
                 if is_export else
