@@ -919,7 +919,7 @@ def get_monthly_report(
             br_no=br_no or None,
             br_date=br_date or None,
             remarks=remarks,
-            adjudicated_by_ac_dc=case.adj_offr_name,
+            adjudicated_by_ac_dc=case.adj_offr_name or case.adj_offr_designation or None,
             export_import=export_import,
             column1=column1,
         ))

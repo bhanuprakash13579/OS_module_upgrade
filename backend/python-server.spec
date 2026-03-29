@@ -86,6 +86,8 @@ a = Analysis(
         'openpyxl.worksheet._read_only',
         'openpyxl.worksheet.worksheet',
         'et_xmlfile',
+        # pyodbc — Windows MDB/Access file import via ODBC driver
+        'pyodbc',
     ],
     hookspath=[],
     hooksconfig={},

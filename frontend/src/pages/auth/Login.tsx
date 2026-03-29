@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ShieldAlert, KeyRound, User, Loader2, Gavel, Search, ScanLine } from 'lucide-react';
+import { ClipboardEdit, AlertTriangle, KeyRound, User, Loader2, Gavel, Search, ScanLine } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
 
@@ -98,7 +98,7 @@ export default function Login() {
       <div className="sm:mx-auto sm:w-full sm:max-w-md cursor-pointer" onClick={() => navigate('/modules')}>
         <div className="flex justify-center flex-col items-center group">
           <div className={`p-4 rounded-2xl shadow-lg border transition-transform group-hover:scale-105 ${isSDO ? 'bg-blue-900 border-blue-800' : isQuery ? 'bg-emerald-900 border-emerald-800' : isApis ? 'bg-violet-900 border-violet-800' : 'bg-amber-800 border-amber-700'}`}>
-            {isSDO && <ShieldAlert className="w-12 h-12 text-blue-300" />}
+            {isSDO && <ClipboardEdit className="w-12 h-12 text-blue-300" />}
             {isAdjn && <Gavel className="w-12 h-12 text-amber-300" />}
             {isQuery && <Search className="w-12 h-12 text-emerald-300" />}
             {isApis && <ScanLine className="w-12 h-12 text-violet-300" />}
@@ -119,7 +119,7 @@ export default function Login() {
             <div className={`mb-6 p-4 rounded-lg border-2 shadow-lg ${isSDO ? 'bg-blue-50 border-blue-400' : 'bg-amber-50 border-amber-400'}`}>
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-2 font-bold text-slate-800">
-                  <ShieldAlert className={`w-5 h-5 ${isSDO ? 'text-blue-600' : 'text-amber-600'}`} />
+                  <AlertTriangle className={`w-5 h-5 ${isSDO ? 'text-blue-600' : 'text-amber-600'}`} />
                   <h2>First-Time Setup Required</h2>
                 </div>
                 <p className="text-sm text-slate-600 font-medium">

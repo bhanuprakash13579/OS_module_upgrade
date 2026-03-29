@@ -1723,6 +1723,27 @@ def admin_restore_fulldb(file: UploadFile = File(...), _=Depends(require_admin))
                     detail="Uploaded file is not a valid SQLite database (plaintext or encrypted).",
                 )
 
+        # Snapshot current users before overwriting so we can re-merge them
+        # after the restore (prevents local machine users from being wiped).
+        _local_users: list[dict] = []
+        try:
+            _snap_con = (cipher.connect(db_path) if (cipher and db_key) else _stdlib_sqlite3.connect(db_path))
+            if cipher and db_key:
+                _snap_con.execute(hex_pragma)
+            _snap_cur = _snap_con.execute(
+                "SELECT user_name, user_desig, user_id, user_pwd, created_by, "
+                "created_on, user_status, user_role, closed_on FROM users"
+            )
+            for _row in _snap_cur.fetchall():
+                _local_users.append({
+                    "user_name": _row[0], "user_desig": _row[1], "user_id": _row[2],
+                    "user_pwd": _row[3], "created_by": _row[4], "created_on": _row[5],
+                    "user_status": _row[6], "user_role": _row[7], "closed_on": _row[8],
+                })
+            _snap_con.close()
+        except Exception:
+            _local_users = []
+
         # Close all pooled connections before overwriting
         engine.dispose()
 
@@ -1773,6 +1794,31 @@ def admin_restore_fulldb(file: UploadFile = File(...), _=Depends(require_admin))
             os.unlink(tmp_path)
         except OSError:
             pass
+
+    # Re-merge local users that were not present in the backup.
+    # This prevents users registered on this machine from being wiped out.
+    if _local_users:
+        try:
+            _merge_con = (cipher.connect(db_path) if (cipher and db_key) else _stdlib_sqlite3.connect(db_path))
+            if cipher and db_key:
+                _merge_con.execute(hex_pragma)
+            _existing_ids = {r[0] for r in _merge_con.execute("SELECT user_id FROM users").fetchall()}
+            for _u in _local_users:
+                if _u["user_id"] not in _existing_ids:
+                    _merge_con.execute(
+                        "INSERT INTO users (user_name, user_desig, user_id, user_pwd, "
+                        "created_by, created_on, user_status, user_role, closed_on) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (
+                            _u["user_name"], _u["user_desig"], _u["user_id"],
+                            _u["user_pwd"], _u["created_by"], _u["created_on"],
+                            _u["user_status"], _u["user_role"], _u["closed_on"],
+                        ),
+                    )
+            _merge_con.commit()
+            _merge_con.close()
+        except Exception:
+            pass  # best-effort — don't fail the restore if merge has issues
 
     bust_all_master_caches()  # full DB replaced — invalidate all in-memory caches
     return {

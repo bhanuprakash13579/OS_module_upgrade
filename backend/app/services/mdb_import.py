@@ -333,6 +333,15 @@ def import_from_mdb(mdb_path: str, db: Session) -> dict:
                 deleted_masters.discard(key)
                 master_reactivated += 1
             else:
+                # Even on skip, patch case_type if MDB says Export Case and DB differs.
+                # This fixes records imported before the export-case detection was added.
+                if mdb_case_type == "Export Case":
+                    db.query(CopsMaster).filter(
+                        CopsMaster.os_no == os_no,
+                        CopsMaster.os_year == os_year,
+                        CopsMaster.location_code == location_code,
+                        CopsMaster.case_type != "Export Case",
+                    ).update({"case_type": "Export Case"})
                 master_skipped += 1
             continue
 

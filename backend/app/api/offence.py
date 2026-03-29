@@ -33,6 +33,9 @@ def _pending_filters():
       - is_draft == 'N'        (SDO has submitted it)
       - adjudication_date IS NULL  (no order date set)
       - adj_offr_name IS NULL     (no adjudicating officer assigned)
+      - adjn_offr_remarks IS NULL or ''  (no AC order text — historical MDB data
+            has AC remarks set even when adj_offr_name/date are NULL because the
+            old module stored them separately; non-empty remarks = already adjudicated)
       - quashed != 'Y'           (not quashed)
       - rejected != 'Y'          (not rejected)
     """
@@ -40,6 +43,7 @@ def _pending_filters():
         CopsMaster.is_draft == 'N',
         CopsMaster.adjudication_date.is_(None),
         CopsMaster.adj_offr_name.is_(None),
+        or_(CopsMaster.adjn_offr_remarks.is_(None), CopsMaster.adjn_offr_remarks == ''),
         CopsMaster.quashed != 'Y',
         CopsMaster.rejected != 'Y',
     ]
