@@ -99,7 +99,7 @@ export default function AppLayout() {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden print:h-auto print:overflow-visible">
-        <div className="flex-1 overflow-auto p-4 md:p-8 print:overflow-visible">
+        <div className="flex-1 overflow-auto overscroll-contain p-4 md:p-8 print:overflow-visible">
           <Outlet />
         </div>
       </main>

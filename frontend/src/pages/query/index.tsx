@@ -1,12 +1,13 @@
 import { useState, Component, ReactNode } from 'react';
 import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
-import { FileSearch, LogOut, Menu, ChevronLeft, Download, FileText, Users, AlertTriangle } from 'lucide-react';
+import { FileSearch, LogOut, Menu, ChevronLeft, Download, FileText, Users, AlertTriangle, BarChart2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import OSQueryPage from './OSQueryPage';
 import OSPrintView from './OSPrintView';
 import ExportData from './ExportData';
 import CustomReport from './CustomReport';
 import AdjudicationSummaryReport from './AdjudicationSummaryReport';
+import MonthlyReportPage from './MonthlyReportPage';
 
 class QueryErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
   constructor(props: { children: ReactNode }) {
@@ -74,7 +75,7 @@ export default function QueryModule() {
             </button>
           </div>
         
-        <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain min-h-0">
           <nav className="p-3 space-y-1 mt-2">
             {!isCollapsed && <p className="text-emerald-500/70 text-xs uppercase tracking-widest font-semibold px-3 mb-3">Search & Reports</p>}
             
@@ -112,6 +113,15 @@ export default function QueryModule() {
             >
               <Users className="w-5 h-5 shrink-0 opacity-90" />
               {!isCollapsed && <span className="font-medium leading-tight">Officer Summary</span>}
+            </button>
+
+            <button
+              onClick={() => navigate('/query/monthly-report')}
+              className={`mt-2 w-full flex items-center ${isCollapsed ? 'justify-center py-3' : 'gap-3 px-4 py-3'} rounded-lg text-base transition-colors text-emerald-200 bg-slate-900/40 border border-slate-700/60 hover:bg-slate-800/70`}
+              title={isCollapsed ? 'Monthly Report' : undefined}
+            >
+              <BarChart2 className="w-5 h-5 shrink-0 opacity-90" />
+              {!isCollapsed && <span className="font-medium leading-tight">Monthly Report</span>}
             </button>
           </nav>
         </div>
@@ -160,6 +170,7 @@ export default function QueryModule() {
               <Route path="report" element={<CustomReport />} />
               <Route path="export" element={<ExportData />} />
               <Route path="adjn-summary" element={<AdjudicationSummaryReport />} />
+              <Route path="monthly-report" element={<MonthlyReportPage />} />
             </Routes>
           </QueryErrorBoundary>
         </div>

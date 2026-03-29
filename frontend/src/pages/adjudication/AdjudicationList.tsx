@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Gavel, Search, Filter, AlertCircle, RefreshCw, X, CheckCircle, ShieldAlert } from 'lucide-react';
+import { Gavel, Search, Filter, AlertCircle, RefreshCw, X, CheckCircle, ShieldAlert, FileDown, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
+import { startDownload, progressDownload, completeDownload, failDownload } from '@/components/DownloadToast';
 
 const PER_PAGE = 20;
 
@@ -83,6 +84,70 @@ export default function AdjudicationList() {
     setCurrentPage(1);
     fetchCases(1, searchTerm, '', 'pending');
     setShowFilter(false);
+  };
+
+  const [downloadingKeys, setDownloadingKeys] = useState<Set<string>>(new Set());
+
+  const handleDownload = async (os_no: string, os_year: number) => {
+    const key = `${os_no}-${os_year}`;
+    if (downloadingKeys.has(key)) return; // already in progress
+    setDownloadingKeys(prev => new Set(prev).add(key));
+
+    const label = `OS_${os_no}/${os_year}.pdf`;
+    startDownload(key, label);
+
+    // Fake progress: animate 0 → 70 % while server generates PDF (~binary search)
+    let fakePct = 0;
+    const fakeTimer = setInterval(() => {
+      fakePct = Math.min(70, fakePct + 2);
+      progressDownload(key, fakePct);
+      if (fakePct >= 70) clearInterval(fakeTimer);
+    }, 100);
+
+    try {
+      const res = await api.get(`/os/${os_no}/${os_year}/print-pdf`, {
+        responseType: 'arraybuffer',
+        onDownloadProgress: (evt) => {
+          if (evt.total && evt.total > 0) {
+            clearInterval(fakeTimer);
+            // Map real transfer % onto 70–100 range
+            progressDownload(key, 70 + Math.round((evt.loaded / evt.total) * 30));
+          }
+        },
+      });
+      clearInterval(fakeTimer);
+
+      const defaultName = `OS_${os_no}_${os_year}.pdf`;
+      let savedPath: string | undefined;
+      try {
+        const { save } = await import('@tauri-apps/plugin-dialog');
+        const { writeFile } = await import('@tauri-apps/plugin-fs');
+        const savePath = await save({
+          title: 'Save OS as PDF',
+          defaultPath: defaultName,
+          filters: [{ name: 'PDF Files', extensions: ['pdf'] }],
+        });
+        if (savePath) {
+          await writeFile(savePath, new Uint8Array(res.data));
+          savedPath = savePath;
+        }
+      } catch {
+        // Web fallback (non-Tauri)
+        const blob = new Blob([res.data], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = defaultName;
+        document.body.appendChild(a); a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+      }
+      completeDownload(key, savedPath);
+    } catch {
+      clearInterval(fakeTimer);
+      failDownload(key);
+    } finally {
+      setDownloadingKeys(prev => { const s = new Set(prev); s.delete(key); return s; });
+    }
   };
 
   const currentYear = new Date().getFullYear();
@@ -179,7 +244,7 @@ export default function AdjudicationList() {
 
       {/* Table */}
       <div className="bg-white rounded-xl flex-1 overflow-hidden flex flex-col border border-slate-200">
-        <div className="overflow-auto flex-1">
+        <div className="overflow-auto overscroll-contain flex-1">
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-amber-800 uppercase bg-amber-50 border-b border-amber-200 sticky top-0 z-10">
               <tr>
@@ -190,12 +255,13 @@ export default function AdjudicationList() {
                 <th className="px-5 py-4 font-bold tracking-wider text-right">Value (₹)</th>
                 <th className="px-5 py-4 font-bold tracking-wider text-center">Status</th>
                 <th className="px-5 py-4 font-bold tracking-wider text-center w-32">Action</th>
+                <th className="px-5 py-4 font-bold tracking-wider text-center w-24">PDF</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-slate-500">
+                  <td colSpan={8} className="text-center py-12 text-slate-500">
                     <div className="flex flex-col items-center justify-center space-y-3">
                       <RefreshCw className="animate-spin text-amber-500" size={28} />
                       <span className="font-medium">Loading cases...</span>
@@ -204,7 +270,7 @@ export default function AdjudicationList() {
                 </tr>
               ) : cases.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-slate-500">
+                  <td colSpan={8} className="text-center py-12 text-slate-500">
                     <div className="flex flex-col items-center justify-center space-y-2">
                       <Gavel size={32} className="text-amber-200" />
                       <span className="font-medium">No cases found.</span>
@@ -213,6 +279,10 @@ export default function AdjudicationList() {
                 </tr>
               ) : (
                 cases.map((row, idx) => {
+                  // IMPORTANT: This must stay in sync with backend _pending_filters()
+                  // in offence.py. The backend excludes cases where EITHER of these
+                  // fields is set from the "pending" list. If you change this condition,
+                  // update _pending_filters() too, or cases will appear in wrong lists.
                   const isAdjudicated = !!(row.adjudication_date || row.adj_offr_name);
                   const isQuashed = row.quashed === 'Y' || row.rejected === 'Y';
                   return (
@@ -267,6 +337,23 @@ export default function AdjudicationList() {
                             View
                           </button>
                         )}
+                      </td>
+                      <td className="px-5 py-3 align-middle text-center">
+                        {(isAdjudicated || isQuashed) && (() => {
+                          const dlKey = `${row.os_no}-${row.os_year}`;
+                          const isLoading = downloadingKeys.has(dlKey);
+                          return (
+                            <button
+                              onClick={() => handleDownload(row.os_no, row.os_year)}
+                              disabled={isLoading}
+                              title="Download PDF"
+                              className="inline-flex items-center gap-1 bg-emerald-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                            >
+                              {isLoading ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />}
+                              PDF
+                            </button>
+                          );
+                        })()}
                       </td>
                     </tr>
                   );

@@ -576,6 +576,7 @@ class CustomReportRequest(BaseModel):
     item_cols: List[str] = []
     from_date: Optional[date] = None
     to_date: Optional[date] = None
+    case_type: Optional[str] = None  # "Export Case" | "Arrival Case" | None (all)
 
 
 @router.post("/custom-report")
@@ -601,6 +602,13 @@ def custom_report(
     q = db.query(CopsMaster).filter(CopsMaster.entry_deleted == "N")
     if body.from_date and body.to_date:
         q = q.filter(CopsMaster.os_date >= body.from_date, CopsMaster.os_date <= body.to_date)
+    if body.case_type:
+        if (body.case_type or "").strip().upper() == "EXPORT CASE":
+            q = q.filter(func.upper(CopsMaster.case_type) == "EXPORT CASE")
+        else:
+            q = q.filter(
+                or_(CopsMaster.case_type.is_(None), func.upper(CopsMaster.case_type) != "EXPORT CASE")
+            )
     masters: List[CopsMaster] = q.order_by(CopsMaster.os_year, CopsMaster.os_no).all()
 
     include_items = bool(body.item_cols)

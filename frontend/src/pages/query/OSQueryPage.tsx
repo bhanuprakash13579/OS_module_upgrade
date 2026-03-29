@@ -5,6 +5,12 @@ import api from '../../lib/api';
 import DatePicker from '@/components/DatePicker';
 import { showDownloadToast } from '@/components/DownloadToast';
 
+// Page size for OS Query results. Kept at 50 to avoid scroll jank in
+// Windows WebView2 — each row carries nested item data so 100+ rows
+// cause a layout spike. Safe range: 20–80. Do NOT go above 100 without
+// testing on the target Windows hardware.
+const OS_QUERY_PAGE_SIZE = 50;
+
 // Interface matching the backend OSQueryResponse schema
 interface OSItem {
   items_sno: number;
@@ -70,7 +76,8 @@ export default function OSQueryPage() {
     country_of_departure: '',
     min_value: '',
     max_value: '',
-    item_desc: ''
+    item_desc: '',
+    case_type: ''
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -101,7 +108,7 @@ export default function OSQueryPage() {
     payload['sort_by'] = overrideSortBy ?? sortBy;
     payload['sort_dir'] = overrideSortDir ?? sortDir;
     payload['page'] = targetPage;
-    payload['limit'] = 100;
+    payload['limit'] = OS_QUERY_PAGE_SIZE;
 
     try {
       const response = await api.post('/os-query/search', payload);
@@ -297,12 +304,20 @@ export default function OSQueryPage() {
               <label className="block text-xs font-semibold text-slate-600 mb-1">Max Value (₹)</label>
               <input type="number" name="max_value" value={formData.max_value} onChange={handleInputChange} className="w-full bg-white border border-slate-300 shadow-sm rounded-md text-sm px-3 py-2 text-slate-800 placeholder-slate-400 focus:ring-emerald-500 focus:border-emerald-500 transition-shadow focus:shadow-md" placeholder="Max value..." />
             </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Case Type</label>
+              <select name="case_type" value={formData.case_type} onChange={e => setFormData(f => ({ ...f, case_type: e.target.value }))} className="w-full bg-white border border-slate-300 shadow-sm rounded-md text-sm px-3 py-2 text-slate-800 focus:ring-emerald-500 focus:border-emerald-500">
+                <option value="">All Cases</option>
+                <option value="Arrival Case">Arrival Cases</option>
+                <option value="Export Case">Export Cases</option>
+              </select>
+            </div>
           </div>
 
           <div className="flex justify-end border-t border-slate-100 pt-4">
             <button 
               type="button" 
-              onClick={() => setFormData({os_no:'', os_year:'', from_date:'', to_date:'', pax_name:'', passport_no:'', flight_no:'', country_of_departure:'', min_value:'', max_value:'', item_desc:''})}
+              onClick={() => setFormData({os_no:'', os_year:'', from_date:'', to_date:'', pax_name:'', passport_no:'', flight_no:'', country_of_departure:'', min_value:'', max_value:'', item_desc:'', case_type:''})}
               className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 shadow-sm rounded-md hover:bg-slate-50 mr-3"
             >
               Clear

@@ -448,6 +448,19 @@ def close_user(user_id: str, db: Session = Depends(get_db)):
     return {"message": f"User '{user_id}' closed."}
 
 
+@router.delete("/users/{user_id}/hard", dependencies=[Depends(require_admin)])
+def hard_delete_user(user_id: str, db: Session = Depends(get_db)):
+    """Completely remove a CLOSED user from the database."""
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    if user.user_status != "CLOSED":
+        raise HTTPException(status_code=400, detail="Only CLOSED users can be permanently deleted.")
+    db.delete(user)
+    db.commit()
+    return {"message": f"User '{user_id}' permanently deleted."}
+
+
 # ── Backup & Restore ──────────────────────────────────────────────────────────
 
 @router.get("/backup/export")
@@ -1326,6 +1339,10 @@ class PrintConfigIn(BaseModel):
     effective_from: date
 
 
+class RemarksTemplateUpdate(BaseModel):
+    value: str
+
+
 class BaggageRuleIn(BaseModel):
     rule_key: str
     rule_label: Optional[str] = None
@@ -1764,4 +1781,341 @@ def admin_restore_fulldb(file: UploadFile = File(...), _=Depends(require_admin))
             "All data has been replaced with the backup. "
             "Refresh your browser to continue."
         )
+    }
+
+
+# ── Remarks Templates ─────────────────────────────────────────────────────────
+# Stored in PrintTemplateConfig with special field_key prefix "remarks_".
+# No versioning needed — only the single row per key is ever written.
+
+_REMARKS_TPL_DEFAULTS: dict = {
+    # ── Opening paragraphs ───────────────────────────────────────────────────
+    "remarks_export_supdt_opening": (
+        "Departure — SUPDT Opening",
+        (
+            "On the basis of specific intelligence/information received by the department, "
+            "the pax was detained at the Departure Hall on {date} while about to depart to "
+            "{city} by flight no. {flight_no}."
+        ),
+    ),
+    "remarks_import_supdt_opening": (
+        "Arrival — SUPDT Opening",
+        "The pax arrived on {date} by flight no. {flight_no} from {city}.",
+    ),
+    # ── SUPDT closing paragraphs (indirect language — section nos indicate outcome) ──
+    "remarks_supdt_import_confs_closing": (
+        "Arrival — SUPDT Closing (Absolute Confiscation)",
+        (
+            "The aforesaid goods were not declared to the Customs authorities at the time of "
+            "arrival as required under Section 77 of the Customs Act, 1962, and the pax was "
+            "unable to produce any valid import authorization/permit for the same. "
+            "The said goods being absolutely prohibited from import are liable for confiscation "
+            "under Sections 111(d), 111(l), 111(m) and 111(o) of the Customs Act, 1962 read "
+            "with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992, for "
+            "improper importation. The pax has also rendered himself/herself liable for penal "
+            "action under Section 112(a) of the Customs Act, 1962. Put up for Adjudication please."
+        ),
+    ),
+    "remarks_supdt_import_rf_closing": (
+        "Arrival — SUPDT Closing (Redemption Fine)",
+        (
+            "The aforesaid goods were not declared to the Customs authorities at the time of "
+            "arrival as required under Section 77 of the Customs Act, 1962. The said goods, "
+            "being commercial in nature and non-bonafide baggage, are liable for confiscation "
+            "under Sections 111(d), 111(l) and 111(m) of the Customs Act, 1962 read with "
+            "Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992. "
+            "The pax has also rendered himself/herself liable for penal action under Section 112 "
+            "of the Customs Act, 1962. Put up for Adjudication please."
+        ),
+    ),
+    "remarks_supdt_import_ref_closing": (
+        "Arrival — SUPDT Closing (Re-export)",
+        (
+            "The aforesaid goods were not declared to the Customs authorities at the time of "
+            "arrival as required under Section 77 of the Customs Act, 1962, and the pax was "
+            "unable to produce any valid import authorization/permit for the same. "
+            "The said goods being restricted for import under the applicable DGFT "
+            "notification/policy are liable for confiscation under Sections 111(d), 111(l), "
+            "111(m) and 111(o) of the Customs Act, 1962 read with Section 3(3) of the Foreign "
+            "Trade (Development & Regulation) Act, 1992. The pax has also rendered "
+            "himself/herself liable for penal action under Section 112(a) of the Customs Act, "
+            "1962. Put up for Adjudication please."
+        ),
+    ),
+    "remarks_supdt_export_confs_closing": (
+        "Departure — SUPDT Closing (Absolute Confiscation)",
+        (
+            "The aforesaid goods were not declared to the Customs authorities at the time of "
+            "departure as required under Section 40 of the Customs Act, 1962, and the pax was "
+            "unable to produce any valid export authorization/permit. "
+            "The said goods being absolutely prohibited from export are liable for confiscation "
+            "under Section 113 of the Customs Act, 1962 read with Section 3(3) of the Foreign "
+            "Trade (Development & Regulation) Act, 1992, for improper exportation. "
+            "The pax has also rendered himself/herself liable for penal action under Section 114 "
+            "of the Customs Act, 1962. Put up for Adjudication please."
+        ),
+    ),
+    "remarks_supdt_export_rf_closing": (
+        "Departure — SUPDT Closing (Redemption Fine)",
+        (
+            "The aforesaid goods were not declared to the Customs authorities at the time of "
+            "departure as required under Section 40 of the Customs Act, 1962. "
+            "The said goods, being in violation of export regulations, are liable for "
+            "confiscation under Section 113 of the Customs Act, 1962 read with Section 3(3) of "
+            "the Foreign Trade (Development & Regulation) Act, 1992. "
+            "The pax has also rendered himself/herself liable for penal action under Section 114 "
+            "of the Customs Act, 1962. Put up for Adjudication please."
+        ),
+    ),
+    # ── AC disposal paragraphs (explicit orders — {items} placeholder replaced at runtime) ─
+    "remarks_ac_import_confs_disposal": (
+        "Arrival — AC Disposal (Absolute Confiscation)",
+        (
+            "{items} being absolutely prohibited from import cannot be allowed to be redeemed "
+            "and are hereby absolutely confiscated under Sections 111(d), 111(l), 111(m) and "
+            "111(o) of the Customs Act, 1962 read with Section 3(3) of the FT(D&R) Act, 1992."
+        ),
+    ),
+    "remarks_ac_import_rf_disposal": (
+        "Arrival — AC Disposal (Redemption Fine)",
+        (
+            "{items} are allowed to be redeemed on payment of the applicable Customs duty and "
+            "Redemption Fine as imposed under Section 125 of the Customs Act, 1962."
+        ),
+    ),
+    "remarks_ac_import_ref_disposal": (
+        "Arrival — AC Disposal (Re-export)",
+        (
+            "{items} are directed to be re-exported within the time stipulated by the Customs "
+            "authorities, on payment of Re-export Fine as imposed under Section 125 of the "
+            "Customs Act, 1962."
+        ),
+    ),
+    "remarks_ac_export_confs_disposal": (
+        "Departure — AC Disposal (Absolute Confiscation)",
+        (
+            "{items} being absolutely prohibited from export cannot be allowed to be redeemed "
+            "and are hereby absolutely confiscated under Section 113 of the Customs Act, 1962."
+        ),
+    ),
+    "remarks_ac_export_rf_disposal": (
+        "Departure — AC Disposal (Redemption Fine)",
+        (
+            "{items} are allowed to be redeemed on payment of the applicable Redemption Fine "
+            "as imposed under Section 125 of the Customs Act, 1962."
+        ),
+    ),
+}
+
+
+@router.get("/config/remarks-templates")
+def get_remarks_templates(db: Session = Depends(get_db)):
+    """Public — no auth required. Returns current remarks opening template text."""
+    from datetime import date as _date
+    today = _date.today()
+    result = {}
+    for key, (label, default) in _REMARKS_TPL_DEFAULTS.items():
+        row = (
+            db.query(PrintTemplateConfig)
+            .filter(
+                PrintTemplateConfig.field_key == key,
+                PrintTemplateConfig.effective_from <= today,
+            )
+            .order_by(PrintTemplateConfig.effective_from.desc())
+            .first()
+        )
+        result[key] = {
+            "id": row.id if row else None,
+            "label": label,
+            "value": row.field_value if row else default,
+        }
+    return result
+
+
+@router.put("/config/remarks-templates/{key}")
+def update_remarks_template(
+    key: str,
+    body: RemarksTemplateUpdate,
+    admin=Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """Admin — update or create a remarks template. Placeholders: {date}, {city}, {flight_no}."""
+    from datetime import date as _date, datetime as _dt, timezone
+    if key not in _REMARKS_TPL_DEFAULTS:
+        raise HTTPException(status_code=404, detail="Unknown template key.")
+    value = body.value.strip()
+    if not value:
+        raise HTTPException(status_code=400, detail="Template text cannot be empty.")
+    row = db.query(PrintTemplateConfig).filter(PrintTemplateConfig.field_key == key).first()
+    if row:
+        row.field_value = value
+    else:
+        label, _ = _REMARKS_TPL_DEFAULTS[key]
+        db.add(PrintTemplateConfig(
+            field_key=key,
+            field_label=label,
+            field_value=value,
+            effective_from=_date(1900, 1, 1),
+            created_by=admin.get("sub", "admin"),
+            created_at=_dt.now(timezone.utc),
+        ))
+    db.commit()
+    return {"message": "Updated"}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Hard-Purge OS Case
+# ══════════════════════════════════════════════════════════════════════════════
+
+class PurgeOSRequest(BaseModel):
+    os_no: str
+    os_year: int
+    admin_password: str
+
+
+@router.post("/purge-os")
+def purge_os_case(
+    body: PurgeOSRequest,
+    db: Session = Depends(get_db),
+    admin: dict = Depends(require_admin),
+):
+    """
+    IRREVERSIBLE hard-delete of a single OS case and ALL related data.
+    Removes every trace from cops_master, cops_items, appeal, UOS staging,
+    report staging, BR/DR records, warehouse, mahazar, and all archive tables.
+    Admin password is re-verified before execution as an extra security layer.
+    """
+    import json as _json
+
+    # Re-verify admin password (JWT alone is not sufficient for destructive ops)
+    if not verify_admin_credentials("sysadmin", body.admin_password):
+        raise HTTPException(status_code=403, detail="Admin password incorrect.")
+
+    os_no = body.os_no.strip()
+    if not os_no:
+        raise HTTPException(status_code=400, detail="OS number cannot be blank.")
+
+    case = db.query(CopsMaster).filter(
+        CopsMaster.os_no == os_no,
+        CopsMaster.os_year == body.os_year,
+    ).first()
+    if not case:
+        raise HTTPException(
+            status_code=404,
+            detail=f"OS {os_no}/{body.os_year} not found."
+        )
+
+    # Collect linked BR numbers (initial BR + post-adjudication BRs)
+    br_nos: list = []
+    if case.br_no_num:
+        try:
+            br_nos.append(int(case.br_no_num))
+        except (ValueError, TypeError):
+            pass
+    if case.post_adj_br_entries:
+        try:
+            for entry in _json.loads(case.post_adj_br_entries):
+                no_val = entry.get("no") or entry.get("br_no")
+                if no_val:
+                    br_nos.append(int(no_val))
+        except Exception:
+            pass
+
+    # Collect linked DR number
+    dr_no_int = None
+    if case.dr_no:
+        try:
+            dr_no_int = int(str(case.dr_no).strip())
+        except (ValueError, TypeError):
+            pass
+
+    # Integer form of os_no for os_master / item_trans (legacy integer keys)
+    os_no_int = None
+    try:
+        os_no_int = int(os_no)
+    except (ValueError, TypeError):
+        pass
+
+    deleted: dict = {}
+
+    def _del(sql: str, **params) -> int:
+        r = db.execute(text(sql), params)
+        return r.rowcount if r.rowcount is not None else 0
+
+    # ── 1. cops_items and archive/temp copies ─────────────────────────────────
+    deleted["cops_items"]         = _del("DELETE FROM cops_items WHERE os_no = :n AND os_year = :y", n=os_no, y=body.os_year)
+    deleted["cops_items_deleted"] = _del("DELETE FROM cops_items_deleted WHERE os_no = :n AND os_year = :y", n=os_no, y=body.os_year)
+    deleted["cops_items_temp"]    = _del("DELETE FROM cops_items_temp WHERE os_no = :n AND os_year = :y", n=os_no, y=body.os_year)
+
+    # ── 2. Appeal (items first, then master) ──────────────────────────────────
+    deleted["appeal_items"]  = _del("DELETE FROM appeal_items WHERE os_no = :n", n=os_no)
+    deleted["appeal_master"] = _del("DELETE FROM appeal_master WHERE os_no = :n AND os_year = :y", n=os_no, y=body.os_year)
+
+    # ── 3. UOS staging ────────────────────────────────────────────────────────
+    deleted["uos_items"]  = _del("DELETE FROM uos_items WHERE os_no = :n AND os_year = :y", n=os_no, y=body.os_year)
+    deleted["uos_master"] = _del("DELETE FROM uos_master WHERE os_no = :n AND os_year = :y", n=os_no, y=body.os_year)
+
+    # ── 4. Report staging ─────────────────────────────────────────────────────
+    deleted["os_rpt_items"]            = _del("DELETE FROM os_rpt_items WHERE os_no = :n", n=os_no)
+    deleted["os_rpt_master"]           = _del("DELETE FROM os_rpt_master WHERE os_no = :n AND os_year = :y", n=os_no, y=body.os_year)
+    deleted["os_item_compare_remarks"] = _del("DELETE FROM os_item_compare_remarks WHERE os_no = :n", n=os_no)
+
+    # ── 5. os_master / item_trans (integer key + exact date for precision) ─────
+    if os_no_int is not None and case.os_date:
+        deleted["os_master"]          = _del("DELETE FROM os_master WHERE osnumber = :n AND osdate = :d", n=os_no_int, d=case.os_date)
+        deleted["os_master_deleted"]  = _del("DELETE FROM os_master_deleted WHERE osnumber = :n AND osdate = :d", n=os_no_int, d=case.os_date)
+        deleted["item_trans"]         = _del("DELETE FROM item_trans WHERE item_os_no = :n AND item_osdate = :d", n=os_no_int, d=case.os_date)
+        deleted["item_trans_deleted"] = _del("DELETE FROM item_trans_deleted WHERE item_os_no = :n AND item_osdate = :d", n=os_no_int, d=case.os_date)
+
+    # ── 6. Baggage Receipts (by specific BR numbers stored on the case) ────────
+    br_del = 0
+    br_items_del = 0
+    for brn in set(br_nos):
+        br_items_del += _del("DELETE FROM br_items WHERE br_no = :b", b=brn)
+        br_del       += _del("DELETE FROM br_master WHERE br_no = :b AND os_no = :n", b=brn, n=os_no)
+        _del("DELETE FROM old_br_items WHERE br_no = :b", b=brn)
+        _del("DELETE FROM old_br_master WHERE br_no = :b", b=brn)
+    if br_items_del:
+        deleted["br_items"]  = br_items_del
+    if br_del:
+        deleted["br_master"] = br_del
+
+    # ── 7. Detention Receipt (by the DR number stored on the case) ─────────────
+    if dr_no_int is not None:
+        deleted["dr_items"]  = _del("DELETE FROM dr_items WHERE dr_no = :d", d=dr_no_int)
+        deleted["dr_master"] = _del("DELETE FROM dr_master WHERE dr_no = :d AND os_no = :n", d=dr_no_int, n=os_no)
+
+    # ── 8. Warehouse — general (cascade via sub-query on wh_no) ───────────────
+    _del("DELETE FROM wh_items WHERE wh_no IN (SELECT wh_no FROM wh_master WHERE os_no = :n)", n=os_no)
+    _del("DELETE FROM wh_release WHERE wh_no IN (SELECT wh_no FROM wh_master WHERE os_no = :n)", n=os_no)
+    _del("DELETE FROM wh_location_change WHERE wh_no IN (SELECT wh_no FROM wh_master WHERE os_no = :n)", n=os_no)
+    deleted["wh_master"] = _del("DELETE FROM wh_master WHERE os_no = :n", n=os_no)
+
+    # ── 9. Valuables warehouse ────────────────────────────────────────────────
+    _del("DELETE FROM valuables_items WHERE wh_no IN (SELECT wh_no FROM valuables_master WHERE os_no = :n)", n=os_no)
+    deleted["valuables_master"] = _del("DELETE FROM valuables_master WHERE os_no = :n", n=os_no)
+
+    # ── 10. Mahazar / forwarding memo ─────────────────────────────────────────
+    deleted["mahazar_items"]  = _del("DELETE FROM mahazar_items WHERE os_no = :n", n=os_no)
+    deleted["mahazar_master"] = _del("DELETE FROM mahazar_master WHERE os_no = :n", n=os_no)
+
+    # ── 11. cops_master archive and temp copies ────────────────────────────────
+    deleted["cops_master_deleted"] = _del("DELETE FROM cops_master_deleted WHERE os_no = :n AND os_year = :y", n=os_no, y=body.os_year)
+    deleted["cops_master_temp"]    = _del("DELETE FROM cops_master_temp WHERE os_no = :n AND os_year = :y", n=os_no, y=body.os_year)
+
+    # ── 12. Primary record — must be last ─────────────────────────────────────
+    deleted["cops_master"] = _del("DELETE FROM cops_master WHERE os_no = :n AND os_year = :y", n=os_no, y=body.os_year)
+
+    db.commit()
+
+    total = sum(v for v in deleted.values() if isinstance(v, int))
+    _log.warning(
+        "ADMIN HARD-PURGE: OS %s/%s permanently deleted by '%s'. Total rows: %d. Breakdown: %s",
+        os_no, body.os_year, admin.get("sub", "?"), total, deleted,
+    )
+
+    return {
+        "message": f"OS {os_no}/{body.os_year} has been permanently deleted.",
+        "total_rows_deleted": total,
+        "breakdown": {k: v for k, v in sorted(deleted.items()) if v and v > 0},
     }

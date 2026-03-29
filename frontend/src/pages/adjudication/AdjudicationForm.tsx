@@ -193,9 +193,9 @@ const CaseDetailsPanel = memo(function CaseDetailsPanel({ osCase }: { osCase: OS
     ['Case Type', osCase.case_type],
     ['Flight No.', osCase.flight_no],
     ['Flight Date', fmtDate(osCase.flight_date)],
-    ['Date of Departure from India', fmtDateStr(osCase.date_of_departure)],
-    ['Stay Abroad (Days)', osCase.stay_abroad_days != null ? String(osCase.stay_abroad_days) : undefined],
-    ['Arrived From', osCase.arrived_from || osCase.country_of_departure],
+    [osCase.case_type === 'Export Case' ? 'Proposed Date of Travel' : 'Date of Departure from India', fmtDateStr(osCase.date_of_departure)],
+    [osCase.case_type === 'Export Case' ? 'Stay Abroad' : 'Stay Abroad (Days)', osCase.case_type === 'Export Case' ? 'N/A' : (osCase.stay_abroad_days != null ? String(osCase.stay_abroad_days) : undefined)],
+    [osCase.case_type === 'Export Case' ? 'Supposed Destination' : 'Arrived From', osCase.arrived_from || osCase.country_of_departure],
     ['Booked By', osCase.booked_by],
     ['Detained By', osCase.detained_by],
     ['Detention Date', fmtDate(osCase.detention_date)],
@@ -348,7 +348,7 @@ export default function AdjudicationForm() {
       const text = generateRemark('ADJN', caseItems, {
         pax_name: osCase?.pax_name, flight_no: osCase?.flight_no,
         flight_date: osCase?.flight_date, port_of_dep_dest: osCase?.port_of_dep_dest,
-        os_date: osCase?.os_date,
+        os_date: osCase?.os_date, case_type: osCase?.case_type,
       }, {});
       setRemarks(text);
     }
@@ -359,7 +359,7 @@ export default function AdjudicationForm() {
     const text = generateRemark('ADJN', caseItems, {
       pax_name: osCase?.pax_name, flight_no: osCase?.flight_no,
       flight_date: osCase?.flight_date, port_of_dep_dest: osCase?.port_of_dep_dest,
-      os_date: osCase?.os_date,
+      os_date: osCase?.os_date, case_type: osCase?.case_type,
     }, contextAnswers);
     setRemarks(text);
     setShowContextModal(false);
@@ -577,7 +577,9 @@ export default function AdjudicationForm() {
     );
   }
 
-  const isAlreadyAdjudicated = !!osCase.adjudication_date;
+  // IMPORTANT: Must match backend _pending_filters() in offence.py.
+  // A case is adjudicated if EITHER field is set — locks the form to VIEW ONLY.
+  const isAlreadyAdjudicated = !!(osCase.adjudication_date || osCase.adj_offr_name);
   const canQuash = osCase.adjudication_time
     ? (new Date().getTime() - new Date(osCase.adjudication_time).getTime() < 3600000)
     : true;

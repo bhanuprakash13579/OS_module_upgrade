@@ -46,7 +46,7 @@ def universal_query(
     for br in br_query.order_by(BrMaster.br_date.desc()).limit(50).all():
         br_results.append({
             "br_no": f"{br.br_no}/{br.br_year}",
-            "date": br.br_date.isoformat(),
+            "date": br.br_date.isoformat() if br.br_date else None,
             "amount": br.total_payable or 0.0,
             "status": "Printed" if br.br_printed == "Y" else "Open"
         })
@@ -63,7 +63,7 @@ def universal_query(
     for dr in dr_query.order_by(DrMaster.dr_date.desc()).limit(50).all():
         dr_results.append({
             "dr_no": f"{dr.dr_no}/{dr.dr_year}",
-            "date": dr.dr_date.isoformat(),
+            "date": dr.dr_date.isoformat() if dr.dr_date else None,
             "amount": dr.total_items_value or 0.0,
             "status": "Closed" if dr.closure_ind == "Y" else "Active"
         })
@@ -80,9 +80,9 @@ def universal_query(
     for os in os_query.order_by(CopsMaster.os_date.desc()).limit(50).all():
         os_results.append({
             "os_no": f"{os.os_no}/{os.os_year}",
-            "date": os.os_date.isoformat(),
+            "date": os.os_date.isoformat() if os.os_date else None,
             "val": os.total_items_value or 0.0,
-            "status": 'Adjudicated' if os.adjudication_date else ('Quashed' if os.quashed == 'Y' else 'Pending')
+            "status": 'Adjudicated' if (os.adjudication_date or os.adj_offr_name) else ('Quashed' if os.quashed == 'Y' else ('Rejected' if os.rejected == 'Y' else 'Pending'))
         })
 
     return {

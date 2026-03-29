@@ -310,7 +310,7 @@ export default function OffenceList() {
 
       {/* Table */}
       <div className="bg-white rounded-xl flex-1 overflow-hidden flex flex-col border border-slate-200 relative">
-        <div className="overflow-auto flex-1">
+        <div className="overflow-auto overscroll-contain flex-1">
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
               <tr>
@@ -345,7 +345,9 @@ export default function OffenceList() {
                 </tr>
               ) : (
                 cases.map((row, idx) => {
-                  const isAdjudicated = !!row.adjudication_date;
+                  // IMPORTANT: Must match backend _pending_filters() in offence.py.
+                  // A case is adjudicated if EITHER adjudication_date or adj_offr_name is set.
+                  const isAdjudicated = !!(row.adjudication_date || row.adj_offr_name);
                   const totalValue = row.total_items_value || 0;
                   const rowKey = `${row.os_no}-${row.os_year}`;
                   const isExpanded = expandedBrDr === rowKey;

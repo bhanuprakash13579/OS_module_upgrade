@@ -151,7 +151,7 @@
       </tr>
       <tr>
         <td class="bold td-bb4">From / To</td>
-        <td class="td-bb4 upper">{{ port_or_country }} TO CHENNAI</td>
+        <td class="td-bb4 upper">{{ from_to_text }}</td>
       </tr>
       <tr>
         <td class="bold td-bb4">Nationality</td>
@@ -161,7 +161,7 @@
       </tr>
       <tr>
         <td class="bold td-bb4">Duration of Stay Abroad</td>
-        <td class="td-br4 td-bb4 upper" colspan="3">{{ stay_abroad_days }} Days</td>
+        <td class="td-br4 td-bb4 upper" colspan="3">{{ stay_abroad_text }}</td>
         <td class="bold td-bb4">Normal Residence in</td>
         <td class="td-bb4 upper">{{ residence_at }}</td>
       </tr>
@@ -356,9 +356,9 @@
     <tbody>
       <tr>
         <td style="width:25%;font-weight:bold;border-bottom:1px solid #000">B.R.No. And Date</td>
-        <td style="width:23%;border-bottom:1px solid #000;border-right:1px solid #000"></td>
+        <td style="width:23%;border-bottom:1px solid #000;border-right:1px solid #000;word-break:break-word">{{ br_display }}</td>
         <td style="width:20%;font-weight:bold;border-bottom:1px solid #000">Goods Detained Vide</td>
-        <td style="width:32%;border-bottom:1px solid #000">DR No. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Dt. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td>
+        <td style="width:32%;border-bottom:1px solid #000;word-break:break-word">{{ dr_display }}</td>
       </tr>
       <tr>
         <td style="font-weight:bold;border-bottom:1px solid #000">Duty</td>

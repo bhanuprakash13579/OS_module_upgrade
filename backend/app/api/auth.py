@@ -163,8 +163,8 @@ def list_users(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Return all non-TEMP users. Frontend filters by role for the current module."""
-    return db.query(User).filter(User.user_status != "TEMP").all()
+    """Return all ACTIVE users. Frontend filters by role for the current module."""
+    return db.query(User).filter(User.user_status == "ACTIVE").all()
 
 
 # ── Create user ───────────────────────────────────────────────────────────────

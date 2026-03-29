@@ -64,7 +64,9 @@ _MASTER_RENAME = {
 }
 
 # Columns from MDB that don't exist in new schema — skip them
-_MASTER_SKIP = {"table_name"}
+# NOTE: table_name is intentionally NOT skipped — it is read below to detect
+# departure/SDO cases (table_name="SDO") and map them to case_type="Export Case".
+_MASTER_SKIP: set = set()
 
 
 def _flt_safe(val) -> Optional[float]:
@@ -248,6 +250,10 @@ def import_from_mdb(mdb_path: str, db: Session) -> dict:
         key = (os_no, os_year, location_code)
         mdb_entry_deleted = _str_safe(row.get("entry_deleted")) or "N"
 
+        # Derive case_type: SDO table_name means departure/export case
+        mdb_table_name = (row.get("table_name") or "").strip().upper()
+        mdb_case_type = "Export Case" if mdb_table_name == "SDO" else _str_safe(row.get("case_type"))
+
         if key in existing_masters:
             # If DB has this as deleted but MDB cops_master has it as active →
             # overwrite ALL fields with the new active record's data.
@@ -258,6 +264,7 @@ def import_from_mdb(mdb_path: str, db: Session) -> dict:
                     CopsMaster.location_code == location_code,
                 ).update({
                     "os_date":                  os_date_parsed,
+                    "case_type":                mdb_case_type,
                     "pax_name":                 _str_safe(row.get("pax_name")),
                     "pax_name_modified_by_vig": _str_safe(row.get("pax_name_modified_by_vig")),
                     "pax_address1":             _str_safe(row.get("pax_address1")),
@@ -334,6 +341,7 @@ def import_from_mdb(mdb_path: str, db: Session) -> dict:
             os_year=os_year,
             location_code=location_code,
             os_date=os_date_parsed,
+            case_type=mdb_case_type,
             # Passenger
             pax_name=_str_safe(row.get("pax_name")),
             pax_name_modified_by_vig=_str_safe(row.get("pax_name_modified_by_vig")),
@@ -435,11 +443,15 @@ def import_from_mdb(mdb_path: str, db: Session) -> dict:
                 deleted_skipped += 1
                 continue
 
+            del_table_name = (row.get("table_name") or "").strip().upper()
+            del_case_type = "Export Case" if del_table_name == "SDO" else _str_safe(row.get("case_type"))
+
             m = CopsMaster(
                 os_no=os_no,
                 os_year=os_year,
                 location_code=location_code,
                 os_date=del_os_date_parsed,
+                case_type=del_case_type,
                 pax_name=_str_safe(row.get("pax_name")),
                 pax_name_modified_by_vig=_str_safe(row.get("pax_name_modified_by_vig")),
                 pax_address1=_str_safe(row.get("pax_address1")),

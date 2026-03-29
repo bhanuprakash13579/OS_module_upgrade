@@ -18,6 +18,33 @@ from app.services.rules_engine import BusinessRulesEngine
 router = APIRouter()
 
 
+# ── Centralized "pending adjudication" filter ─────────────────────────────────
+# IMPORTANT: This is the single source of truth for what makes a case "pending".
+# It is used by:
+#   1. get_all_os()             — the generic list endpoint (?status=pending)
+#   2. get_pending_count()      — sidebar badge count
+#   3. get_pending_adjudication() — dedicated pending list endpoint
+# If the definition of "pending" ever changes, update this ONE function.
+def _pending_filters():
+    """Return SQLAlchemy filter criteria for a truly pending case.
+
+    A case is pending adjudication when ALL of these are true:
+      - entry_deleted != 'Y'   (not soft-deleted — applied by the caller)
+      - is_draft == 'N'        (SDO has submitted it)
+      - adjudication_date IS NULL  (no order date set)
+      - adj_offr_name IS NULL     (no adjudicating officer assigned)
+      - quashed != 'Y'           (not quashed)
+      - rejected != 'Y'          (not rejected)
+    """
+    return [
+        CopsMaster.is_draft == 'N',
+        CopsMaster.adjudication_date.is_(None),
+        CopsMaster.adj_offr_name.is_(None),
+        CopsMaster.quashed != 'Y',
+        CopsMaster.rejected != 'Y',
+    ]
+
+
 # ── Free-allowance helper ─────────────────────────────────────────────────────
 def _eff_fa(item_value: float, item) -> float:
     """
@@ -318,13 +345,17 @@ def get_all_os(
     br_dr_pending: bool = Query(False),
 ):
     """All active users: OS case list with server-side pagination, search, and filters."""
-    q = db.query(CopsMaster).filter(CopsMaster.entry_deleted == "N")
+    q = db.query(CopsMaster).filter(
+        CopsMaster.entry_deleted == "N",
+        CopsMaster.os_year <= 2100,   # guard against stray data-entry errors (e.g. os_year=20007)
+    )
     if search.strip():
         s = f"%{search.strip()}%"
         q = q.filter(or_(
             CopsMaster.os_no.ilike(s),
             CopsMaster.pax_name.ilike(s),
             CopsMaster.passport_no.ilike(s),
+            CopsMaster.old_passport_no.ilike(s),
             CopsMaster.flight_no.ilike(s),
         ))
     if year:
@@ -334,21 +365,23 @@ def get_all_os(
         if sl == 'draft':
             q = q.filter(CopsMaster.is_draft == 'Y')
         elif sl == 'adjudicated':
-            # Adjudicated = adjudication_date is set (order has been issued)
+            # Adjudicated = EITHER adjudication_date OR adj_offr_name is set.
+            # This mirrors the inverse of _pending_filters() — a case exits the
+            # pending queue as soon as either field is populated.  Old imported
+            # records may have adj_offr_name without a date, so checking only
+            # adjudication_date would make those invisible in both lists.
             q = q.filter(
                 CopsMaster.is_draft == 'N',
                 CopsMaster.quashed != 'Y',
                 CopsMaster.rejected != 'Y',
-                CopsMaster.adjudication_date.isnot(None),
+                or_(
+                    CopsMaster.adjudication_date.isnot(None),
+                    CopsMaster.adj_offr_name.isnot(None),
+                )
             )
         elif sl == 'pending':
-            # Pending = not adjudicated, not quashed/rejected, not a draft
-            q = q.filter(
-                CopsMaster.is_draft == 'N',
-                CopsMaster.adjudication_date.is_(None),
-                CopsMaster.quashed != 'Y',
-                CopsMaster.rejected != 'Y',
-            )
+            # Uses the centralized _pending_filters() — see top of file
+            q = q.filter(*_pending_filters())
         elif sl == 'quashed':
             q = q.filter(or_(CopsMaster.quashed == 'Y', CopsMaster.rejected == 'Y'))
     # BR/DR pending: adjudicated cases where no post-adj receipt data has been entered yet
@@ -423,12 +456,10 @@ def get_pending_count(
             CopsItems.items_release_category.in_(['Under OS', 'Under Duty'])
         )
     )
+    # Uses _pending_filters() — single source of truth (see top of file)
     count = db.query(func.count(CopsMaster.id)).filter(
         CopsMaster.entry_deleted == "N",
-        CopsMaster.is_draft == "N",
-        CopsMaster.adjudication_date.is_(None),
-        CopsMaster.quashed != "Y",
-        CopsMaster.rejected != "Y",
+        *_pending_filters(),
         pending_items_subq,
     ).scalar()
     return {"count": count or 0}
@@ -448,13 +479,10 @@ def get_pending_adjudication(
             CopsItems.items_release_category.in_(['Under OS', 'Under Duty'])
         )
     )
+    # Uses _pending_filters() — single source of truth (see top of file)
     records = db.query(CopsMaster).filter(
         CopsMaster.entry_deleted == "N",
-        CopsMaster.is_draft == "N",
-        CopsMaster.adjudication_date.is_(None),
-        CopsMaster.adj_offr_name.is_(None),
-        CopsMaster.quashed != "Y",
-        CopsMaster.rejected != "Y",
+        *_pending_filters(),
         pending_items_subq,
     ).order_by(CopsMaster.os_year.desc(), cast(CopsMaster.os_no, SAInteger).desc()).limit(200).all()
     # List view only needs master-level fields — skip item join for performance
@@ -562,15 +590,18 @@ def update_os(
     # Free allowance applies to "Under Duty" goods (reduces dutiable value) and "Under OS" goods (reduces seized value)
     total_val = 0.0
     total_duty = 0.0
+    total_fa = 0.0
     for item in data.items:
         item_value = float(item.items_value or 0.0)
         fa = _eff_fa(item_value, item)
         rate = float(item.cumulative_duty_rate or 0.0)
         duty = round(max(0.0, (item_value - fa)) * rate / 100.0, 2)
         total_val += item_value
+        total_fa += fa
         total_duty = round(total_duty + duty, 2)
 
     os_obj.total_items_value = total_val
+    os_obj.total_fa_value = round(total_fa, 2)
     os_obj.total_duty_amount = total_duty
     os_obj.total_payable = total_duty
     os_obj.total_items = len(data.items)
@@ -627,6 +658,50 @@ def mark_printed(
         os_obj.os_printed = 'Y'
         db.commit()
     return {"message": "O.S. marked as printed.", "os_no": os_no, "os_year": os_year}
+
+
+# ── BR / DR display helpers for PDF template ─────────────────────────────────
+def _fmt_dot_date(d) -> str:
+    """Format a date (date object or ISO string) as dd.mm.yyyy with dots."""
+    if not d:
+        return ""
+    try:
+        from datetime import date as _date
+        if isinstance(d, _date):
+            return d.strftime("%d.%m.%Y")
+        # Try parsing ISO string — strip any time component before the T or space
+        from datetime import datetime as _dt
+        date_part = str(d).split("T")[0].split(" ")[0]
+        return _dt.strptime(date_part, "%Y-%m-%d").strftime("%d.%m.%Y")
+    except Exception:
+        return str(d)
+
+
+def _fmt_br_entries(raw_json) -> str:
+    """Return e.g. 'BR.No.9291 dt.05.03.2026, BR.No.9292 dt.06.03.2026' or ''."""
+    if not raw_json:
+        return ""
+    try:
+        import json as _json
+        entries = _json.loads(raw_json) if isinstance(raw_json, str) else raw_json
+        parts = []
+        for e in entries:
+            no = (e.get("no") or "").strip()
+            if not no:
+                continue
+            dt = _fmt_dot_date(e.get("date"))
+            parts.append(f"BR.No.{no} dt.{dt}" if dt else f"BR.No.{no}")
+        return ", ".join(parts)
+    except Exception:
+        return ""
+
+
+def _fmt_dr(dr_no, dr_date) -> str:
+    """Return e.g. 'DR.No.3539 dt.05.03.2026' or ''."""
+    if not dr_no or not str(dr_no).strip():
+        return ""
+    dt = _fmt_dot_date(dr_date)
+    return f"DR.No.{str(dr_no).strip()} dt.{dt}" if dt else f"DR.No.{str(dr_no).strip()}"
 
 
 # ── Print O/S as PDF (WeasyPrint, legal size) ────────────────────────────────
@@ -863,6 +938,9 @@ def print_os_pdf(
     env = Environment(loader=FileSystemLoader(str(templates_dir)), autoescape=True)
     tmpl = env.get_template("os_print.html")
 
+    # ── Export / Arrival distinction ──────────────────────────────────────────
+    is_export = (os_obj.case_type or "").strip().upper() == "EXPORT CASE"
+
     # ── Point-in-time versioned config (based on OS date) ────────────────────
     from app.api.admin_api import _pit_config
     ref_date = os_obj.os_date if os_obj.os_date else date.today()
@@ -938,6 +1016,12 @@ def print_os_pdf(
         flight_no=os_obj.flight_no or "",
         flight_date=fmt_date(os_obj.flight_date),
         port_or_country=os_obj.port_of_dep_dest or os_obj.country_of_departure or "—",
+        from_to_text=(
+            f"CHENNAI TO {os_obj.port_of_dep_dest or os_obj.country_of_departure or '—'}"
+            if is_export else
+            f"{os_obj.port_of_dep_dest or os_obj.country_of_departure or '—'} TO CHENNAI"
+        ),
+        stay_abroad_text="N/A" if is_export else f"{os_obj.stay_abroad_days or 0} Days",
         nationality=os_obj.nationality or os_obj.pax_nationality or "—",
         date_of_departure=os_obj.date_of_departure or "N.A.",
         stay_abroad_days=os_obj.stay_abroad_days or 0,
@@ -982,7 +1066,7 @@ def print_os_pdf(
         page1_title=_ptc("page1_title",
             "Detention / Seizure of Passenger's Baggage"),
         inventory_heading=_ptc("inventory_heading",
-            "INVENTORY OF THE GOODS IMPORTED"),
+            "INVENTORY OF THE GOODS DETAINED FOR EXPORT" if is_export else "INVENTORY OF THE GOODS IMPORTED"),
         col_duty_heading=_ptc("col_duty_heading",
             "Goods Passed On Duty"),
         supdt_sig_title=_ptc("supdt_sig_title",
@@ -992,6 +1076,8 @@ def print_os_pdf(
         p2_waiver_heading=_ptc("p2_waiver_heading",
             "WAIVER OF SHOW CAUSE NOTICE"),
         waiver_text_1=_ptc("waiver_text_1",
+            "The Charges have been orally communicated to me in respect of the goods mentioned overleaf and detained at the time of my departure. Orders in the case may please be passed without issue of Show Cause Notice. However I may kindly be given a Personal Hearing."
+            if is_export else
             "The Charges have been orally communicated to me in respect of the goods mentioned overleaf and imported by me. Orders in the case may please be passed without issue of Show Cause Notice. However I may kindly be given a Personal Hearing."),
         waiver_text_2=_ptc("waiver_text_2",
             "I was present during the personal hearing conducted by the Deputy / Asst. Commissioner and I was heard."),
@@ -1002,8 +1088,12 @@ def print_os_pdf(
         note_scn_waived=_ptc("note_scn_waived",
             "Note: The issue of Show Cause Notice was waived at the instance of the Passenger."),
         legal_para_1=_ptc("legal_para_1",
+            "In terms of Foreign Trade Policy notified by the Government in pursuance to Section 3(1) & 3(2) of the Foreign Trade (Development & Regulation) Act, 1992, export of goods without proper Customs declaration or in violation of applicable export regulations / restrictions is prohibited. Passengers are required to declare all goods carried at the time of departure as mandated under Section 40 of the Customs Act, 1962."
+            if is_export else
             "In terms of Foreign Trade Policy notified by the Government in pursuance to Section 3(1) & 3(2) of the Foreign Trade (Development & Regulation) Act, 1992 read with the Rules framed thereunder, also read with Section 11(2)(u) of Customs Act, 1962, import of 'goods in commercial quantity / goods in the nature of non-bonafide baggage' is not permitted without a valid import licence, though exemption exists under clause 3(h) of the Foreign Trade (Exemption from application of Rules in certain cases) order 1993 for import of goods by a passenger from abroad only to the extent admissible under the Baggage Rules framed under Section 79 of the Customs Act, 1962."),
         legal_para_2=_ptc("legal_para_2",
+            "Export of goods non-declared / misdeclared / concealed / in commercial quantity / contrary to any prohibition or export restriction is therefore liable for confiscation under Section 113 of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992."
+            if is_export else
             "Import of goods non-declared / misdeclared / concealed / in trade and in commercial quantity / non-bonafide in excess of the baggage allowance is therefore liable for confiscation under Section 111(d), (i), (l), (m) & (o) of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992."),
         record_heading=_ptc("record_heading",
             "RECORD OF PERSONAL HEARING & FINDINGS"),
@@ -1012,12 +1102,17 @@ def print_os_pdf(
         # Pre-rendered ORDER paragraphs (template substitution done in Python)
         para_rf=_render_para(
             _ptc("order_para_rf",
+                # Export: Section 113, no "Duty extra" (export violations don't attract inbound duty)
+                "I Order confiscation of the goods{rf_slnos_text} valued at Rs.{conf_value}/- under Section 113 of the Customs Act, 1962, but allow the passenger an option to redeem the goods valued at Rs.{conf_value}/- on a fine of Rs.{rf_amount}/- (Rupees {rf_words} Only) in lieu of confiscation under Section 125 of the Customs Act 1962 within 7 days from the date of receipt of this Order."
+                if is_export else
                 "I Order confiscation of the goods{rf_slnos_text} valued at Rs.{conf_value}/- under Section 111(d), (i), (l), (m) & (o) of the Customs Act, 1962 read with Section 3(3) of Foreign Trade (D&R) Act, 1992, but allow the passenger an option to redeem the goods valued at Rs.{conf_value}/- on a fine of Rs.{rf_amount}/- (Rupees {rf_words} Only) in lieu of confiscation under Section 125 of the Customs Act 1962 within 7 days from the date of receipt of this Order, Duty extra."),
             rf_slnos_text=_slnos_text(rf_slnos),
             conf_value=int(conf_value),
             rf_amount=int(rf_amount),
             rf_words=title_words(rf_amount),
         ) if conf_value > 0 and int(rf_amount) > 0 else "",
+        # Re-export option does not apply to export/departure cases —
+        # goods seized on exit cannot be "reshipped abroad"
         para_ref=_render_para(
             _ptc("order_para_ref",
                 "However, I give an option to reship the goods{ref_slnos_text} valued at Rs.{re_exp_value}/- on a fine of Rs.{ref_amount}/- (Rupees {ref_words} Only) under Section 125 of the Customs Act 1962 within 1 Month from the date of this Order."),
@@ -1025,9 +1120,12 @@ def print_os_pdf(
             re_exp_value=int(re_exp_value),
             ref_amount=int(ref_amount),
             ref_words=title_words(ref_amount),
-        ) if re_exp_value > 0 and int(ref_amount) > 0 else "",
+        ) if (re_exp_value > 0 and int(ref_amount) > 0 and not is_export) else "",
         para_abs_conf=_render_para(
             _ptc("order_para_abs_conf",
+                # Export: Section 113
+                "I {also_text}order absolute confiscation of the goods{abs_conf_slnos_text} valued at Rs.{abs_conf_value}/- under Section 113 of the Customs Act, 1962."
+                if is_export else
                 "I {also_text}order absolute confiscation of the goods{abs_conf_slnos_text} valued at Rs.{abs_conf_value}/- under Section 111(d), (i), (l), (m) & (o) of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (D&R) Act, 1992."),
             also_text="also " if (conf_value > 0 or re_exp_value > 0) else "",
             abs_conf_slnos_text=_slnos_text(all_abs_conf_slnos),
@@ -1035,6 +1133,9 @@ def print_os_pdf(
         ) if abs_conf_value > 0 else "",
         para_pp=_render_para(
             _ptc("order_para_pp",
+                # Export: Section 114 (import equivalent is Section 112)
+                "I further impose a Personal Penalty of Rs.{pp_amount}/- (Rupees {pp_words} Only) under Section 114 of the Customs Act, 1962."
+                if is_export else
                 "I further impose a Personal Penalty of Rs.{pp_amount}/- (Rupees {pp_words} Only) under Section 112(a) of the Customs Act, 1962."),
             pp_amount=int(pp_amount),
             pp_words=title_words(pp_amount),
@@ -1043,18 +1144,21 @@ def print_os_pdf(
             "Deputy / Asst. Commissioner of Customs (Airport)"),
         bottom_nb1=_ptc("bottom_nb1",
             "N.B: 1. Perishables will be disposed off within seven days from the date of detention."),
-        bottom_nb2=_ptc("bottom_nb2",
+        # Re-export note is irrelevant for export/departure cases
+        bottom_nb2="" if is_export else _ptc("bottom_nb2",
             "2. Where re-export is permitted, the passenger is advised to intimate the date of departure of flight atleast 48 hours in advance."),
         bottom_nb3=_ptc("bottom_nb3",
             "3. Warehouse rent and Handling Charges are chargeable for the goods detained."),
         received_order_text=_ptc("received_order_text",
             "Received the Order-in-Original"),
+        br_display=_fmt_br_entries(os_obj.post_adj_br_entries),
+        dr_display=_fmt_dr(os_obj.post_adj_dr_no, os_obj.post_adj_dr_date),
     )
 
     # ── Generate PDF ───────────────────────────────────────────────────────────
     # Two-phase binary search — O(log n) renders instead of O(n).
-    # Phase 1: find largest p2 (p1 fixed at 9pt anchor).
-    # Phase 2: find largest p1 (p2 fixed from phase 1).
+    # Phase 1: find largest p2 (page 2 font) with p1 fixed at 9pt anchor.
+    # Phase 2: find largest p1 (page 1 font) with best_p2 fixed.
     _P2 = [11.0, 10.5, 10.0, 9.5, 9.0, 8.5, 8.0, 7.5, 7.0, 6.5, 6.0, 5.5]
     _P1 = [11.0, 10.5, 10.0, 9.5, 9.0, 8.5, 8.0]
 
@@ -1074,12 +1178,14 @@ def print_os_pdf(
     # Phase 2 — binary search over p1 with best_p2 fixed
     lo, hi = 0, len(_P1) - 1
     rendered_doc = None
+    best_p1 = f"{_P1[-1]}pt"
     while lo <= hi:
         mid = (lo + hi) // 2
         doc = WeasyHTML(string=tmpl.render(**template_vars,
                         p1_font_size=f"{_P1[mid]}pt", p2_font_size=best_p2)).render()
         if len(doc.pages) <= 2:
             rendered_doc = doc
+            best_p1 = f"{_P1[mid]}pt"
             hi = mid - 1   # try a larger font
         else:
             lo = mid + 1   # need a smaller font
@@ -1087,9 +1193,9 @@ def print_os_pdf(
     if rendered_doc is None:
         rendered_doc = WeasyHTML(string=tmpl.render(**template_vars,
                        p1_font_size=f"{_P1[-1]}pt", p2_font_size=best_p2)).render()
+
     pdf_bytes = rendered_doc.write_pdf()
 
-    # Mark as printed
     if os_obj.os_printed != "Y":
         os_obj.os_printed = "Y"
         db.commit()

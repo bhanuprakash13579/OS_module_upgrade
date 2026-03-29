@@ -4,7 +4,7 @@ import {
   ArrowLeft, ShieldCheck, ShieldAlert, Lock, LogIn,
   UserPlus, Users, Pencil, X, KeyRound, Download,
   Upload, FileUp, Eye, EyeOff, RefreshCw, Database, ToggleLeft, ToggleRight, ScanLine,
-  Wifi, Plus, AlertTriangle, Monitor, Settings, Scale
+  Wifi, Plus, AlertTriangle, Monitor, Settings, Scale, Trash2
 } from 'lucide-react';
 import api from '@/lib/api';
 import { showDownloadToast } from '@/components/DownloadToast';
@@ -141,7 +141,17 @@ export default function RestoreBackup() {
   const [fullDbRestoreErr, setFullDbRestoreErr] = useState('');
 
   // Tab navigation
-  const [activeTab, setActiveTab] = useState<'security' | 'users' | 'settings' | 'backup' | 'osconfig' | 'statutes'>('security');
+  const [activeTab, setActiveTab] = useState<'security' | 'users' | 'settings' | 'backup' | 'osconfig' | 'statutes' | 'danger'>('security');
+
+  // Purge OS case
+  const [purgeOsNo, setPurgeOsNo] = useState('');
+  const [purgeYear, setPurgeYear] = useState('');
+  const [purgePwd, setPurgePwd] = useState('');
+  const [showPurgePwd, setShowPurgePwd] = useState(false);
+  const [purgeConfirmed, setPurgeConfirmed] = useState(false);
+  const [purgeLoading, setPurgeLoading] = useState(false);
+  const [purgeResult, setPurgeResult] = useState<{ message: string; total_rows_deleted: number; breakdown: Record<string, number> } | null>(null);
+  const [purgeErr, setPurgeErr] = useState('');
 
 
   // ── Load on login ─────────────────────────────────────────────────────────
@@ -303,6 +313,16 @@ export default function RestoreBackup() {
       await api.delete(`/admin/users/${encodeURIComponent(userId)}`, { headers: adminHeaders(adminToken) });
       loadUsers();
     } catch { }
+  };
+
+  const hardDeleteUser = async (userId: string) => {
+    if (!confirm(`Permanently delete account ${userId}?\n\nThis completely removes it from the list. (OS records created by this user will remain safe).`)) return;
+    try {
+      await api.delete(`/admin/users/${encodeURIComponent(userId)}/hard`, { headers: adminHeaders(adminToken) });
+      loadUsers();
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Failed to delete user.');
+    }
   };
 
   // ── Backup download ───────────────────────────────────────────────────────
@@ -566,13 +586,45 @@ export default function RestoreBackup() {
 
   // ── Admin dashboard ───────────────────────────────────────────────────────
   const TABS = [
-    { id: 'security' as const, label: 'Security', icon: <ShieldCheck size={14} /> },
-    { id: 'users'    as const, label: 'Users',    icon: <Users size={14} /> },
-    { id: 'settings' as const, label: 'Settings', icon: <ScanLine size={14} /> },
-    { id: 'backup'   as const, label: 'Backup & Restore', icon: <Database size={14} /> },
-    { id: 'osconfig' as const, label: 'OS Config', icon: <Settings size={14} /> },
-    { id: 'statutes' as const, label: 'Legal Statutes', icon: <Scale size={14} /> },
+    { id: 'security' as const, label: 'Security',        icon: <ShieldCheck size={14} /> },
+    { id: 'users'    as const, label: 'Users',           icon: <Users size={14} /> },
+    { id: 'settings' as const, label: 'Settings',        icon: <ScanLine size={14} /> },
+    { id: 'backup'   as const, label: 'Backup & Restore',icon: <Database size={14} /> },
+    { id: 'osconfig' as const, label: 'OS Config',       icon: <Settings size={14} /> },
+    { id: 'statutes' as const, label: 'Legal Statutes',  icon: <Scale size={14} /> },
+    { id: 'danger'   as const, label: 'Danger Zone',     icon: <Trash2 size={14} className="text-red-500" /> },
   ];
+
+  const handlePurgeOS = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPurgeErr('');
+    setPurgeResult(null);
+    if (!purgeOsNo.trim() || !purgeYear.trim() || !purgePwd) {
+      setPurgeErr('All fields are required.');
+      return;
+    }
+    if (!purgeConfirmed) {
+      setPurgeErr('You must check the confirmation box before proceeding.');
+      return;
+    }
+    setPurgeLoading(true);
+    try {
+      const res = await api.post('/admin/purge-os', {
+        os_no: purgeOsNo.trim(),
+        os_year: parseInt(purgeYear, 10),
+        admin_password: purgePwd,
+      }, { headers: adminHeaders(adminToken) });
+      setPurgeResult(res.data);
+      setPurgeOsNo('');
+      setPurgeYear('');
+      setPurgePwd('');
+      setPurgeConfirmed(false);
+    } catch (err: any) {
+      setPurgeErr(err.response?.data?.detail || 'Purge failed. Please try again.');
+    } finally {
+      setPurgeLoading(false);
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto py-6 px-4 space-y-5">
@@ -879,12 +931,16 @@ export default function RestoreBackup() {
                             setEditId(u.user_id);
                             setEditData({ user_name: u.user_name, user_desig: u.user_desig, user_pwd: '', user_role: u.user_role, user_status: u.user_status });
                             setEditMsg(''); setShowEditPwd(false);
-                          }} className="p-1 rounded hover:bg-slate-100">
+                          }} className="p-1 rounded hover:bg-slate-100" title="Edit User">
                             <Pencil size={12} className="text-slate-500" />
                           </button>
-                          {u.user_status === 'ACTIVE' && (
-                            <button onClick={() => closeUser(u.user_id)} className="p-1 rounded hover:bg-red-50">
-                              <X size={12} className="text-red-500" />
+                          {u.user_status === 'ACTIVE' ? (
+                            <button onClick={() => closeUser(u.user_id)} className="p-1 rounded hover:bg-amber-50" title="Close Account">
+                              <X size={12} className="text-amber-500" />
+                            </button>
+                          ) : (
+                            <button onClick={() => hardDeleteUser(u.user_id)} className="p-1 rounded hover:bg-red-100" title="Permanently Delete">
+                              <ShieldAlert size={12} className="text-red-700" />
                             </button>
                           )}
                         </td>
@@ -1173,6 +1229,135 @@ export default function RestoreBackup() {
       {/* ══ TAB: STATUTES ════════════════════════════════════════════════════════ */}
       {activeTab === 'statutes' && (
         <StatutesAdmin adminToken={adminToken} />
+      )}
+
+      {/* ══ TAB: DANGER ZONE ═════════════════════════════════════════════════════ */}
+      {activeTab === 'danger' && (
+        <div className="space-y-5">
+
+          {/* Warning banner */}
+          <div className="bg-red-50 border border-red-300 rounded-xl p-4 flex items-start gap-3">
+            <AlertTriangle size={20} className="text-red-600 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-bold text-red-700">Irreversible Actions — Proceed with Extreme Caution</p>
+              <p className="text-xs text-red-600 mt-1">
+                Operations in this section permanently destroy data. There is no undo, no recycle bin, and no backup created automatically.
+                Every record associated with the case — items, adjudication, warehouse, receipts, archive snapshots — will be wiped from the database.
+              </p>
+            </div>
+          </div>
+
+          {/* Permanent OS Case Deletion */}
+          <section className="bg-white rounded-xl border-2 border-red-200 shadow-sm p-5">
+            <div className="flex items-center gap-2 mb-1">
+              <Trash2 size={16} className="text-red-600" />
+              <h2 className="text-sm font-bold text-red-700">Permanent OS Case Deletion</h2>
+            </div>
+            <p className="text-xs text-slate-500 mb-4">
+              Enter the OS No. and Year to permanently delete the case and all linked data:
+              items, appeals, BR/DR receipts, warehouse entries, report staging, and all archive snapshots.
+              The case will cease to exist in both the SDO module and the Adjudication module.
+            </p>
+
+            <form onSubmit={handlePurgeOS} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">OS No.</label>
+                  <input
+                    type="text"
+                    value={purgeOsNo}
+                    onChange={e => { setPurgeOsNo(e.target.value); setPurgeResult(null); setPurgeErr(''); }}
+                    placeholder="e.g. 252"
+                    className="w-full border border-slate-300 rounded-md text-sm px-3 py-2 focus:ring-red-400 focus:border-red-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">OS Year</label>
+                  <input
+                    type="number"
+                    value={purgeYear}
+                    onChange={e => { setPurgeYear(e.target.value); setPurgeResult(null); setPurgeErr(''); }}
+                    placeholder="e.g. 2026"
+                    className="w-full border border-slate-300 rounded-md text-sm px-3 py-2 focus:ring-red-400 focus:border-red-400"
+                  />
+                </div>
+              </div>
+
+              {/* Confirmation checkbox */}
+              <label className="flex items-start gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={purgeConfirmed}
+                  onChange={e => setPurgeConfirmed(e.target.checked)}
+                  className="mt-0.5 accent-red-600"
+                />
+                <span className="text-xs text-slate-700">
+                  I understand that this action is <strong>permanent and irreversible</strong>. All data for OS&nbsp;
+                  <span className="font-mono font-bold">{purgeOsNo || '—'}/{purgeYear || '—'}</span> will be
+                  deleted without any trace or archive.
+                </span>
+              </label>
+
+              {/* Admin password */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">
+                  Admin Password (re-enter to confirm)
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPurgePwd ? 'text' : 'password'}
+                    value={purgePwd}
+                    onChange={e => setPurgePwd(e.target.value)}
+                    placeholder="Admin password"
+                    className="w-full border border-slate-300 rounded-md text-sm px-3 py-2 pr-10 focus:ring-red-400 focus:border-red-400"
+                  />
+                  <button type="button" onClick={() => setShowPurgePwd(p => !p)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                    {showPurgePwd ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+              </div>
+
+              {purgeErr && (
+                <p className="text-xs text-red-600 font-medium flex items-center gap-1">
+                  <AlertTriangle size={12} /> {purgeErr}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={purgeLoading || !purgeOsNo.trim() || !purgeYear.trim() || !purgePwd || !purgeConfirmed}
+                className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {purgeLoading ? <RefreshCw size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                {purgeLoading ? 'Deleting…' : 'Delete Permanently'}
+              </button>
+            </form>
+
+            {/* Result */}
+            {purgeResult && (
+              <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4 space-y-2">
+                <p className="text-sm font-semibold text-green-800 flex items-center gap-1.5">
+                  <ShieldCheck size={15} /> {purgeResult.message}
+                </p>
+                <p className="text-xs text-green-700">
+                  Total rows removed: <strong>{purgeResult.total_rows_deleted}</strong>
+                </p>
+                {Object.keys(purgeResult.breakdown).length > 0 && (
+                  <div className="text-xs text-green-700 space-y-0.5">
+                    <p className="font-medium">Breakdown:</p>
+                    {Object.entries(purgeResult.breakdown).map(([tbl, cnt]) => (
+                      <div key={tbl} className="flex justify-between font-mono">
+                        <span>{tbl}</span>
+                        <span className="font-bold">{cnt}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+        </div>
       )}
 
     </div>

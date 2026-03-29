@@ -39,5 +39,12 @@ build/
 backend/build/
 backend/dist/
 
+# Claude Code local config (machine-specific permissions, not for VCS)
+.claude/settings.local.json
+
+# Runtime logs
+backend/cops_startup.log
+*.log
+
 # Large source assets (icons are generated from these; not needed as web assets)
 frontend/public/new_cops_logo.png

@@ -426,7 +426,7 @@ export default function OffenceForm() {
         pax_name: formData.pax_name, flight_no: formData.flight_no,
         flight_date: formData.flight_date, port_of_dep_dest: formData.port_of_dep_dest,
         os_date: formData.os_date, passport_no: formData.passport_no,
-        passport_date: formData.passport_date,
+        passport_date: formData.passport_date, case_type: formData.case_type,
       }, {});
       setSupdtsRemarks(text);
     }
@@ -437,7 +437,7 @@ export default function OffenceForm() {
       pax_name: formData.pax_name, flight_no: formData.flight_no,
       flight_date: formData.flight_date, port_of_dep_dest: formData.port_of_dep_dest,
       os_date: formData.os_date, passport_no: formData.passport_no,
-      passport_date: formData.passport_date,
+      passport_date: formData.passport_date, case_type: formData.case_type,
     }, contextAnswers);
     setSupdtsRemarks(text);
     setShowContextModal(false);
@@ -457,7 +457,7 @@ export default function OffenceForm() {
     os_date: new Date().toISOString().split('T')[0],
     shift: 'Day',
     booked_by: 'Batch A',
-    case_type: 'Mis-Declaration',
+    case_type: 'Non-Bonafide',
     detention_date: new Date().toISOString().split('T')[0],
     
     pax_name: '',
@@ -568,8 +568,7 @@ export default function OffenceForm() {
         const safeData = { ...formData };
         Object.keys(safeData).forEach(key => {
             if (data[key] !== undefined && data[key] !== null) {
-                // @ts-ignore
-                safeData[key as keyof typeof safeData] = data[key];
+                (safeData as Record<string, unknown>)[key] = data[key];
             }
         });
         // Handle mapped fields specifically if needed
@@ -829,7 +828,7 @@ export default function OffenceForm() {
       requireField('os_date', 'O.S. Date');
       requireField('shift', 'Shift', 'Day');
       requireField('booked_by', 'Booked By', 'Batch A');
-      requireField('case_type', 'Case Type', 'Mis-Declaration');
+      requireField('case_type', 'Case Type', 'Non-Bonafide');
       requireField('detention_date', 'Detention/Seizure Date');
 
       // Passenger / passport
@@ -846,10 +845,13 @@ export default function OffenceForm() {
       requireField('flight_no', 'Flight No.');
       requireField('flight_date', 'Flight Date');
       requireField('port_of_dep_dest', 'Port of Dep/Dest');
-      requireField('arrived_from', 'Arrived From');
-      // Date of departure: allow "N.A." or a non-empty date string
-      if (!String(formData.date_of_departure ?? '').trim()) {
-        errors['date_of_departure'] = 'Date of Departure from India is required (or N.A.).';
+      const isExportCase = formData.case_type === 'Export Case';
+      if (!isExportCase) {
+        requireField('arrived_from', 'Arrived From');
+        // Date of departure: allow "N.A." or a non-empty date string
+        if (!String(formData.date_of_departure ?? '').trim()) {
+          errors['date_of_departure'] = 'Date of Departure from India is required (or N.A.).';
+        }
       }
 
       // History / remarks
@@ -922,8 +924,7 @@ export default function OffenceForm() {
           const el = document.getElementById(`field-${firstFieldKey}`);
           if (el) {
             el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            // @ts-ignore
-            el.focus?.();
+            (el as HTMLElement & { focus?: () => void }).focus?.();
           }
         } else if (Object.keys(itemErrs).length > 0) {
           const firstRow = Number(Object.keys(itemErrs)[0]);
@@ -944,7 +945,7 @@ export default function OffenceForm() {
             supdts_remarks: supdtsRemarks,
             shift: formData.shift || 'Day',
             booked_by: formData.booked_by || 'Batch A',
-            case_type: formData.case_type || 'Mis-Declaration',
+            case_type: formData.case_type || 'Non-Bonafide',
             pax_nationality: formData.pax_nationality || 'INDIAN',
             residence_at: formData.residence_at || 'INDIA',
             country_of_departure: formData.arrived_from,
@@ -1204,11 +1205,12 @@ export default function OffenceForm() {
                         <div>
                             <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Case Type</label>
                             <select id="field-case_type" className={`w-full px-3 py-2 bg-slate-50 border ${fieldErrors.case_type ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-300 focus:ring-brand-500'} rounded focus:ring-2 text-sm font-medium text-slate-800`} value={formData.case_type} onChange={e => setFormData({...formData, case_type: e.target.value})}>
+                                <option>Non-Bonafide</option>
                                 <option>Mis-Declaration</option>
                                 <option>Concealment</option>
                                 <option>Trade Goods</option>
-                                <option>Non-Bonafide</option>
                                 <option>Unclaimed</option>
+                                <option>Export Case</option>
                             </select>
                         </div>
                         <div>
@@ -1389,14 +1391,29 @@ export default function OffenceForm() {
                     <input id="field-port_of_dep_dest" type="text" className={`w-full px-3 py-1.5 bg-slate-50 border ${fieldErrors.port_of_dep_dest ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-300 focus:ring-emerald-500'} rounded text-sm focus:ring-2 uppercase text-slate-800`} value={formData.port_of_dep_dest} onChange={e => setFormData({...formData, port_of_dep_dest: e.target.value.toUpperCase()})} />
                 </div>
                 <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Arrived From</label>
-                    <select id="field-arrived_from" className={`w-full px-3 py-1.5 bg-slate-50 border ${fieldErrors.arrived_from ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-300 focus:ring-emerald-500'} rounded text-sm focus:ring-2`} value={formData.arrived_from} onChange={e => setFormData({...formData, arrived_from: e.target.value})}>
-                        <option>Nepal</option><option>Bhutan</option><option>Myanmar</option><option>Others</option>
-                    </select>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                      {formData.case_type === 'Export Case' ? 'Supposed Destination' : 'Arrived From'}
+                    </label>
+                    {formData.case_type === 'Export Case' ? (
+                      <input
+                        id="field-arrived_from"
+                        type="text"
+                        className={`w-full px-3 py-1.5 bg-slate-50 border ${fieldErrors.arrived_from ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-300 focus:ring-emerald-500'} rounded text-sm focus:ring-2 uppercase`}
+                        value={formData.arrived_from === 'Others' ? '' : formData.arrived_from}
+                        placeholder="e.g. DUBAI, SINGAPORE"
+                        onChange={e => setFormData({...formData, arrived_from: e.target.value.toUpperCase() || 'Others'})}
+                      />
+                    ) : (
+                      <select id="field-arrived_from" className={`w-full px-3 py-1.5 bg-slate-50 border ${fieldErrors.arrived_from ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-300 focus:ring-emerald-500'} rounded text-sm focus:ring-2`} value={formData.arrived_from} onChange={e => setFormData({...formData, arrived_from: e.target.value})}>
+                          <option>Nepal</option><option>Bhutan</option><option>Myanmar</option><option>Others</option>
+                      </select>
+                    )}
                 </div>
-                
+
                 <div>
-                    <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1 truncate" title="Date of Departure From INDIA (For Foreign Nationals, if DOD from India is Not Available, Type N.A.)">Date of Departure from India (Type N.A. If none)</label>
+                    <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1 truncate" title={formData.case_type === 'Export Case' ? 'Proposed Date of Travel / Departure' : 'Date of Departure From INDIA (For Foreign Nationals, if DOD from India is Not Available, Type N.A.)'}>
+                      {formData.case_type === 'Export Case' ? 'Proposed Date of Travel' : 'Date of Departure from India (Type N.A. If none)'}
+                    </label>
                     <DatePicker
                         id="field-date_of_departure"
                         value={formData.date_of_departure}
@@ -1408,8 +1425,14 @@ export default function OffenceForm() {
                     />
                 </div>
                 <div>
-                    <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1 truncate">Stay Abroad in days</label>
-                    <input type="text" readOnly className="w-full px-3 py-1.5 bg-amber-50 border border-amber-300 rounded text-sm text-amber-900 font-bold cursor-not-allowed" value={formData.stay_abroad_days} />
+                    <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1 truncate">
+                      {formData.case_type === 'Export Case' ? 'Stay Abroad (N/A for Export)' : 'Stay Abroad in days'}
+                    </label>
+                    {formData.case_type === 'Export Case' ? (
+                      <input type="text" readOnly className="w-full px-3 py-1.5 bg-slate-200 border border-slate-300 rounded text-sm text-slate-500 cursor-not-allowed" value="N/A" />
+                    ) : (
+                      <input type="text" readOnly className="w-full px-3 py-1.5 bg-amber-50 border border-amber-300 rounded text-sm text-amber-900 font-bold cursor-not-allowed" value={formData.stay_abroad_days} />
+                    )}
                 </div>
                 <div>
                     <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Previous Visits</label>
@@ -1555,7 +1578,7 @@ export default function OffenceForm() {
                 <li><b>Case Type:</b> {formData.case_type}</li>
                 <li><b>Nationality:</b> {formData.pax_nationality}</li>
                 <li><b>Normal Residence At:</b> {formData.residence_at || 'INDIA'}</li>
-                <li><b>Arrived From:</b> {formData.arrived_from}</li>
+                <li><b>{formData.case_type === 'Export Case' ? 'Supposed Destination' : 'Arrived From'}:</b> {formData.arrived_from}</li>
               </ul>
             </div>
           </div>

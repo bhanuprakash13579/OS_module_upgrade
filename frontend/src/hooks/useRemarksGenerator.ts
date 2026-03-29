@@ -19,6 +19,7 @@ interface CaseContext {
   os_date?: string;
   passport_no?: string;
   passport_date?: string;
+  case_type?: string;
 }
 
 // Contextual answers provided by the user before generating remarks
@@ -204,16 +205,46 @@ function isDuty(item: any) { const c = categorize(item); return c === 'UNDER DUT
 
 // ────────────────────────────────────────────────────────────────────────────
 // MAIN HOOK
+// ── Hardcoded fallbacks (match admin_api.py _REMARKS_TPL_DEFAULTS) ───────────
+// Used when the admin template fetch hasn't completed yet or returns nothing.
+const _SUPDT_CLOSING_DEFAULTS: Record<string, string> = {
+  remarks_supdt_import_confs_closing:
+    'The aforesaid goods were not declared to the Customs authorities at the time of arrival as required under Section 77 of the Customs Act, 1962, and the pax was unable to produce any valid import authorization/permit for the same. The said goods being absolutely prohibited from import are liable for confiscation under Sections 111(d), 111(l), 111(m) and 111(o) of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992, for improper importation. The pax has also rendered himself/herself liable for penal action under Section 112(a) of the Customs Act, 1962. Put up for Adjudication please.',
+  remarks_supdt_import_rf_closing:
+    'The aforesaid goods were not declared to the Customs authorities at the time of arrival as required under Section 77 of the Customs Act, 1962. The said goods, being commercial in nature and non-bonafide baggage, are liable for confiscation under Sections 111(d), 111(l) and 111(m) of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992. The pax has also rendered himself/herself liable for penal action under Section 112 of the Customs Act, 1962. Put up for Adjudication please.',
+  remarks_supdt_import_ref_closing:
+    'The aforesaid goods were not declared to the Customs authorities at the time of arrival as required under Section 77 of the Customs Act, 1962, and the pax was unable to produce any valid import authorization/permit for the same. The said goods being restricted for import under the applicable DGFT notification/policy are liable for confiscation under Sections 111(d), 111(l), 111(m) and 111(o) of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992. The pax has also rendered himself/herself liable for penal action under Section 112(a) of the Customs Act, 1962. Put up for Adjudication please.',
+  remarks_supdt_export_confs_closing:
+    'The aforesaid goods were not declared to the Customs authorities at the time of departure as required under Section 40 of the Customs Act, 1962, and the pax was unable to produce any valid export authorization/permit. The said goods being absolutely prohibited from export are liable for confiscation under Section 113 of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992, for improper exportation. The pax has also rendered himself/herself liable for penal action under Section 114 of the Customs Act, 1962. Put up for Adjudication please.',
+  remarks_supdt_export_rf_closing:
+    'The aforesaid goods were not declared to the Customs authorities at the time of departure as required under Section 40 of the Customs Act, 1962. The said goods, being in violation of export regulations, are liable for confiscation under Section 113 of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992. The pax has also rendered himself/herself liable for penal action under Section 114 of the Customs Act, 1962. Put up for Adjudication please.',
+};
+
+const _AC_DISPOSAL_DEFAULTS: Record<string, string> = {
+  remarks_ac_import_confs_disposal:
+    '{items} being absolutely prohibited from import cannot be allowed to be redeemed and are hereby absolutely confiscated under Sections 111(d), 111(l), 111(m) and 111(o) of the Customs Act, 1962 read with Section 3(3) of the FT(D&R) Act, 1992.',
+  remarks_ac_import_rf_disposal:
+    '{items} are allowed to be redeemed on payment of the applicable Customs duty and Redemption Fine as imposed under Section 125 of the Customs Act, 1962.',
+  remarks_ac_import_ref_disposal:
+    '{items} are directed to be re-exported within the time stipulated by the Customs authorities, on payment of Re-export Fine as imposed under Section 125 of the Customs Act, 1962.',
+  remarks_ac_export_confs_disposal:
+    '{items} being absolutely prohibited from export cannot be allowed to be redeemed and are hereby absolutely confiscated under Section 113 of the Customs Act, 1962.',
+  remarks_ac_export_rf_disposal:
+    '{items} are allowed to be redeemed on payment of the applicable Redemption Fine as imposed under Section 125 of the Customs Act, 1962.',
+};
+
 // ── Module-level cache — statutes are seeded at startup and never change ─────
 // Without this, every OffenceForm mount (new/edit/view) re-fetches the full
 // statutes list from the backend, adding a round-trip before the wand button works.
 let _statutesCache: Statute[] | null = null;
 let _statutesFetch: Promise<Statute[]> | null = null;
+let _remarksTemplateCache: Record<string, string> | null = null;
 
 // ────────────────────────────────────────────────────────────────────────────
 export function useRemarksGenerator() {
   const [statutes, setStatutes] = useState<Statute[]>(_statutesCache ?? []);
   const [loading, setLoading] = useState(_statutesCache === null);
+  const [remarksTemplates, setRemarksTemplates] = useState<Record<string, string>>(_remarksTemplateCache ?? {});
 
   useEffect(() => {
     if (_statutesCache !== null) return; // already loaded for this session
@@ -250,6 +281,26 @@ export function useRemarksGenerator() {
       setLoading(false);
     });
 
+    return () => { mounted = false; };
+  }, []);
+
+  // Fetch remarks opening templates (non-critical — hardcoded fallbacks used if absent)
+  useEffect(() => {
+    if (_remarksTemplateCache !== null) {
+      setRemarksTemplates(_remarksTemplateCache);
+      return;
+    }
+    let mounted = true;
+    api.get('/admin/config/remarks-templates')
+      .then(res => {
+        const out: Record<string, string> = {};
+        for (const [k, v] of Object.entries(res.data as Record<string, any>)) {
+          out[k] = (v as any).value || '';
+        }
+        _remarksTemplateCache = out;
+        if (mounted) setRemarksTemplates(out);
+      })
+      .catch(() => {}); // fallback to hardcoded defaults in buildSupdtRemark
     return () => { mounted = false; };
   }, []);
 
@@ -325,25 +376,45 @@ export function useRemarksGenerator() {
   // ── SUPDT REMARK BUILDER ────────────────────────────────────────────────
   function buildSupdtRemark(
     items: any[], ctx: CaseContext | undefined, allDutyOnly: boolean,
-    _confsItems: any[], _rfItems: any[], _refItems: any[], _dutyItems: any[],
+    confsItems: any[], rfItems: any[], refItems: any[], _dutyItems: any[],
     statuteGroups: Map<string, { statute: Statute; items: any[]; indices: number[] }>,
     answers: ContextualAnswers,
   ): string {
     const parts: string[] = [];
 
-    // 1. OPENING — arrival + flight + passport
+    // 1. OPENING — arrival/departure + flight + passport
     const date = formatDate(ctx?.flight_date || ctx?.os_date);
     const city = ctx?.port_of_dep_dest || '';
     const flight = ctx?.flight_no || '';
     const ppNo = ctx?.passport_no || '';
+    const isExport = (ctx?.case_type || '').trim().toUpperCase() === 'EXPORT CASE';
+
+    // Template placeholder substitution helper
+    const _applyTpl = (tpl: string) => tpl
+      .replace(/\{date\}/g, date || 'the date of interception')
+      .replace(/\{city\}/g, city || 'the destination')
+      .replace(/\{flight_no\}/g, flight || 'the flight');
 
     let arrPart = '';
-    if (date && city && flight) {
-      arrPart = `The pax arrived on ${date} by flight no. ${flight} from ${city}.`;
-    } else if (date && flight) {
-      arrPart = `The pax arrived on ${date} by flight no. ${flight}.`;
+    if (isExport) {
+      if (date || city || flight) {
+        // Admin-configurable template (Legal Statutes → Remarks Templates in admin panel)
+        const tpl = remarksTemplates['remarks_export_supdt_opening'] ||
+          'On the basis of specific intelligence/information received by the department, the pax was detained at the Departure Hall on {date} while about to depart to {city} by flight no. {flight_no}.';
+        arrPart = _applyTpl(tpl);
+      } else {
+        arrPart = 'The pax was detained at the Departure Hall while attempting to export goods without proper Customs declaration.';
+      }
     } else {
-      arrPart = 'The pax arrived and was intercepted at the Customs Examination Hall.';
+      if (date && city && flight) {
+        const tpl = remarksTemplates['remarks_import_supdt_opening'] ||
+          'The pax arrived on {date} by flight no. {flight_no} from {city}.';
+        arrPart = _applyTpl(tpl);
+      } else if (date && flight) {
+        arrPart = `The pax arrived on ${date} by flight no. ${flight}.`;
+      } else {
+        arrPart = 'The pax arrived and was intercepted at the Customs Examination Hall.';
+      }
     }
     if (ppNo) {
       arrPart += ` The pax was holding Passport No. ${ppNo}`;
@@ -363,18 +434,25 @@ export function useRemarksGenerator() {
 
     // 3. ALL DUTY ONLY — concise remark
     if (allDutyOnly) {
-      // Compute total duty-payable value for the summary
       const totalDutyVal = items.reduce((s: number, i: any) => {
         const val = Number(i.items_value || 0);
         const fa = computeEffFa(i, val);
         return s + Math.max(0, val - fa);
       }, 0);
       const totalDuty = items.reduce((s: number, i: any) => s + Number(i.items_duty || 0), 0);
-      parts.push(
-        `The aforesaid goods are dutiable and were not declared to the Customs authorities at the time of arrival as mandated under Section 77 of the Customs Act, 1962. ` +
-        `The total assessable value (after free allowance) amounts to Rs. ${Math.round(totalDutyVal).toLocaleString('en-IN')}/- on which customs duty of Rs. ${Math.round(totalDuty).toLocaleString('en-IN')}/- is payable. ` +
-        `Since the said goods were concealed and not declared, they are also liable for confiscation under Section 111(m) of the Customs Act, 1962. Put up for Adjudication please.`
-      );
+      if (isExport) {
+        parts.push(
+          `The aforesaid goods were not declared to the Customs authorities at the time of departure as required under Section 40 of the Customs Act, 1962. ` +
+          `The total assessable value amounts to Rs. ${Math.round(totalDutyVal).toLocaleString('en-IN')}/- on which customs duty of Rs. ${Math.round(totalDuty).toLocaleString('en-IN')}/- is payable. ` +
+          `The said goods are therefore liable for confiscation under Section 113 of the Customs Act, 1962. Put up for Adjudication please.`
+        );
+      } else {
+        parts.push(
+          `The aforesaid goods are dutiable and were not declared to the Customs authorities at the time of arrival as mandated under Section 77 of the Customs Act, 1962. ` +
+          `The total assessable value (after free allowance) amounts to Rs. ${Math.round(totalDutyVal).toLocaleString('en-IN')}/- on which customs duty of Rs. ${Math.round(totalDuty).toLocaleString('en-IN')}/- is payable. ` +
+          `Since the said goods were concealed and not declared, they are also liable for confiscation under Section 111(m) of the Customs Act, 1962. Put up for Adjudication please.`
+        );
+      }
       return parts.join(' ');
     }
 
@@ -403,7 +481,10 @@ export function useRemarksGenerator() {
       } else {
         parts.push(grp.statute.supdt_goods_clause);
         if (grp.statute.keyword !== 'narcotic' && grp.statute.keyword !== 'poppy') {
-          parts.push(`The said goods are in commercial quantity and hence cannot be considered as bonafide baggage.`);
+          parts.push(isExport
+            ? `The said goods are being attempted to be exported without proper export authorization/permit.`
+            : `The said goods are in commercial quantity and hence cannot be considered as bonafide baggage.`
+          );
         }
       }
     }
@@ -446,24 +527,44 @@ export function useRemarksGenerator() {
       }
     }
 
-    // 6. NON-DECLARATION + CLOSING
-    parts.push(
-      `The aforesaid goods were not declared to the Customs authorities at the time of arrival as required under Section 77 of the Customs Act, 1962, and the pax was also unable to produce valid import authorization/permit for the same. ` +
-      `The said goods are therefore liable for confiscation under Sections 111(d), 111(l), 111(m) and 111(o) of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992. ` +
-      `The pax has also rendered himself/herself liable for penal action under Section 112 of the Customs Act, 1962. Put up for Adjudication please.`
-    );
+    // 6. CLOSING — category-determined template (indirect language; section numbers
+    //    are the signal — SUPDT does NOT recommend confiscation/redemption explicitly)
+    const hasConfs = confsItems.length > 0;
+    const hasRf    = rfItems.length > 0;
+    const hasRef   = refItems.length > 0;
+
+    // Pick which closing template applies based on dominant category:
+    //   CONFS-only          → prohibited-goods language  (Sec 111(o) + "improper importation")
+    //   REF-only            → restricted-goods language  (Sec 111(o) but no "improper")
+    //   RF or mixed         → commercial-goods language  (Sec 111(d)(l)(m) only, no (o))
+    //   Export CONFS-only   → Sec 113 + "improper exportation"
+    //   Export RF/mixed     → Sec 113, commercial language
+    let closingKey: string;
+    if (isExport) {
+      closingKey = (hasConfs && !hasRf)
+        ? 'remarks_supdt_export_confs_closing'
+        : 'remarks_supdt_export_rf_closing';
+    } else if (hasConfs && !hasRf && !hasRef) {
+      closingKey = 'remarks_supdt_import_confs_closing';
+    } else if (hasRef && !hasConfs && !hasRf) {
+      closingKey = 'remarks_supdt_import_ref_closing';
+    } else {
+      closingKey = 'remarks_supdt_import_rf_closing';
+    }
+    parts.push(remarksTemplates[closingKey] || _SUPDT_CLOSING_DEFAULTS[closingKey]);
 
     return parts.join(' ');
   }
 
   // ── AC REMARK BUILDER ───────────────────────────────────────────────────
   function buildAdjnRemark(
-    items: any[], _ctx: CaseContext | undefined, allDutyOnly: boolean,
+    items: any[], ctx: CaseContext | undefined, allDutyOnly: boolean,
     confsItems: any[], rfItems: any[], refItems: any[], dutyItems: any[],
     statuteGroups: Map<string, { statute: Statute; items: any[]; indices: number[] }>,
     answers: ContextualAnswers,
   ): string {
     const parts: string[] = [];
+    const isExport = (ctx?.case_type || '').trim().toUpperCase() === 'EXPORT CASE';
 
     // 1. OPENING — hearing statement
     parts.push(
@@ -474,8 +575,9 @@ export function useRemarksGenerator() {
     // 2. PAX STATEMENT — what pax claimed
     const allPhrases = mergedItemPhrases(items);
     if (allPhrases.length > 0) {
-      parts.push(
-        `The pax stated that the ${joinNatural(allPhrases)} were brought by him/her for personal use and were not meant for commercial purposes.`
+      parts.push(isExport
+        ? `The pax stated that the ${joinNatural(allPhrases)} were being carried for personal use and were not meant for commercial purposes.`
+        : `The pax stated that the ${joinNatural(allPhrases)} were brought by him/her for personal use and were not meant for commercial purposes.`
       );
     }
 
@@ -487,15 +589,27 @@ export function useRemarksGenerator() {
         return s + Math.max(0, val - fa);
       }, 0);
       const totalDuty = dutyItems.reduce((s: number, i: any) => s + Number(i.items_duty || 0), 0);
-      parts.push(
-        `On examination, the goods were found to be dutiable and were not declared to Customs as required under Section 77 of the Customs Act, 1962. ` +
-        `After deducting the permissible free allowance under the Baggage Rules, 2016, the total assessable value works out to Rs. ${Math.round(totalDutyVal).toLocaleString('en-IN')}/- on which the applicable Customs Duty is Rs. ${Math.round(totalDuty).toLocaleString('en-IN')}/-.`
-      );
-      parts.push(
-        `The said goods are therefore liable for confiscation under Section 111(m) of the Customs Act, 1962 for non-declaration. ` +
-        `The goods are, however, being allowed to be redeemed on payment of the applicable customs duty and redemption fine as imposed. ` +
-        `A personal penalty is also imposed under Section 112(b) of the Customs Act, 1962.`
-      );
+      if (isExport) {
+        parts.push(
+          `On examination, the goods were found to be liable for export restrictions and were not declared to Customs as required under Section 40 of the Customs Act, 1962. ` +
+          `The total assessable value of the goods is Rs. ${Math.round(totalDutyVal).toLocaleString('en-IN')}/-.`
+        );
+        parts.push(
+          `The said goods are therefore liable for confiscation under Section 113 of the Customs Act, 1962 for non-declaration. ` +
+          `The goods are, however, being allowed to be redeemed on payment of the applicable redemption fine as imposed. ` +
+          `A personal penalty is also imposed under Section 114(i) of the Customs Act, 1962.`
+        );
+      } else {
+        parts.push(
+          `On examination, the goods were found to be dutiable and were not declared to Customs as required under Section 77 of the Customs Act, 1962. ` +
+          `After deducting the permissible free allowance under the Baggage Rules, 2016, the total assessable value works out to Rs. ${Math.round(totalDutyVal).toLocaleString('en-IN')}/- on which the applicable Customs Duty is Rs. ${Math.round(totalDuty).toLocaleString('en-IN')}/-.`
+        );
+        parts.push(
+          `The said goods are therefore liable for confiscation under Section 111(m) of the Customs Act, 1962 for non-declaration. ` +
+          `The goods are, however, being allowed to be redeemed on payment of the applicable customs duty and redemption fine as imposed. ` +
+          `A personal penalty is also imposed under Section 112(b) of the Customs Act, 1962.`
+        );
+      }
       return parts.join(' ');
     }
 
@@ -576,26 +690,44 @@ export function useRemarksGenerator() {
     const refPhrases = mergedItemPhrases(refItems);
     const dutyPhrases = mergedItemPhrases(dutyItems);
 
-    // Confiscation liability
-    parts.push(
-      `The aforesaid goods are therefore liable for confiscation under Sections 111(d), 111(l), 111(m) and 111(o) of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992, and the pax has rendered himself/herself liable for penal action under Section 112 of the Customs Act, 1962.`
-    );
-
-    // Disposal orders — only include if items exist in that category
-    if (confsAbsPhrases.length > 0) {
+    // Confiscation liability statement — section references depend on category.
+    // CONFS/REF → include Section 111(o) + 112(a); RF-only → 111(d)(l)(m) + 112 only.
+    const hasConfsOrRef = confsItems.length > 0 || refItems.length > 0;
+    if (isExport) {
       parts.push(
-        `The ${joinNatural(confsAbsPhrases)} are hereby absolutely confiscated under Section 111 of the Customs Act, 1962.`
+        `The aforesaid goods are therefore liable for confiscation under Section 113 of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992, and the pax has rendered himself/herself liable for penal action under Section 114 of the Customs Act, 1962.`
       );
+    } else if (hasConfsOrRef) {
+      parts.push(
+        `The aforesaid goods are therefore liable for confiscation under Sections 111(d), 111(l), 111(m) and 111(o) of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992, and the pax has rendered himself/herself liable for penal action under Section 112(a) of the Customs Act, 1962.`
+      );
+    } else {
+      parts.push(
+        `The aforesaid goods are therefore liable for confiscation under Sections 111(d), 111(l) and 111(m) of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992, and the pax has rendered himself/herself liable for penal action under Section 112 of the Customs Act, 1962.`
+      );
+    }
+
+    // Helper: apply an AC disposal template (supports {items} placeholder)
+    const _applyDisposal = (key: string, itemPhrases: string[]): string => {
+      const tpl = remarksTemplates[key] || _AC_DISPOSAL_DEFAULTS[key] || '';
+      return tpl.replace('{items}', `The ${joinNatural(itemPhrases)}`);
+    };
+
+    // Disposal orders — one sentence per category, only if items exist
+    if (confsAbsPhrases.length > 0) {
+      parts.push(_applyDisposal(
+        isExport ? 'remarks_ac_export_confs_disposal' : 'remarks_ac_import_confs_disposal',
+        confsAbsPhrases,
+      ));
     }
     if (rfPhrases.length > 0) {
-      parts.push(
-        `The ${joinNatural(rfPhrases)} are allowed to be redeemed on payment of the applicable Customs duty and Redemption Fine as imposed.`
-      );
+      parts.push(_applyDisposal(
+        isExport ? 'remarks_ac_export_rf_disposal' : 'remarks_ac_import_rf_disposal',
+        rfPhrases,
+      ));
     }
     if (refPhrases.length > 0) {
-      parts.push(
-        `The ${joinNatural(refPhrases)} are directed to be re-exported within the time stipulated by the Customs authorities. A Re-export Fine as imposed is payable.`
-      );
+      parts.push(_applyDisposal('remarks_ac_import_ref_disposal', refPhrases));
     }
     if (dutyPhrases.length > 0) {
       parts.push(

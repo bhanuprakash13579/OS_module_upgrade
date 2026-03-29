@@ -64,7 +64,7 @@ export default function AdjudicationLayout() {
           </div>
 
         {/* Navigation */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain min-h-0">
           <nav className="p-3 space-y-1 mt-2">
             
             {user?.user_status !== 'TEMP' && (
@@ -147,7 +147,7 @@ export default function AdjudicationLayout() {
       <main className="flex-1 flex flex-col h-screen overflow-hidden print:h-auto print:overflow-visible">
 
 
-        <div className="flex-1 overflow-y-auto p-5 md:p-7 bg-amber-50 print:overflow-visible">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-5 md:p-7 bg-amber-50 print:overflow-visible">
           {user?.user_status === 'TEMP' && !location.pathname.endsWith('/users') ? (
             <Navigate to="/adjudication/users" replace />
           ) : (

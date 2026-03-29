@@ -174,6 +174,7 @@ export default function CustomReport() {
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [caseType, setCaseType] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ columns: string[]; rows: Record<string, string>[]; total: number } | null>(null);
   const [error, setError] = useState('');
@@ -240,6 +241,7 @@ export default function CustomReport() {
         item_cols: [...selectedItems],
         from_date: fromDate || null,
         to_date: toDate || null,
+        case_type: caseType || null,
       });
       setResult(res.data);
     } catch (err: any) {
@@ -342,7 +344,7 @@ export default function CustomReport() {
                 </span>
               )}
             </p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs text-slate-500 mb-1">From Date <span className="text-slate-400">(optional)</span></label>
                 <DatePicker value={fromDate} onChange={setFromDate} inputClassName="input-field" />
@@ -350,6 +352,14 @@ export default function CustomReport() {
               <div>
                 <label className="block text-xs text-slate-500 mb-1">To Date <span className="text-slate-400">(optional)</span></label>
                 <DatePicker value={toDate} onChange={setToDate} inputClassName="input-field" />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Case Type <span className="text-slate-400">(optional)</span></label>
+                <select value={caseType} onChange={e => setCaseType(e.target.value)} className="w-full bg-white border border-slate-300 rounded-md text-xs px-3 py-2 text-slate-800 focus:ring-emerald-500 focus:border-emerald-500">
+                  <option value="">All Cases</option>
+                  <option value="Arrival Case">Arrival Cases</option>
+                  <option value="Export Case">Export Cases</option>
+                </select>
               </div>
             </div>
             <div className="flex gap-2 flex-wrap">

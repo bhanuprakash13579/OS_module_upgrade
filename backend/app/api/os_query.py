@@ -1,15 +1,441 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query as QParam
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, desc, asc, func, and_, cast, Integer
+from sqlalchemy import or_, desc, asc, func, and_, cast, Integer, extract
 from collections import defaultdict
 from typing import List, Optional
 from datetime import date
+import json
+import re
 from pydantic import BaseModel
 
 from app.database import get_db
 from app.models.offence import CopsMaster, CopsItems
 from app.services.auth import get_current_user
 from app.models.auth import User
+
+
+# ── Monthly Report: Tags Classifier ──────────────────────────────────────────
+
+MONTHLY_REPORT_TAGS = [
+    "Gold (Primary & Jewellery Forms)",
+    "Silver",
+    "Drone",
+    "Foreign Currency (Equivalent to Indian Rs.)",
+    "Indian Currency (Quantity in Nos.)",
+    "Garments",
+    "Diamonds & Precious Stones",
+    "Wild Life / Flora / Fauna",
+    "Ganja",
+    "Fabrics",
+    "Consumer Electronics (Cameras,Televisions,Cell Phones,DVD Players Etc)",
+    "Liquor",
+    "Miscellaneous Goods (With Different Unit Qty Codes)",
+    "E-CIGARETTES",
+    "Cigarettes",
+    "Poppy Seeds",
+    "Heroin",
+    "Cocaine",
+    "Morphine",
+    "Hashish / Charas",
+    "Mandrax / Methaqualone",
+    "Opium",
+    "Acetic_Anhydride",
+    "Misc. Electronic Items (CDs,DVDs,Walkman,Calculator,Digital Diary etc)",
+    "Other Narcotics",
+    "Antiquities",
+    "Watches",
+    "Watch_Parts",
+    "Zip Fasteners",
+    "Synthetic Fibre / Yarn Waste",
+    "Pharmaceutical Drugs / Medicines",
+    "Chemicals",
+    "Computer And Computer Parts",
+    "Ball Bearings",
+    "Machinery And Parts Thereof",
+    "Indian Fake Currency Notes (FICN)- Face Value in Rs.",
+    "Agricultural Produce",
+    "Vehicles",
+    "Vessels",
+    "Aircrafts",
+    "Arms & Ammunition",
+    "Explosives",
+    "Red Sanders (Qty in MTS)",
+    "Metal Scrap",
+    "Ozone Depleting Substances Like R-22 Gas Etc",
+    "Ketamine",
+]
+
+# Keyword → tag mapping (longest phrase first for priority)
+_TAG_KW_MAP: list[tuple[str, str]] = sorted([
+    ("acetic anhydride",    "Acetic_Anhydride"),
+    ("precursor",           "Acetic_Anhydride"),
+    ("ephedrine",           "Acetic_Anhydride"),
+    ("drone",               "Drone"),
+    ("quadcopter",          "Drone"),
+    ("hexacopter",          "Drone"),
+    ("octocopter",          "Drone"),
+    ("uav drone",           "Drone"),
+    ("dji",                 "Drone"),
+    ("r-22 gas",            "Ozone Depleting Substances Like R-22 Gas Etc"),
+    ("r-22",                "Ozone Depleting Substances Like R-22 Gas Etc"),
+    ("refrigerant gas",     "Ozone Depleting Substances Like R-22 Gas Etc"),
+    ("ozone",               "Ozone Depleting Substances Like R-22 Gas Etc"),
+    ("metal scrap",         "Metal Scrap"),
+    ("scrap metal",         "Metal Scrap"),
+    ("iron scrap",          "Metal Scrap"),
+    ("copper scrap",        "Metal Scrap"),
+    ("ball bearing",        "Ball Bearings"),
+    ("machinery part",      "Machinery And Parts Thereof"),
+    ("machine part",        "Machinery And Parts Thereof"),
+    ("machine parts",       "Machinery And Parts Thereof"),
+    ("machinery",           "Machinery And Parts Thereof"),
+    ("computer part",       "Computer And Computer Parts"),
+    ("computer parts",      "Computer And Computer Parts"),
+    ("laptop",              "Computer And Computer Parts"),
+    ("notebook computer",   "Computer And Computer Parts"),
+    ("server",              "Computer And Computer Parts"),
+    ("zip fastener",        "Zip Fasteners"),
+    ("zipper",              "Zip Fasteners"),
+    ("synthetic fibre",     "Synthetic Fibre / Yarn Waste"),
+    ("synthetic fiber",     "Synthetic Fibre / Yarn Waste"),
+    ("yarn waste",          "Synthetic Fibre / Yarn Waste"),
+    ("yarn",                "Synthetic Fibre / Yarn Waste"),
+    ("synthetic yarn",      "Synthetic Fibre / Yarn Waste"),
+    ("watch part",          "Watch_Parts"),
+    ("watch movement",      "Watch_Parts"),
+    ("watch parts",         "Watch_Parts"),
+    ("watch movements",     "Watch_Parts"),
+    ("electronic cigarette","E-CIGARETTES"),
+    ("e-cigarette",         "E-CIGARETTES"),
+    ("e cigarette",         "E-CIGARETTES"),
+    ("vaping device",       "E-CIGARETTES"),
+    ("vape",                "E-CIGARETTES"),
+    ("juul",                "E-CIGARETTES"),
+    ("iqos",                "E-CIGARETTES"),
+    ("indian currency",     "Indian Currency (Quantity in Nos.)"),
+    ("indian rupee",        "Indian Currency (Quantity in Nos.)"),
+    ("indian note",         "Indian Currency (Quantity in Nos.)"),
+    ("foreign currency",    "Foreign Currency (Equivalent to Indian Rs.)"),
+    ("foreign exchange",    "Foreign Currency (Equivalent to Indian Rs.)"),
+    ("ficn",                "Indian Fake Currency Notes (FICN)- Face Value in Rs."),
+    ("counterfeit note",    "Indian Fake Currency Notes (FICN)- Face Value in Rs."),
+    ("fake note",           "Indian Fake Currency Notes (FICN)- Face Value in Rs."),
+    ("fake currency",       "Indian Fake Currency Notes (FICN)- Face Value in Rs."),
+    ("forged note",         "Indian Fake Currency Notes (FICN)- Face Value in Rs."),
+    ("gold",                "Gold (Primary & Jewellery Forms)"),
+    ("silver",              "Silver"),
+    ("diamond",             "Diamonds & Precious Stones"),
+    ("precious stone",      "Diamonds & Precious Stones"),
+    ("sapphire",            "Diamonds & Precious Stones"),
+    ("ruby",                "Diamonds & Precious Stones"),
+    ("emerald",             "Diamonds & Precious Stones"),
+    ("gemstone",            "Diamonds & Precious Stones"),
+    ("coral",               "Wild Life / Flora / Fauna"),
+    ("ivory",               "Wild Life / Flora / Fauna"),
+    ("pangolin",            "Wild Life / Flora / Fauna"),
+    ("elephant tusk",       "Wild Life / Flora / Fauna"),
+    ("wildlife",            "Wild Life / Flora / Fauna"),
+    ("ganja",               "Ganja"),
+    ("marijuana",           "Ganja"),
+    ("cannabis",            "Ganja"),
+    ("poppy seed",          "Poppy Seeds"),
+    ("poppy husk",          "Poppy Seeds"),
+    ("poppy straw",         "Poppy Seeds"),
+    ("poppy",               "Poppy Seeds"),
+    ("heroin",              "Heroin"),
+    ("brown sugar",         "Heroin"),
+    ("cocaine",             "Cocaine"),
+    ("morphine",            "Morphine"),
+    ("opium",               "Opium"),
+    ("hashish",             "Hashish / Charas"),
+    ("charas",              "Hashish / Charas"),
+    ("mandrax",             "Mandrax / Methaqualone"),
+    ("methaqualone",        "Mandrax / Methaqualone"),
+    ("ketamine",            "Ketamine"),
+    ("pharmaceutical",      "Pharmaceutical Drugs / Medicines"),
+    ("medicine",            "Pharmaceutical Drugs / Medicines"),
+    ("steroid",             "Pharmaceutical Drugs / Medicines"),
+    ("psychotropic",        "Pharmaceutical Drugs / Medicines"),
+    ("chemical",            "Chemicals"),
+    ("liquor",              "Liquor"),
+    ("whisky",              "Liquor"),
+    ("whiskey",             "Liquor"),
+    ("brandy",              "Liquor"),
+    ("wine",                "Liquor"),
+    ("vodka",               "Liquor"),
+    ("rum",                 "Liquor"),
+    ("beer",                "Liquor"),
+    ("alcohol",             "Liquor"),
+    ("scotch",              "Liquor"),
+    ("champagne",           "Liquor"),
+    ("cigarette",           "Cigarettes"),
+    ("cigar",               "Cigarettes"),
+    ("garment",             "Garments"),
+    ("shirt",               "Garments"),
+    ("trouser",             "Garments"),
+    ("pant",                "Garments"),
+    ("dress",               "Garments"),
+    ("saree",               "Garments"),
+    ("lehenga",             "Garments"),
+    ("clothes",             "Garments"),
+    ("fabric",              "Fabrics"),
+    ("textile",             "Fabrics"),
+    ("cloth",               "Fabrics"),
+    ("cell phone",          "Consumer Electronics (Cameras,Televisions,Cell Phones,DVD Players Etc)"),
+    ("mobile phone",        "Consumer Electronics (Cameras,Televisions,Cell Phones,DVD Players Etc)"),
+    ("smartphone",          "Consumer Electronics (Cameras,Televisions,Cell Phones,DVD Players Etc)"),
+    ("iphone",              "Consumer Electronics (Cameras,Televisions,Cell Phones,DVD Players Etc)"),
+    ("camera",              "Consumer Electronics (Cameras,Televisions,Cell Phones,DVD Players Etc)"),
+    ("television",          "Consumer Electronics (Cameras,Televisions,Cell Phones,DVD Players Etc)"),
+    ("dvd player",          "Consumer Electronics (Cameras,Televisions,Cell Phones,DVD Players Etc)"),
+    ("electronic",          "Consumer Electronics (Cameras,Televisions,Cell Phones,DVD Players Etc)"),
+    ("mobile",              "Consumer Electronics (Cameras,Televisions,Cell Phones,DVD Players Etc)"),
+    ("samsung",             "Consumer Electronics (Cameras,Televisions,Cell Phones,DVD Players Etc)"),
+    ("android phone",       "Consumer Electronics (Cameras,Televisions,Cell Phones,DVD Players Etc)"),
+    ("ipad",                "Consumer Electronics (Cameras,Televisions,Cell Phones,DVD Players Etc)"),
+    ("android tablet",      "Consumer Electronics (Cameras,Televisions,Cell Phones,DVD Players Etc)"),
+    ("headphone",           "Consumer Electronics (Cameras,Televisions,Cell Phones,DVD Players Etc)"),
+    ("earphone",            "Consumer Electronics (Cameras,Televisions,Cell Phones,DVD Players Etc)"),
+    ("airpod",              "Consumer Electronics (Cameras,Televisions,Cell Phones,DVD Players Etc)"),
+    ("power bank",          "Consumer Electronics (Cameras,Televisions,Cell Phones,DVD Players Etc)"),
+    ("smartwatch",          "Consumer Electronics (Cameras,Televisions,Cell Phones,DVD Players Etc)"),
+    ("fitness band",        "Consumer Electronics (Cameras,Televisions,Cell Phones,DVD Players Etc)"),
+    ("walkman",             "Misc. Electronic Items (CDs,DVDs,Walkman,Calculator,Digital Diary etc)"),
+    ("calculator",          "Misc. Electronic Items (CDs,DVDs,Walkman,Calculator,Digital Diary etc)"),
+    ("digital diary",       "Misc. Electronic Items (CDs,DVDs,Walkman,Calculator,Digital Diary etc)"),
+    ("audio cd",            "Misc. Electronic Items (CDs,DVDs,Walkman,Calculator,Digital Diary etc)"),
+    ("dvd",                 "Misc. Electronic Items (CDs,DVDs,Walkman,Calculator,Digital Diary etc)"),
+    ("watch",               "Watches"),
+    ("wristwatch",          "Watches"),
+    ("rolex",               "Watches"),
+    ("omega watch",         "Watches"),
+    ("gold jewellery",      "Gold (Primary & Jewellery Forms)"),
+    ("gold jewelry",        "Gold (Primary & Jewellery Forms)"),
+    ("gold bangle",         "Gold (Primary & Jewellery Forms)"),
+    ("gold chain",          "Gold (Primary & Jewellery Forms)"),
+    ("gold necklace",       "Gold (Primary & Jewellery Forms)"),
+    ("gold ring",           "Gold (Primary & Jewellery Forms)"),
+    ("gold bracelet",       "Gold (Primary & Jewellery Forms)"),
+    ("gold earring",        "Gold (Primary & Jewellery Forms)"),
+    ("gold pendant",        "Gold (Primary & Jewellery Forms)"),
+    ("gold coin",           "Gold (Primary & Jewellery Forms)"),
+    ("gold bar",            "Gold (Primary & Jewellery Forms)"),
+    ("gold biscuit",        "Gold (Primary & Jewellery Forms)"),
+    ("yellow metal",        "Gold (Primary & Jewellery Forms)"),
+    ("silver jewellery",    "Silver"),
+    ("silver ornament",     "Silver"),
+    ("silver coin",         "Silver"),
+    ("diamond",             "Diamonds & Precious Stones"),
+    ("gemstone",            "Diamonds & Precious Stones"),
+    ("ruby",                "Diamonds & Precious Stones"),
+    ("emerald",             "Diamonds & Precious Stones"),
+    ("sapphire",            "Diamonds & Precious Stones"),
+    ("pearl",               "Diamonds & Precious Stones"),
+    ("precious stone",      "Diamonds & Precious Stones"),
+    ("semi precious",       "Diamonds & Precious Stones"),
+    ("pharmaceutical",      "Pharmaceutical Drugs / Medicines"),
+    ("medicine",            "Pharmaceutical Drugs / Medicines"),
+    ("capsule",             "Pharmaceutical Drugs / Medicines"),
+    ("injection",           "Pharmaceutical Drugs / Medicines"),
+    ("steroid",             "Pharmaceutical Drugs / Medicines"),
+    ("antique",             "Antiquities"),
+    ("antiquity",           "Antiquities"),
+    ("red sanders",         "Red Sanders (Qty in MTS)"),
+    ("red sandalwood",      "Red Sanders (Qty in MTS)"),
+    ("aircraft",            "Aircrafts"),
+    ("airplane",            "Aircrafts"),
+    ("vessel",              "Vessels"),
+    ("boat",                "Vessels"),
+    ("vehicle",             "Vehicles"),
+    ("car",                 "Vehicles"),
+    ("motorcycle",          "Vehicles"),
+    ("arms",                "Arms & Ammunition"),
+    ("ammunition",          "Arms & Ammunition"),
+    ("gun",                 "Arms & Ammunition"),
+    ("pistol",              "Arms & Ammunition"),
+    ("explosive",           "Explosives"),
+    ("agricultural",        "Agricultural Produce"),
+    ("saffron",             "Agricultural Produce"),
+    ("currency",            "Foreign Currency (Equivalent to Indian Rs.)"),
+], key=lambda x: len(x[0]), reverse=True)
+
+
+def _tag_from_duty_type(duty_type_str: str) -> str:
+    """Map a stored duty_type string (e.g. 'Cell Phones-18') to a report tag."""
+    if not duty_type_str:
+        return "Miscellaneous Goods (With Different Unit Qty Codes)"
+    dt = duty_type_str.lower()
+    if "gold" in dt:
+        return "Gold (Primary & Jewellery Forms)"
+    if "silver" in dt:
+        return "Silver"
+    if "liquor" in dt:
+        return "Liquor"
+    if "cigarette" in dt:
+        # e-cigarette check
+        if "e-cig" in dt or "electronic cig" in dt:
+            return "E-CIGARETTES"
+        return "Cigarettes"
+    if any(x in dt for x in ["cell phone", "mobile phone", "smartphone", "iphone", "camera", "television", "cordless phone", "electronic good", "vcd", "dvd player", "tablet", "ipad", "headphone", "power bank", "smartwatch"]):
+        return "Consumer Electronics (Cameras,Televisions,Cell Phones,DVD Players Etc)"
+    if any(x in dt for x in ["walkman", "calculator", "diary", "audio cd", "video cd"]):
+        return "Misc. Electronic Items (CDs,DVDs,Walkman,Calculator,Digital Diary etc)"
+    if "watch movement" in dt or "watch part" in dt:
+        return "Watch_Parts"
+    if "watch" in dt:
+        return "Watches"
+    if "ganja" in dt or "cannabis" in dt:
+        return "Ganja"
+    if "heroin" in dt or "brown sugar" in dt:
+        return "Heroin"
+    if "cocaine" in dt:
+        return "Cocaine"
+    if "morphine" in dt:
+        return "Morphine"
+    if "opium" in dt:
+        return "Opium"
+    if "hashish" in dt or "charas" in dt:
+        return "Hashish / Charas"
+    if "mandrax" in dt or "methaqualone" in dt:
+        return "Mandrax / Methaqualone"
+    if "ketamine" in dt:
+        return "Ketamine"
+    if "poppy" in dt:
+        return "Poppy Seeds"
+    if "methamphetamine" in dt or "synthetic" in dt:
+        return "Other Narcotics"
+    if "narcotic" in dt or "ndps" in dt:
+        return "Other Narcotics"
+    if "psychotropic" in dt or "precursor" in dt or "ephedrine" in dt:
+        return "Pharmaceutical Drugs / Medicines"
+    if "prohibited" in dt:
+        return "Pharmaceutical Drugs / Medicines"
+    if "ficn" in dt or "counterfeit curr" in dt:
+        return "Indian Fake Currency Notes (FICN)- Face Value in Rs."
+    if "foreign currency" in dt or "fema" in dt or "foreign exchange" in dt:
+        return "Foreign Currency (Equivalent to Indian Rs.)"
+    if "currency" in dt:
+        return "Foreign Currency (Equivalent to Indian Rs.)"
+    if any(x in dt for x in ["wildlife", "ivory", "elephant", "pangolin", "coral", "live species"]):
+        return "Wild Life / Flora / Fauna"
+    if "arms" in dt or "ammunition" in dt:
+        return "Arms & Ammunition"
+    if "explosive" in dt:
+        return "Explosives"
+    if any(x in dt for x in ["precious stone", "sapphire", "diamond", "gemstone", "ruby", "emerald", "pearl", "semi precious"]):
+        return "Diamonds & Precious Stones"
+    if "red sanders" in dt or "sandalwood" in dt:
+        return "Red Sanders (Qty in MTS)"
+    if "textile" in dt or "fabric" in dt:
+        return "Fabrics"
+    if "garment" in dt:
+        return "Garments"
+    if "antique" in dt:
+        return "Antiquities"
+    if any(x in dt for x in ["medicine", "pharmaceutical", "drug", "capsule", "injection", "steroid"]):
+        return "Pharmaceutical Drugs / Medicines"
+    if any(x in dt for x in ["jewellery", "jewelry", "necklace", "bangle", "bracelet", "earring", "pendant", "yellow metal"]):
+        return "Gold (Primary & Jewellery Forms)"
+    if "chemical" in dt:
+        return "Chemicals"
+    return "Miscellaneous Goods (With Different Unit Qty Codes)"
+
+
+def _tag_from_desc(desc: str) -> str:
+    """Map a free-text description to a report tag using keyword matching."""
+    if not desc:
+        return "Miscellaneous Goods (With Different Unit Qty Codes)"
+    norm = re.sub(r'[^a-z0-9 ]', ' ', desc.lower())
+    for kw, tag in _TAG_KW_MAP:
+        if kw in norm:
+            return tag
+    return "Miscellaneous Goods (With Different Unit Qty Codes)"
+
+
+def _classify_items_tags(items: list) -> str:
+    """Return comma-separated report tags for a list of CopsItems."""
+    seen: list[str] = []
+    seen_set: set[str] = set()
+    for item in items:
+        duty_type = getattr(item, 'items_duty_type', None) or ''
+        desc = getattr(item, 'items_desc', None) or ''
+        # Prefer duty_type classification (already vetted by SDO), fall back to desc
+        tag = _tag_from_duty_type(duty_type) if duty_type else _tag_from_desc(desc)
+        # Also try desc override for high-specificity items
+        if tag == "Miscellaneous Goods (With Different Unit Qty Codes)" and desc:
+            tag = _tag_from_desc(desc)
+        if tag not in seen_set:
+            seen_set.add(tag)
+            seen.append(tag)
+    return ", ".join(seen) if seen else ""
+
+
+def _build_item_desc(items: list) -> str:
+    """Build 'qty unit description' strings for all items, comma-separated."""
+    parts = []
+    for item in items:
+        qty = item.items_qty or 0
+        uqc = (item.items_uqc or '').strip()
+        desc = (item.items_desc or '').strip()
+        qty_str = f"{qty:g}" if qty else "0"
+        parts.append(f"{qty_str} {uqc} {desc}".strip())
+    return ", ".join(filter(None, parts))
+
+
+def _parse_br_entries(json_str: str | None) -> tuple[str, str]:
+    """Parse post_adj_br_entries JSON → (br_numbers_str, br_dates_str)."""
+    if not json_str:
+        return "", ""
+    try:
+        entries = json.loads(json_str)
+        numbers = [str(e.get("no", "")).strip() for e in entries if e.get("no")]
+        dates = []
+        for e in entries:
+            d = (e.get("date") or "").strip()
+            if d:
+                # Convert YYYY-MM-DD → DD-MM-YYYY
+                try:
+                    parts = d.split("-")
+                    if len(parts) == 3 and len(parts[0]) == 4:
+                        d = f"{parts[2]}-{parts[1]}-{parts[0]}"
+                except Exception:
+                    pass
+                dates.append(d)
+        return ", ".join(numbers), ", ".join(dates)
+    except Exception:
+        return "", ""
+
+
+def _format_dr_remarks(dr_no: str | None, dr_date) -> str:
+    """Format DR number + date as 'DR.No.9598 dt.05.03.2026'."""
+    if not dr_no:
+        return ""
+    parts = [f"DR.No.{dr_no}"]
+    if dr_date:
+        try:
+            d = str(dr_date)
+            if "-" in d and len(d) >= 10:
+                y, m, day = d[:10].split("-")
+                parts.append(f"dt.{day}.{m}.{y}")
+        except Exception:
+            pass
+    return " ".join(parts)
+
+
+def _confiscation_label(items: list) -> str:
+    """Determine confiscation label from item release categories."""
+    cats: set[str] = set()
+    for item in items:
+        rc = (getattr(item, 'items_release_category', None) or '').upper().strip()
+        if rc == 'CONFS':
+            cats.add('Absolute Confiscation')
+        elif rc == 'REF':
+            cats.add('Re-Export')
+        elif rc == 'RF':
+            cats.add('Confiscation')
+    if not cats:
+        return ""
+    return " & ".join(sorted(cats))
 
 router = APIRouter(prefix="/api/os-query", tags=["OS Query"])
 
@@ -41,7 +467,10 @@ class OSQueryRequest(BaseModel):
     
     # Goods
     item_desc: Optional[str] = None
-    
+
+    # Case type filter: "Export Case" | "Arrival Case" | None (all)
+    case_type: Optional[str] = None
+
     # Sorting
     sort_by: str = "os_year"
     sort_dir: str = "desc"
@@ -115,6 +544,8 @@ class OSQueryResponse(BaseModel):
     post_adj_br_entries: Optional[str] = None
     post_adj_dr_no:      Optional[str] = None
     post_adj_dr_date:    Optional[date] = None
+
+    case_type: Optional[str] = None
 
     items: List[OSQueryItemResponse] = []
 
@@ -204,6 +635,16 @@ def search_os_cases(
     # ── Goods ──
     if query.item_desc:
         q = q.filter(CopsItems.items_desc.ilike(f"%{query.item_desc}%"))
+
+    # ── Case Type ──
+    if query.case_type:
+        if (query.case_type or "").strip().upper() == "EXPORT CASE":
+            q = q.filter(func.upper(CopsMaster.case_type) == "EXPORT CASE")
+        else:
+            # Arrival cases: case_type is NULL or not "EXPORT CASE"
+            q = q.filter(
+                or_(CopsMaster.case_type.is_(None), func.upper(CopsMaster.case_type) != "EXPORT CASE")
+            )
 
     # To avoid duplicates if searching by item description
     if query.item_desc:
@@ -296,6 +737,10 @@ def search_os_cases(
             "adjn_offr_remarks": (" ".join(filter(bool, [case.adjn_offr_remarks, case.adjn_offr_remarks1]))).strip() or None,
             "adj_offr_name": case.adj_offr_name,
             "adj_offr_designation": case.adj_offr_designation,
+            "post_adj_br_entries": case.post_adj_br_entries,
+            "post_adj_dr_no": case.post_adj_dr_no,
+            "post_adj_dr_date": case.post_adj_dr_date,
+            "case_type": case.case_type,
             "items": [
                 {
                     "items_sno": i.items_sno,
@@ -325,4 +770,159 @@ def search_os_cases(
         has_next=page < total_pages,
         has_prev=page > 1
     )
+
+
+# ── Monthly Report ────────────────────────────────────────────────────────────
+
+class MonthlyReportRow(BaseModel):
+    os_no: str
+    os_date: Optional[date]
+    batch_aiu: Optional[str]
+    flt_no: Optional[str]
+    pax_name: Optional[str]
+    nationality: Optional[str]
+    passport_no: Optional[str]
+    address: Optional[str]
+    item_description: Optional[str]
+    tags: Optional[str]
+    quantity: Optional[str]
+    value_in_rs: float
+    oinO_no: str = ""
+    date_of_oinO: str = ""
+    rf_ref: float
+    penalty: float
+    duty_rs: float
+    other_charges: str = ""
+    total: float
+    br_no: Optional[str]
+    br_date: Optional[str]
+    remarks: Optional[str]
+    file_spot: str = "SPOT"
+    adjudicated_by_ac_dc: Optional[str]
+    adjudicated_by_jc_adc: str = ""
+    export_import: str
+    column1: Optional[str]
+
+
+@router.get("/monthly-report", response_model=List[MonthlyReportRow])
+def get_monthly_report(
+    month: int = QParam(..., ge=1, le=12, description="Month (1-12)"),
+    year: int = QParam(..., ge=2000, le=2100, description="Year"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Returns all submitted (non-draft, non-deleted) OS cases for the given month/year
+    with all columns needed for the monthly register report.
+    """
+    # Filter: submitted, not deleted, in the given month/year
+    q = (
+        db.query(CopsMaster)
+        .filter(
+            CopsMaster.entry_deleted != "Y",
+            CopsMaster.is_draft == "N",
+            extract("month", CopsMaster.os_date) == month,
+            extract("year", CopsMaster.os_date) == year,
+        )
+        .order_by(
+            asc(cast(CopsMaster.os_no, Integer)),
+        )
+    )
+    cases = q.all()
+
+    if not cases:
+        return []
+
+    # Bulk-load items (N+1 prevention)
+    keys = [(c.os_no, c.os_year) for c in cases]
+    pair_filter = or_(*[
+        and_(CopsItems.os_no == no, CopsItems.os_year == yr) for no, yr in keys
+    ])
+    all_items = (
+        db.query(CopsItems)
+        .filter(
+            pair_filter,
+            or_(CopsItems.entry_deleted.is_(None), CopsItems.entry_deleted != "Y"),
+        )
+        .order_by(CopsItems.os_no, CopsItems.os_year, CopsItems.items_sno)
+        .all()
+    )
+    items_map: dict = defaultdict(list)
+    for item in all_items:
+        items_map[(item.os_no, item.os_year)].append(item)
+
+    rows: list[MonthlyReportRow] = []
+    for case in cases:
+        items = items_map.get((case.os_no, case.os_year), [])
+
+        # ── Col 8: Address ─────────────────────────────────────────────────
+        addr_parts = [
+            (case.pax_address1 or "").strip(),
+            (case.pax_address2 or "").strip(),
+            (case.pax_address3 or "").strip(),
+        ]
+        address = " ".join(p for p in addr_parts if p) or None
+
+        # ── Col 9 & 11: Item Description / Quantity ────────────────────────
+        item_desc = _build_item_desc(items)
+
+        # ── Col 10: Tags ───────────────────────────────────────────────────
+        tags = _classify_items_tags(items)
+
+        # ── Col 12: Value in Rs (after free allowance) ─────────────────────
+        # total_fa_value is 0 for old imported data, so subtraction is safe
+        value_in_rs = max(0.0,
+            (case.total_items_value or 0.0) - (case.total_fa_value or 0.0)
+        )
+
+        # ── Col 15: RF / R.E.F ─────────────────────────────────────────────
+        rf_ref = (case.rf_amount or 0.0) + (case.ref_amount or 0.0)
+
+        # ── Col 16: Penalty ────────────────────────────────────────────────
+        penalty = case.pp_amount or 0.0
+
+        # ── Col 17: Duty ───────────────────────────────────────────────────
+        duty_rs = case.total_duty_amount or 0.0
+
+        # ── Col 19: Total ─────────────────────────────────────────────────
+        total = rf_ref + penalty + duty_rs
+
+        # ── Col 20 & 21: BR No / BR Date ──────────────────────────────────
+        br_no, br_date = _parse_br_entries(case.post_adj_br_entries)
+
+        # ── Col 22: Remarks (DR.No. + date) ───────────────────────────────
+        remarks = _format_dr_remarks(case.post_adj_dr_no, case.post_adj_dr_date) or None
+
+        # ── Col 26: Export / Import ────────────────────────────────────────
+        export_import = "Export" if (case.case_type or "").strip().upper() == "EXPORT CASE" else "Import"
+
+        # ── Col 27: Confiscation label ────────────────────────────────────
+        column1 = _confiscation_label(items) or None
+
+        rows.append(MonthlyReportRow(
+            os_no=case.os_no,
+            os_date=case.os_date,
+            batch_aiu=(case.booked_by or "").strip() or None,
+            flt_no=case.flight_no,
+            pax_name=case.pax_name,
+            nationality=case.pax_nationality,
+            passport_no=case.passport_no,
+            address=address,
+            item_description=item_desc or None,
+            tags=tags or None,
+            quantity=item_desc or None,
+            value_in_rs=value_in_rs,
+            rf_ref=rf_ref,
+            penalty=penalty,
+            duty_rs=duty_rs,
+            total=total,
+            br_no=br_no or None,
+            br_date=br_date or None,
+            remarks=remarks,
+            adjudicated_by_ac_dc=case.adj_offr_name,
+            export_import=export_import,
+            column1=column1,
+        ))
+
+    return rows
 

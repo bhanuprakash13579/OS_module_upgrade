@@ -50,7 +50,7 @@ export default function SDOLayout() {
           </div>
 
         {/* Navigation */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain min-h-0">
           <nav className="p-3 space-y-1 mt-2">
             
             {user?.user_status !== 'TEMP' && (
@@ -112,7 +112,7 @@ export default function SDOLayout() {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden print:h-auto print:overflow-visible">
-        <div className="flex-1 overflow-y-auto print:overflow-visible">
+        <div className="flex-1 overflow-y-auto overscroll-contain print:overflow-visible">
           {user?.user_status === 'TEMP' && !location.pathname.endsWith('/users') ? (
             <Navigate to="/sdo/users" replace />
           ) : (
