@@ -92,6 +92,7 @@ def require_admin(
         )
         if payload.get("role") != "system_admin":
             raise JWTError("not admin")
+        return payload
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
