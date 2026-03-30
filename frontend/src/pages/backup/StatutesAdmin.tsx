@@ -24,16 +24,20 @@ export default function StatutesAdmin({ adminToken }: { adminToken: string }) {
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<Statute>>({});
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   // Remarks templates state
   const [templates, setTemplates] = useState<Record<string, RemarksTemplate>>({});
   const [editingTplKey, setEditingTplKey] = useState<string | null>(null);
   const [tplDraft, setTplDraft] = useState('');
   const [savingTpl, setSavingTpl] = useState(false);
+  const [tplSaveError, setTplSaveError] = useState('');
 
   useEffect(() => {
     api.get('/statutes').then(res => {
       setStatutes(res.data);
+      setLoading(false);
+    }).catch(() => {
       setLoading(false);
     });
     api.get('/admin/config/remarks-templates').then(res => {
@@ -60,6 +64,7 @@ export default function StatutesAdmin({ adminToken }: { adminToken: string }) {
   const saveEdit = async () => {
     if (!editingKey) return;
     setSaving(true);
+    setSaveError('');
     try {
       await api.put(`/statutes/${editingKey}`, editData, {
         headers: { Authorization: `Bearer ${adminToken}` },
@@ -67,8 +72,8 @@ export default function StatutesAdmin({ adminToken }: { adminToken: string }) {
       setStatutes(prev => prev.map(s => s.keyword === editingKey ? { ...s, ...editData } as Statute : s));
       setEditingKey(null);
       setEditData({});
-    } catch (err) {
-      import.meta.env.DEV && console.error('Failed to save statute', err);
+    } catch (err: any) {
+      setSaveError(err?.response?.data?.detail || 'Save failed. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -76,13 +81,16 @@ export default function StatutesAdmin({ adminToken }: { adminToken: string }) {
 
   const saveTpl = async (key: string) => {
     setSavingTpl(true);
+    setTplSaveError('');
     try {
       await api.put(`/admin/config/remarks-templates/${key}`, { value: tplDraft }, {
         headers: { Authorization: `Bearer ${adminToken}` },
       });
       setTemplates(prev => ({ ...prev, [key]: { ...prev[key], value: tplDraft } }));
       setEditingTplKey(null);
-    } catch { /* silently ignore */ } finally {
+    } catch (err: any) {
+      setTplSaveError(err?.response?.data?.detail || 'Save failed. Please try again.');
+    } finally {
       setSavingTpl(false);
     }
   };
@@ -109,7 +117,7 @@ export default function StatutesAdmin({ adminToken }: { adminToken: string }) {
               <Pencil size={11} /> Edit
             </button>
           ) : (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <button
                 onClick={() => saveTpl(tplKey)}
                 disabled={savingTpl}
@@ -123,6 +131,7 @@ export default function StatutesAdmin({ adminToken }: { adminToken: string }) {
               >
                 <X size={11} /> Cancel
               </button>
+              {tplSaveError && <span className="text-[11px] text-red-600 font-medium">{tplSaveError}</span>}
             </div>
           )}
         </div>
@@ -302,7 +311,7 @@ export default function StatutesAdmin({ adminToken }: { adminToken: string }) {
                 <Pencil size={12} /> Edit
               </button>
             ) : (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <button
                   onClick={saveEdit}
                   disabled={saving}
@@ -316,6 +325,7 @@ export default function StatutesAdmin({ adminToken }: { adminToken: string }) {
                 >
                   <X size={12} /> Cancel
                 </button>
+                {saveError && <span className="text-[11px] text-red-600 font-medium">{saveError}</span>}
               </div>
             )}
           </div>

@@ -1322,6 +1322,7 @@ def cancel_adjudicate(
     os_obj.adj_offr_name = None
     os_obj.adj_offr_designation = None
     os_obj.adjn_offr_remarks = None
+    os_obj.os_printed = 'N'  # allow SDO to re-edit after cancellation
     os_obj.confiscated_value = 0.0
     os_obj.redeemed_value = 0.0
     os_obj.re_export_value = 0.0

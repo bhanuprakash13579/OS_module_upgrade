@@ -125,6 +125,7 @@ function ES({ fieldKey, children, onEdit, selected }: {
 export default function OSTemplateEditor({ adminToken }: OSTemplateEditorProps) {
   const [rows, setRows] = useState<PtcRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [edit, setEdit] = useState<EditState | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState('');
@@ -135,10 +136,13 @@ export default function OSTemplateEditor({ adminToken }: OSTemplateEditorProps) 
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError('');
     try {
       const res = await api.get('/admin/config/print-template', { headers: adminHeaders() });
       setRows(res.data);
-    } catch { /* ignore */ }
+    } catch (e: any) {
+      setLoadError(e?.response?.data?.detail || 'Failed to load saved customisations. Showing built-in defaults.');
+    }
     setLoading(false);
   }, [adminToken]);
 
@@ -217,9 +221,16 @@ export default function OSTemplateEditor({ adminToken }: OSTemplateEditorProps) 
   };
 
   if (loading) return <div className="p-8 text-center text-slate-400 text-xs">Loading template...</div>;
+  // loadError is non-fatal — show a banner but still render the editor with defaults
 
   return (
-    <div className="flex gap-4 min-h-[600px]">
+    <div className="flex flex-col gap-3 min-h-[600px]">
+      {loadError && (
+        <div className="px-3 py-2 bg-amber-50 border border-amber-300 rounded text-xs text-amber-800 font-medium">
+          ⚠ {loadError}
+        </div>
+      )}
+    <div className="flex gap-4 flex-1">
 
       {/* ── OS Shell (left / main) ───────────────────────────────────────── */}
       <div className={`flex-1 min-w-0 overflow-y-auto transition-[max-width] duration-200 ${edit ? 'max-w-[60%]' : 'max-w-full'}`}>
@@ -645,6 +656,7 @@ export default function OSTemplateEditor({ adminToken }: OSTemplateEditorProps) 
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 }

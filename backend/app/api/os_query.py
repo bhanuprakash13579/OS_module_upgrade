@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from app.database import get_db
 from app.models.offence import CopsMaster, CopsItems
-from app.services.auth import get_current_user
+from app.services.auth import get_current_user, get_current_active_user
 from app.models.auth import User
 
 
@@ -566,7 +566,7 @@ class OSQueryPaginatedResponse(BaseModel):
 def search_os_cases(
     query: OSQueryRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Query Offence/Seizure records based on dynamic filters.
@@ -809,7 +809,7 @@ def get_monthly_report(
     month: int = QParam(..., ge=1, le=12, description="Month (1-12)"),
     year: int = QParam(..., ge=2000, le=2100, description="Year"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Returns all submitted (non-draft, non-deleted) OS cases for the given month/year

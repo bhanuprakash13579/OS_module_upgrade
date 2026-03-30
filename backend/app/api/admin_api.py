@@ -64,6 +64,7 @@ from app.security.admin_auth import (
     verify_admin_credentials,
     create_admin_token,
     require_admin,
+    _ADMIN_USERNAME,
 )
 from app.security.device import (
     is_device_registered,
@@ -644,6 +645,13 @@ def admin_restore_backup(
                 if _written > _MAX_ZIP:
                     raise HTTPException(status_code=413, detail="Upload too large (max 500 MB).")
                 _f.write(_chunk)
+    except HTTPException:
+        if _zip_tmp:
+            try:
+                os.unlink(_zip_tmp)
+            except OSError:
+                pass
+        raise  # re-raise 413 / other HTTP errors as-is
     except Exception:
         if _zip_tmp:
             try:
@@ -2034,7 +2042,7 @@ def purge_os_case(
     import json as _json
 
     # Re-verify admin password (JWT alone is not sufficient for destructive ops)
-    if not verify_admin_credentials("sysadmin", body.admin_password):
+    if not verify_admin_credentials(_ADMIN_USERNAME, body.admin_password):
         raise HTTPException(status_code=403, detail="Admin password incorrect.")
 
     os_no = body.os_no.strip()
@@ -2152,7 +2160,11 @@ def purge_os_case(
     # ── 12. Primary record — must be last ─────────────────────────────────────
     deleted["cops_master"] = _del("DELETE FROM cops_master WHERE os_no = :n AND os_year = :y", n=os_no, y=body.os_year)
 
-    db.commit()
+    try:
+        db.commit()
+    except Exception as _exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Purge failed during commit: {_exc}. No data was deleted.")
 
     total = sum(v for v in deleted.values() if isinstance(v, int))
     _log.warning(
