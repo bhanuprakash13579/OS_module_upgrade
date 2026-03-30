@@ -72,6 +72,8 @@ def apply_sqlite_migrations():
         ("post_adj_br_entries", "TEXT"),
         ("post_adj_dr_no", "TEXT"),
         ("post_adj_dr_date", "DATE"),
+        # Legacy-origin flag: 'Y' = imported from old VB6 module (excluded from pending list)
+        ("is_legacy", "TEXT DEFAULT 'N'"),
     ]
 
     TABLES_TO_MIGRATE = ["cops_master", "cops_master_deleted", "cops_master_temp"]
@@ -109,6 +111,18 @@ def apply_sqlite_migrations():
                 conn.execute(text("ALTER TABLE feature_flags ADD COLUMN prod_mode BOOLEAN DEFAULT 0"))
             if "session_timeout_minutes" not in ff_cols:
                 conn.execute(text("ALTER TABLE feature_flags ADD COLUMN session_timeout_minutes INTEGER DEFAULT 480"))
+
+            # ── Backfill is_legacy for all pre-March-18-2026 records ─────────
+            # Cases before the new module went live are historical data from the
+            # old VB6 module. Mark them as legacy so they are excluded from the
+            # pending adjudication list (they clutter the list with thousands of
+            # old unresolved cases that were handled outside this system).
+            conn.execute(text("""
+                UPDATE cops_master
+                SET is_legacy = 'Y'
+                WHERE (is_legacy IS NULL OR is_legacy != 'Y')
+                  AND os_date < '2026-03-18'
+            """))
 
             # ── allowed_devices: new table for IP/MAC whitelist ───────────────
             conn.execute(text("""

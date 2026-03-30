@@ -491,6 +491,7 @@ def import_from_mdb(mdb_path: str, db: Session) -> dict:
             unique_no=_int_safe(row.get("unique_no")),
             pax_image_filename=_str_safe(row.get("pax_image_filename")),
             is_draft="N",
+            is_legacy="Y",
         )
         db.add(m)
         existing_masters.add(key)
@@ -590,6 +591,7 @@ def import_from_mdb(mdb_path: str, db: Session) -> dict:
                 unique_no=_int_safe(row.get("unique_no")),
                 pax_image_filename=_str_safe(row.get("pax_image_filename")),
                 is_draft="N",
+            is_legacy="Y",
             )
             db.add(m)
             existing_masters.add(key)

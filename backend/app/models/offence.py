@@ -76,6 +76,7 @@ class CopsMaster(Base):
     br_amount_str = Column(String(50))              # Legacy: BR amount as string
 
     # ── Status ──
+    is_legacy = Column(String(1), default="N")  # 'Y' = imported from old VB6 module; excluded from pending list
     is_draft = Column(String(5), default="N")
     os_printed = Column(String(5), default="N")
     os_category = Column(String(50))                # Legacy: goods category (elec_goods, gold, etc.)

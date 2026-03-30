@@ -46,6 +46,7 @@ def _pending_filters():
         or_(CopsMaster.adjn_offr_remarks.is_(None), CopsMaster.adjn_offr_remarks == ''),
         CopsMaster.quashed != 'Y',
         CopsMaster.rejected != 'Y',
+        or_(CopsMaster.is_legacy.is_(None), CopsMaster.is_legacy != 'Y'),
     ]
 
 
