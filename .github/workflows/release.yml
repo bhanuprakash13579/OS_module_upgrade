@@ -205,6 +205,41 @@ jobs:
         with:
           targets: ${{ matrix.rust_targets }}
 
+      # ── WiX Toolset (Windows MSI bundler) ────────────────────────────────────
+      - name: Cache Tauri WiX tools (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.LOCALAPPDATA }}\tauri\WixTools
+          key: wix-3141
+
+      - name: Pre-download WiX toolset if not cached (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: powershell
+        run: |
+          $wixDir = "$env:LOCALAPPDATA\tauri\WixTools"
+          if (Test-Path "$wixDir\candle.exe") {
+            Write-Host "WiX already present — skipping download"
+            exit 0
+          }
+          New-Item -ItemType Directory -Force -Path $wixDir | Out-Null
+          $zip = "$env:TEMP\wix314-binaries.zip"
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            try {
+              Write-Host "Downloading WiX toolset (attempt $attempt/3)..."
+              Invoke-WebRequest `
+                -Uri "https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip" `
+                -OutFile $zip -UseBasicParsing -TimeoutSec 120
+              Expand-Archive -Path $zip -DestinationPath $wixDir -Force
+              Write-Host "WiX installed to $wixDir"
+              break
+            } catch {
+              if ($attempt -eq 3) { throw }
+              Write-Host "Attempt $attempt failed — retrying in 15 s..."
+              Start-Sleep -Seconds 15
+            }
+          }
+
       # ── Build + Sign + Publish GitHub Release ────────────────────────────────
       # tauri-action with tagName set will:
       #   1. Build the Tauri app (frontend already built above — beforeBuildCommand is a no-op)
