@@ -130,45 +130,40 @@ export default function OSPrintView() {
   const colLiableHeading = pitText('col_liable_heading', "Goods Liable to Action Under FEMA / Foreign Trade Act, 1992 & Customs Act, 1962");
 
   const page1Title      = pitText('page1_title',      "Detention / Seizure of Passenger's Baggage");
-  const inventoryHeading = pitText('inventory_heading',
-    isExportCase ? "INVENTORY OF THE GOODS DETAINED FOR EXPORT" : "INVENTORY OF THE GOODS IMPORTED");
+  const inventoryHeading = isExportCase
+    ? pitText('export_inventory_heading', "INVENTORY OF THE GOODS DETAINED FOR EXPORT")
+    : pitText('inventory_heading', "INVENTORY OF THE GOODS IMPORTED");
   const colDutyHeading  = pitText('col_duty_heading',  "Goods Passed On Duty");
   const supdtSigTitle   = pitText('supdt_sig_title',   "Supdt. of Customs");
   const officeHeader1   = pitText('office_header_line1', "Office of the Deputy / Asst. Commissioner of Customs");
   const officeHeader2   = pitText('office_header_line2', "(Airport), Anna International Airport, Chennai-600027");
   const p2OfficeHeading = pitText('p2_office_heading', "Office of the Deputy / Asst. Commissioner of Customs (Airport), Anna International airport, Chennai-600027.");
   const p2WaiverHeading = pitText('p2_waiver_heading', "WAIVER OF SHOW CAUSE NOTICE");
-  const waiverText1     = pitText('waiver_text_1',
-    isExportCase
-      ? "The Charges have been orally communicated to me in respect of the goods mentioned overleaf and detained at the time of my departure. Orders in the case may please be passed without issue of Show Cause Notice. However I may kindly be given a Personal Hearing."
-      : "The Charges have been orally communicated to me in respect of the goods mentioned overleaf and imported by me. Orders in the case may please be passed without issue of Show Cause Notice. However I may kindly be given a Personal Hearing.");
+  const waiverText1     = isExportCase
+    ? pitText('export_waiver_text_1', "The Charges have been orally communicated to me in respect of the goods mentioned overleaf and detained at the time of my departure. Orders in the case may please be passed without issue of Show Cause Notice. However I may kindly be given a Personal Hearing.")
+    : pitText('waiver_text_1', "The Charges have been orally communicated to me in respect of the goods mentioned overleaf and imported by me. Orders in the case may please be passed without issue of Show Cause Notice. However I may kindly be given a Personal Hearing.");
   const waiverText2     = pitText('waiver_text_2',     "I was present during the personal hearing conducted by the Deputy / Asst. Commissioner and I was heard.");
   const nb1Text         = pitText('nb1_text',          "N.B: 1. This copy is granted free of charge for the private use of the person to whom it is issued.");
   const nb2Text         = pitText('nb2_text',          "2. An Appeal against this Order shall lie before the Commissioner of Customs (Appeals), Custom House, Chennai-600 001 on payment of 7.5% of the duty demanded where duty or duty and penalty are in dispute, or penalty, where penalty alone is in dispute. The Appeal shall be filed within 60 days provided under Section 128 of the Customs Act, 1962 from the date of receipt of this Order.");
   const noteScnWaived   = pitText('note_scn_waived',   "Note: The issue of Show Cause Notice was waived at the instance of the Passenger.");
-  const legalPara1      = pitText('legal_para_1',
-    isExportCase
-      ? "In terms of Foreign Trade Policy notified by the Government in pursuance to Section 3(1) & 3(2) of the Foreign Trade (Development & Regulation) Act, 1992, export of goods without proper Customs declaration or in violation of applicable export regulations / restrictions is prohibited. Passengers are required to declare all goods carried at the time of departure as mandated under Section 40 of the Customs Act, 1962."
-      : "In terms of Foreign Trade Policy notified by the Government in pursuance to Section 3(1) & 3(2) of the Foreign Trade (Development & Regulation) Act, 1992 read with the Rules framed thereunder, also read with Section 11(2)(u) of Customs Act, 1962, import of 'goods in commercial quantity / goods in the nature of non-bonafide baggage' is not permitted without a valid import licence, though exemption exists under clause 3(h) of the Foreign Trade (Exemption from application of Rules in certain cases) order 1993 for import of goods by a passenger from abroad only to the extent admissible under the Baggage Rules framed under Section 79 of the Customs Act, 1962.");
-  const legalPara2      = pitText('legal_para_2',
-    isExportCase
-      ? "Export of goods non-declared / misdeclared / concealed / in commercial quantity / contrary to any prohibition or export restriction is therefore liable for confiscation under Section 113 of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992."
-      : "Import of goods non-declared / misdeclared / concealed / in trade and in commercial quantity / non-bonafide in excess of the baggage allowance is therefore liable for confiscation under Section 111(d), (i), (l), (m) & (o) of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992.");
+  const legalPara1      = isExportCase
+    ? pitText('export_legal_para_1', "In terms of Foreign Trade Policy notified by the Government in pursuance to Section 3(1) & 3(2) of the Foreign Trade (Development & Regulation) Act, 1992, export of goods without proper Customs declaration or in violation of applicable export regulations / restrictions is prohibited. Passengers are required to declare all goods carried at the time of departure as mandated under Section 40 of the Customs Act, 1962.")
+    : pitText('legal_para_1', "In terms of Foreign Trade Policy notified by the Government in pursuance to Section 3(1) & 3(2) of the Foreign Trade (Development & Regulation) Act, 1992 read with the Rules framed thereunder, also read with Section 11(2)(u) of Customs Act, 1962, import of 'goods in commercial quantity / goods in the nature of non-bonafide baggage' is not permitted without a valid import licence, though exemption exists under clause 3(h) of the Foreign Trade (Exemption from application of Rules in certain cases) order 1993 for import of goods by a passenger from abroad only to the extent admissible under the Baggage Rules framed under Section 79 of the Customs Act, 1962.");
+  const legalPara2      = isExportCase
+    ? pitText('export_legal_para_2', "Export of goods non-declared / misdeclared / concealed / in commercial quantity / contrary to any prohibition or export restriction is therefore liable for confiscation under Section 113 of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992.")
+    : pitText('legal_para_2', "Import of goods non-declared / misdeclared / concealed / in trade and in commercial quantity / non-bonafide in excess of the baggage allowance is therefore liable for confiscation under Section 111(d), (i), (l), (m) & (o) of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992.");
   const recordHeading   = pitText('record_heading',    "RECORD OF PERSONAL HEARING & FINDINGS");
   const orderHeading    = pitText('order_heading',     "ORDER");
-  const orderParaRfTpl      = pitText('order_para_rf',
-    isExportCase
-      ? "I Order confiscation of the goods{rf_slnos_text} valued at Rs.{conf_value}/- under Section 113 of the Customs Act, 1962, but allow the passenger an option to redeem the goods valued at Rs.{conf_value}/- on a fine of Rs.{rf_amount}/- (Rupees {rf_words} Only) in lieu of confiscation under Section 125 of the Customs Act 1962 within 7 days from the date of receipt of this Order."
-      : "I Order confiscation of the goods{rf_slnos_text} valued at Rs.{conf_value}/- under Section 111(d), (i), (l), (m) & (o) of the Customs Act, 1962 read with Section 3(3) of Foreign Trade (D&R) Act, 1992, but allow the passenger an option to redeem the goods valued at Rs.{conf_value}/- on a fine of Rs.{rf_amount}/- (Rupees {rf_words} Only) in lieu of confiscation under Section 125 of the Customs Act 1962 within 7 days from the date of receipt of this Order, Duty extra.");
+  const orderParaRfTpl      = isExportCase
+    ? pitText('export_order_para_rf', "I Order confiscation of the goods{rf_slnos_text} valued at Rs.{conf_value}/- under Section 113 of the Customs Act, 1962, but allow the passenger an option to redeem the goods valued at Rs.{conf_value}/- on a fine of Rs.{rf_amount}/- (Rupees {rf_words} Only) in lieu of confiscation under Section 125 of the Customs Act 1962 within 7 days from the date of receipt of this Order.")
+    : pitText('order_para_rf', "I Order confiscation of the goods{rf_slnos_text} valued at Rs.{conf_value}/- under Section 111(d), (i), (l), (m) & (o) of the Customs Act, 1962 read with Section 3(3) of Foreign Trade (D&R) Act, 1992, but allow the passenger an option to redeem the goods valued at Rs.{conf_value}/- on a fine of Rs.{rf_amount}/- (Rupees {rf_words} Only) in lieu of confiscation under Section 125 of the Customs Act 1962 within 7 days from the date of receipt of this Order, Duty extra.");
   const orderParaRefTpl     = pitText('order_para_ref',      "However, I give an option to reship the goods{ref_slnos_text} valued at Rs.{re_exp_value}/- on a fine of Rs.{ref_amount}/- (Rupees {ref_words} Only) under Section 125 of the Customs Act 1962 within 1 Month from the date of this Order.");
-  const orderParaAbsConfTpl = pitText('order_para_abs_conf',
-    isExportCase
-      ? "I {also_text}order absolute confiscation of the goods{abs_conf_slnos_text} valued at Rs.{abs_conf_value}/- under Section 113 of the Customs Act, 1962."
-      : "I {also_text}order absolute confiscation of the goods{abs_conf_slnos_text} valued at Rs.{abs_conf_value}/- under Section 111(d), (i), (l), (m) & (o) of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (D&R) Act, 1992.");
-  const orderParaPpTpl      = pitText('order_para_pp',
-    isExportCase
-      ? "I further impose a Personal Penalty of Rs.{pp_amount}/- (Rupees {pp_words} Only) under Section 114 of the Customs Act, 1962."
-      : "I further impose a Personal Penalty of Rs.{pp_amount}/- (Rupees {pp_words} Only) under Section 112(a) of the Customs Act, 1962.");
+  const orderParaAbsConfTpl = isExportCase
+    ? pitText('export_order_para_abs_conf', "I {also_text}order absolute confiscation of the goods{abs_conf_slnos_text} valued at Rs.{abs_conf_value}/- under Section 113 of the Customs Act, 1962.")
+    : pitText('order_para_abs_conf', "I {also_text}order absolute confiscation of the goods{abs_conf_slnos_text} valued at Rs.{abs_conf_value}/- under Section 111(d), (i), (l), (m) & (o) of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (D&R) Act, 1992.");
+  const orderParaPpTpl      = isExportCase
+    ? pitText('export_order_para_pp', "I further impose a Personal Penalty of Rs.{pp_amount}/- (Rupees {pp_words} Only) under Section 114 of the Customs Act, 1962.")
+    : pitText('order_para_pp', "I further impose a Personal Penalty of Rs.{pp_amount}/- (Rupees {pp_words} Only) under Section 112(a) of the Customs Act, 1962.");
   const deputySigTitle  = pitText('deputy_sig_title',  "Deputy / Asst. Commissioner of Customs (Airport)");
   const bottomNb1       = pitText('bottom_nb1',        "N.B: 1. Perishables will be disposed off within seven days from the date of detention.");
   // Re-export note is irrelevant for export/departure cases
