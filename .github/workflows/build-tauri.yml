@@ -229,23 +229,24 @@ jobs:
         run: |
           $wixDir = "$env:LOCALAPPDATA\tauri\WixTools"
           if (Test-Path "$wixDir\candle.exe") {
-            Write-Host "WiX already present — skipping download"
+            Write-Host "WiX already present - skipping download"
             exit 0
           }
           New-Item -ItemType Directory -Force -Path $wixDir | Out-Null
           $zip = "$env:TEMP\wix314-binaries.zip"
-          for ($attempt = 1; $attempt -le 3; $attempt++) {
+          $uri = "https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip"
+          $ok = $false
+          for ($i = 1; $i -le 3; $i++) {
             try {
-              Write-Host "Downloading WiX toolset (attempt $attempt/3)..."
-              Invoke-WebRequest `
-                -Uri "https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip" `
-                -OutFile $zip -UseBasicParsing -TimeoutSec 120
+              Write-Host "Downloading WiX toolset (attempt $i of 3)..."
+              Invoke-WebRequest -Uri $uri -OutFile $zip -UseBasicParsing -TimeoutSec 120
               Expand-Archive -Path $zip -DestinationPath $wixDir -Force
               Write-Host "WiX installed to $wixDir"
+              $ok = $true
               break
             } catch {
-              if ($attempt -eq 3) { throw }
-              Write-Host "Attempt $attempt failed — retrying in 15 s..."
+              if ($i -ge 3) { throw }
+              Write-Host "Attempt $i failed, retrying in 15 seconds..."
               Start-Sleep -Seconds 15
             }
           }

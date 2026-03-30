@@ -21,6 +21,7 @@ Column name differences between MDB and new schema:
 import csv
 import io
 import logging
+import re
 import subprocess
 import sys
 from datetime import datetime, date as _date
@@ -34,6 +35,77 @@ from app.models.offence import CopsMaster, CopsItems
 from app.api.backup import _existing_os_keys, _existing_item_keys, _parse_date, _flt, post_import_optimise, set_bulk_pragma
 
 _CURRENT_YEAR = _date.today().year
+
+# ── Export-case classification ────────────────────────────────────────────────
+# The old VB6 module stored arrival and departure cases in the same cops_master
+# table with no reliable "case_type" column.  We infer the case type from two
+# independent signals:
+#
+#   1. os_category contains an export-specific keyword (highest confidence).
+#      Examples: banned_exp, cites_exports, red_sanders_exp, gold_exports,
+#                ficn_export — these are ONLY ever used for outbound seizures.
+#
+#   2. Free-text remarks contain a departure-context phrase (high confidence).
+#      We require the phrase to clearly place the passenger at departure
+#      (departure hall, attempting to export, taking goods out of India, etc.)
+#      and deliberately avoid weak signals like "prohibited for export" which
+#      appears in both arrival and export case write-ups.
+#
+# Anything that does NOT match either rule stays as NULL (unclassified / arrival).
+# We never falsely promote an arrival case to Export Case.
+
+_EXPORT_CATEGORY_RE = re.compile(
+    r'_exp\b|_export\b|\bexports?\b',
+    re.IGNORECASE,
+)
+
+_EXPORT_REMARK_PATTERNS = [
+    re.compile(p, re.IGNORECASE) for p in [
+        r'departure hall',
+        r'departing passenger',
+        r'at the departure',
+        r'in the departure',
+        r'departure gate',
+        r'\bat departure\b',
+        r'attempting to export',
+        r'attempted to export',
+        r'smuggle.*out of india',
+        r'smuggle.*outside india',
+        r'taking out of india',
+        r'taking.*out of.*india',
+        r'export.*outside india',
+        r'goods.*for export.*monetary',
+        r'carrying.*for export.*monetary',
+        r'to smuggle.*outside',
+        r'take.*out of.*country',
+        r'out of india.*monetary benefit',
+        r'departure.*intercepted',
+    ]
+]
+
+
+def _classify_case_type(row: dict) -> Optional[str]:
+    """
+    Return "Export Case" if the MDB row belongs to an outbound/departure seizure,
+    otherwise return whatever case_type the MDB already has (usually None).
+
+    Called for every cops_master / cops_master_deleted row during import.
+    """
+    os_category = (row.get("os_category") or "").strip()
+    if _EXPORT_CATEGORY_RE.search(os_category):
+        return "Export Case"
+
+    combined_remarks = " ".join([
+        row.get("adjn_offr_remarks") or "",
+        row.get("supdt_remarks1") or "",
+        row.get("supdt_remarks2") or "",
+        row.get("adjn_offr_remarks1") or "",
+    ])
+    for pattern in _EXPORT_REMARK_PATTERNS:
+        if pattern.search(combined_remarks):
+            return "Export Case"
+
+    return _str_safe(row.get("case_type"))
 
 
 def _sanitize_year(raw_year: int, fallback_date: Optional[_date]) -> Optional[int]:
@@ -250,9 +322,7 @@ def import_from_mdb(mdb_path: str, db: Session) -> dict:
         key = (os_no, os_year, location_code)
         mdb_entry_deleted = _str_safe(row.get("entry_deleted")) or "N"
 
-        # Derive case_type: SDO table_name means departure/export case
-        mdb_table_name = (row.get("table_name") or "").strip().upper()
-        mdb_case_type = "Export Case" if mdb_table_name == "SDO" else _str_safe(row.get("case_type"))
+        mdb_case_type = _classify_case_type(row)
 
         if key in existing_masters:
             # If DB has this as deleted but MDB cops_master has it as active →
@@ -452,8 +522,7 @@ def import_from_mdb(mdb_path: str, db: Session) -> dict:
                 deleted_skipped += 1
                 continue
 
-            del_table_name = (row.get("table_name") or "").strip().upper()
-            del_case_type = "Export Case" if del_table_name == "SDO" else _str_safe(row.get("case_type"))
+            del_case_type = _classify_case_type(row)
 
             m = CopsMaster(
                 os_no=os_no,
