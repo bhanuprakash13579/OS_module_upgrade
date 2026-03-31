@@ -98,6 +98,7 @@ class CopsMasterBase(BaseModel):
 
     is_draft: Optional[str] = "N"
     is_offline_adjudication: Optional[str] = None
+    file_spot: Optional[str] = None
 
 
 class CopsMasterCreate(CopsMasterBase):
@@ -124,6 +125,7 @@ class CopsMasterOut(CopsMasterBase):
     
     os_printed: str = 'N'
     is_offline_adjudication: Optional[str] = None
+    file_spot: Optional[str] = None
     entry_deleted: str = 'N'
     closure_ind: Optional[str] = None
 

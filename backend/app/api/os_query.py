@@ -797,7 +797,7 @@ class MonthlyReportRow(BaseModel):
     br_no: Optional[str]
     br_date: Optional[str]
     remarks: Optional[str]
-    file_spot: str = "SPOT"
+    file_spot: str = "Spot"
     adjudicated_by_ac_dc: Optional[str]
     adjudicated_by_jc_adc: str = ""
     export_import: str
@@ -919,6 +919,7 @@ def get_monthly_report(
             br_no=br_no or None,
             br_date=br_date or None,
             remarks=remarks,
+            file_spot=case.file_spot or "Spot",
             adjudicated_by_ac_dc=case.adj_offr_name or case.adj_offr_designation or None,
             export_import=export_import,
             column1=column1,

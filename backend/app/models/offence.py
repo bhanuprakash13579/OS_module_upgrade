@@ -78,6 +78,7 @@ class CopsMaster(Base):
     # ── Status ──
     is_legacy = Column(String(1), default="N")  # 'Y' = imported from old VB6 module; excluded from pending list
     is_offline_adjudication = Column(String(1), default='N')  # 'Y' = offline adjudication case
+    file_spot = Column(String(20), default='Spot')  # 'Spot' = spot adjudication; 'File' = adjudication vide file
     is_draft = Column(String(5), default="N")
     os_printed = Column(String(5), default="N")
     os_category = Column(String(50))                # Legacy: goods category (elec_goods, gold, etc.)

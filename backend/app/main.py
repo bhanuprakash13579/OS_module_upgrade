@@ -75,6 +75,7 @@ def apply_sqlite_migrations():
         # Legacy-origin flag: 'Y' = imported from old VB6 module (excluded from pending list)
         ("is_legacy", "TEXT DEFAULT 'N'"),
         ("is_offline_adjudication", "TEXT DEFAULT 'N'"),
+        ("file_spot", "TEXT DEFAULT 'Spot'"),
     ]
 
     TABLES_TO_MIGRATE = ["cops_master", "cops_master_deleted", "cops_master_temp"]

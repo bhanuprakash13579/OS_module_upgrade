@@ -189,6 +189,7 @@ export default function OfflineAdjudicationForm() {
     pax_nationality: '',
     passport_no: '',
     pax_address1: '',
+    file_spot: '',
   });
 
   const [optionalData, setOptionalData] = useState({
@@ -343,6 +344,7 @@ export default function OfflineAdjudicationForm() {
     requireField('pax_nationality', formData.pax_nationality, 'Nationality');
     requireField('passport_no', formData.passport_no, 'Passport No.');
     requireField('pax_address1', formData.pax_address1, 'Address');
+    if (!formData.file_spot) errors['file_spot'] = 'Please select Spot Adjudication or Adjudication vide File.';
 
     if (!errors.os_no && !/^\d+$/.test(formData.os_no.trim())) {
       errors.os_no = 'O.S. No. must be digits only.';
@@ -388,6 +390,7 @@ export default function OfflineAdjudicationForm() {
         pax_nationality: formData.pax_nationality.toUpperCase(),
         passport_no: formData.passport_no.toUpperCase(),
         pax_address1: formData.pax_address1.toUpperCase(),
+        file_spot: formData.file_spot,
         is_draft: 'N',
         items: items.map((itm, i) => ({
           items_sno: i + 1,
@@ -862,6 +865,50 @@ export default function OfflineAdjudicationForm() {
               )}
             </table>
           </div>
+        </div>
+
+        {/* ── Adjudication Type ─────────────────────────────────────────────── */}
+        <div className={`bg-white rounded-xl border-2 ${fieldErrors.file_spot ? 'border-red-400' : 'border-slate-200'} p-5`}>
+          <p className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-3 flex items-center">
+            <FileText className="mr-2 text-slate-400" size={15} />
+            Adjudication Type <span className="text-red-500 ml-1">*</span>
+            <span className="ml-2 text-xs font-normal text-slate-400 normal-case">(mandatory)</span>
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <label className={`flex items-center gap-3 cursor-pointer px-5 py-3.5 rounded-xl border-2 transition-all select-none flex-1 ${formData.file_spot === 'Spot' ? 'border-blue-500 bg-blue-50 text-blue-800' : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300'}`}>
+              <input
+                type="radio"
+                name="file_spot"
+                value="Spot"
+                checked={formData.file_spot === 'Spot'}
+                onChange={() => { setFormData(prev => ({ ...prev, file_spot: 'Spot' })); clearFieldError('file_spot'); }}
+                className="w-4 h-4 accent-blue-600"
+              />
+              <div>
+                <div className="font-bold text-sm">Spot Adjudication</div>
+                <div className="text-xs text-slate-500 mt-0.5">Adjudication done at the spot / on the day of seizure</div>
+              </div>
+            </label>
+            <label className={`flex items-center gap-3 cursor-pointer px-5 py-3.5 rounded-xl border-2 transition-all select-none flex-1 ${formData.file_spot === 'File' ? 'border-purple-500 bg-purple-50 text-purple-800' : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300'}`}>
+              <input
+                type="radio"
+                name="file_spot"
+                value="File"
+                checked={formData.file_spot === 'File'}
+                onChange={() => { setFormData(prev => ({ ...prev, file_spot: 'File' })); clearFieldError('file_spot'); }}
+                className="w-4 h-4 accent-purple-600"
+              />
+              <div>
+                <div className="font-bold text-sm">Adjudication vide File</div>
+                <div className="text-xs text-slate-500 mt-0.5">Adjudication done through file / after issuing show cause notice</div>
+              </div>
+            </label>
+          </div>
+          {fieldErrors.file_spot && (
+            <p className="mt-2 text-xs font-semibold text-red-600 flex items-center gap-1">
+              <AlertCircle size={13} /> {fieldErrors.file_spot}
+            </p>
+          )}
         </div>
 
         {/* ── Submit ────────────────────────────────────────────────────────── */}

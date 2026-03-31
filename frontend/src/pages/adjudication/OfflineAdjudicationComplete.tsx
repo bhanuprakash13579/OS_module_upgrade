@@ -257,7 +257,13 @@ export default function OfflineAdjudicationComplete() {
               <p className="text-xs font-semibold text-slate-500 uppercase mb-0.5">Flight No.</p>
               <p className="font-medium text-slate-700">{caseData.flight_no || '—'}</p>
             </div>
-            <div className="col-span-2 md:col-span-3 xl:col-span-2">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase mb-0.5">Adj. Type</p>
+              <span className={`text-xs font-bold px-2 py-1 rounded-md ${caseData.file_spot === 'File' ? 'bg-purple-100 text-purple-800 border border-purple-200' : 'bg-blue-100 text-blue-800 border border-blue-200'}`}>
+                {caseData.file_spot === 'File' ? 'ADJ. VIDE FILE' : 'SPOT'}
+              </span>
+            </div>
+            <div className="col-span-2 md:col-span-2 xl:col-span-2">
               <p className="text-xs font-semibold text-slate-500 uppercase mb-0.5">Item Summary</p>
               <p className="font-medium text-slate-700">
                 {itemCount} item(s) — Total Value:{' '}

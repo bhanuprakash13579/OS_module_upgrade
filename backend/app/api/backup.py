@@ -335,7 +335,7 @@ _MASTER_COLS = [
     # BR linkage
     "br_no_str", "br_no_num", "br_date_str", "br_amount_str",
     # Status / adjudication
-    "is_draft", "is_legacy", "is_offline_adjudication", "os_printed", "os_category", "online_os",
+    "is_draft", "is_legacy", "is_offline_adjudication", "file_spot", "os_printed", "os_category", "online_os",
     "adjudication_date", "adjudication_time",
     "adj_offr_name", "adj_offr_designation",
     "adjn_offr_remarks", "adjn_offr_remarks1", "online_adjn",
