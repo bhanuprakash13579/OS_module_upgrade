@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useState } from 'react';
-import { ShieldAlert, FileText, Plus, LogOut, Menu, User, KeyRound, Users } from 'lucide-react';
+import { ShieldAlert, FileText, Plus, LogOut, Menu, User, KeyRound, Users, ClipboardList } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function SDOLayout() {
@@ -59,6 +59,7 @@ export default function SDOLayout() {
                   <p className="text-blue-400/70 text-xs uppercase tracking-widest font-semibold px-3 mb-3">Offence Cases</p>
                 )}
                 <NavItem to="/sdo/offence/new" icon={<Plus size={24}/>} label="Register New O/S Case" color="blue" id="nav-new-os" end={false} collapsed={isCollapsed} />
+                <NavItem to="/sdo/offline-adjudication" icon={<ClipboardList size={24}/>} label="Offline Adjudication" color="blue" id="nav-offline-adj" end={false} collapsed={isCollapsed} />
                 <NavItem to="/sdo/offence" icon={<FileText size={24}/>} label="View All O/S Cases" color="blue" id="nav-list-os" end collapsed={isCollapsed} />
               </>
             )}

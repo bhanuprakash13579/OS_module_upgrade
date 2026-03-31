@@ -47,6 +47,7 @@ def _pending_filters():
         CopsMaster.quashed != 'Y',
         CopsMaster.rejected != 'Y',
         or_(CopsMaster.is_legacy.is_(None), CopsMaster.is_legacy != 'Y'),
+        or_(CopsMaster.is_offline_adjudication.is_(None), CopsMaster.is_offline_adjudication != 'Y'),
     ]
 
 
@@ -496,6 +497,148 @@ def get_pending_adjudication(
     return records
 
 
+# ── Lookup passport details for smart auto-fill (Offline Adjudication) ───────
+@router.get("/passports/lookup-by-pp")
+def lookup_passport_details(
+    passport_no: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_sdo_user)
+):
+    """
+    Smart auto-fill: given a passport number, return passenger details
+    from the most recent case in the DB with that passport number.
+    Also returns linked old passports via name+DOB matching.
+    """
+    from app.services.apis_match import _name_score, _NAME_THRESHOLD
+
+    pp = passport_no.strip().upper()
+    if not pp:
+        return {"found": False}
+
+    # Find most recent case with this passport number
+    rec = db.query(CopsMaster).filter(
+        CopsMaster.passport_no == pp,
+        CopsMaster.entry_deleted == "N"
+    ).order_by(CopsMaster.os_year.desc(), CopsMaster.id.desc()).first()
+
+    if not rec:
+        return {"found": False}
+
+    # Build linked passport list (same DOB + similar name)
+    linked_passports: set = {pp}
+    if rec.pax_date_of_birth and rec.pax_name:
+        candidates = db.query(CopsMaster).filter(
+            CopsMaster.pax_date_of_birth == rec.pax_date_of_birth,
+            CopsMaster.entry_deleted == "N"
+        ).limit(200).all()
+        for c in candidates:
+            if _name_score(rec.pax_name, c.pax_name or '') >= _NAME_THRESHOLD:
+                if c.passport_no:
+                    linked_passports.add(c.passport_no.strip().upper())
+                if c.old_passport_no:
+                    for op in c.old_passport_no.split(";"):
+                        if op.strip():
+                            linked_passports.add(op.strip().upper())
+    linked_passports.discard(pp)  # remove current passport from old list
+
+    return {
+        "found": True,
+        "pax_name": rec.pax_name,
+        "pax_nationality": rec.pax_nationality,
+        "pax_date_of_birth": rec.pax_date_of_birth.isoformat() if rec.pax_date_of_birth else None,
+        "pax_address1": rec.pax_address1,
+        "pax_address2": rec.pax_address2,
+        "pax_address3": rec.pax_address3,
+        "pp_issue_place": rec.pp_issue_place,
+        "passport_date": rec.passport_date.isoformat() if rec.passport_date else None,
+        "residence_at": rec.residence_at,
+        "father_name": rec.father_name,
+        "old_passport_no": ";".join(sorted(linked_passports)) if linked_passports else None,
+    }
+
+
+# ── SDO: Create Offline Adjudication Case ────────────────────────────────────
+@router.post("/offline", response_model=schemas.CopsMasterOut)
+def create_offline_adjudication(
+    data: schemas.CopsMasterCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_sdo_user)
+):
+    """
+    SDO Module: Register an offline adjudication case.
+    Same as create_os but with relaxed date validation and is_offline_adjudication='Y'.
+    """
+    from app.services.rules_engine import BusinessRulesEngine
+    rules = BusinessRulesEngine(db)
+    data.passport_no = rules.normalize_passport(data.passport_no)
+
+    os_date = data.os_date
+    if not os_date:
+        from datetime import date as _date
+        os_date = _date.today()
+
+    os_no = str(data.os_no or '').strip()
+    if not os_no:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="O.S. No. is required.")
+    if not os_no.isdigit():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="O.S. No. must contain digits only.")
+
+    os_year = os_date.year
+
+    existing = db.query(CopsMaster).filter(
+        CopsMaster.os_no == os_no,
+        CopsMaster.os_year == os_year,
+        CopsMaster.entry_deleted == "N"
+    ).first()
+    if existing:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"O.S. No. {os_no}/{os_year} already exists.")
+
+    total_val = 0.0
+    total_duty = 0.0
+    for item in data.items:
+        item_value = float(item.items_value or 0.0)
+        fa = _eff_fa(item_value, item)
+        rate = float(item.cumulative_duty_rate or 0.0)
+        duty = round(max(0.0, (item_value - fa)) * rate / 100.0, 2)
+        total_val += item_value
+        total_duty = round(total_duty + duty, 2)
+
+    os_obj = CopsMaster(
+        os_no=os_no,
+        os_date=os_date,
+        os_year=os_year,
+        total_items=len(data.items),
+        total_items_value=total_val,
+        total_duty_amount=total_duty,
+        total_payable=total_duty,
+        is_offline_adjudication='Y',
+        **data.model_dump(exclude={"items", "os_no", "os_year", "os_date", "is_offline_adjudication"})
+    )
+    db.add(os_obj)
+    db.commit()
+    db.refresh(os_obj)
+
+    for c_item in data.items:
+        item_value = float(c_item.items_value or 0.0)
+        fa = _eff_fa(item_value, c_item)
+        rate = float(c_item.cumulative_duty_rate or 0.0)
+        duty = round(max(0.0, (item_value - fa)) * rate / 100.0, 2)
+        db_item = CopsItems(
+            os_no=os_no,
+            os_date=os_obj.os_date,
+            os_year=os_year,
+            items_duty=duty,
+            **c_item.model_dump(exclude={"items_duty"})
+        )
+        db.add(db_item)
+
+    db.commit()
+    return os_obj
+
+
 # ── Adjudication Module: Adjudicated Cases ────────────────────────────────────
 @router.get("/adjudicated", response_model=List[schemas.CopsMasterOut])
 def get_adjudicated_cases(
@@ -529,6 +672,83 @@ def get_quashed_cases(
         r.items = []
     return records
 
+
+
+# ── Adjudication: Pending Offline Adjudication Count ─────────────────────────
+@router.get("/offline-pending/count")
+def get_offline_pending_count(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_adjn_user)
+):
+    """Returns count of offline adjudication cases pending officer details entry."""
+    count = db.query(func.count(CopsMaster.id)).filter(
+        CopsMaster.entry_deleted == "N",
+        CopsMaster.is_offline_adjudication == 'Y',
+        CopsMaster.adj_offr_name.is_(None),
+    ).scalar()
+    return {"count": count or 0}
+
+
+# ── Adjudication: Pending Offline Adjudication List ──────────────────────────
+@router.get("/offline-pending", response_model=List[schemas.CopsMasterOut])
+def get_offline_pending(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_adjn_user)
+):
+    """Cases registered as offline adjudication but officer details not yet captured."""
+    records = db.query(CopsMaster).filter(
+        CopsMaster.entry_deleted == "N",
+        CopsMaster.is_offline_adjudication == 'Y',
+        CopsMaster.adj_offr_name.is_(None),
+    ).order_by(CopsMaster.os_year.desc(), cast(CopsMaster.os_no, SAInteger).desc()).limit(200).all()
+    for r in records:
+        r.items = []
+    return records
+
+
+# ── Adjudication: Complete Offline Adjudication ───────────────────────────────
+@router.patch("/{os_no}/{os_year}/complete-offline-adj")
+def complete_offline_adjudication(
+    os_no: str,
+    os_year: int,
+    data: schemas.OfflineAdjudicationComplete,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_adjn_user)
+):
+    """
+    Adjudication Module: Capture officer details for an offline adjudication case.
+    Mandatory: adj_offr_name, adj_offr_designation.
+    """
+    case = db.query(CopsMaster).filter(
+        CopsMaster.os_no == os_no,
+        CopsMaster.os_year == os_year,
+        CopsMaster.entry_deleted == "N",
+        CopsMaster.is_offline_adjudication == 'Y',
+    ).first()
+    if not case:
+        raise HTTPException(status_code=404,
+                            detail="Offline adjudication case not found.")
+    if case.adj_offr_name:
+        raise HTTPException(status_code=400,
+                            detail="This offline case has already been completed.")
+
+    from datetime import date as _date
+    case.adj_offr_name = data.adj_offr_name.strip()
+    case.adj_offr_designation = data.adj_offr_designation.strip()
+    case.adjudication_date = data.adjudication_date or _date.today()
+    case.rf_amount = data.rf_amount
+    case.pp_amount = data.pp_amount
+    case.ref_amount = data.ref_amount
+    case.confiscated_value = data.confiscated_value
+    case.redeemed_value = data.redeemed_value
+    case.re_export_value = data.re_export_value
+    if data.adjn_offr_remarks:
+        case.adjn_offr_remarks = data.adjn_offr_remarks
+    if data.close_case:
+        case.closure_ind = 'Y'
+
+    db.commit()
+    return {"status": "ok", "os_no": os_no, "os_year": os_year}
 
 
 # ── Get Single O/S Case ───────────────────────────────────────────────────────

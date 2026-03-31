@@ -143,6 +143,11 @@ export default function QuashedList() {
                     <td className="px-5 py-3 align-middle">
                       <div className="font-bold text-slate-700">{c.os_no}/{c.os_year}</div>
                       <div className="text-xs text-slate-400 mt-0.5">{c.location_code || 'CHN'}</div>
+                      {c.is_offline_adjudication === 'Y' && (
+                        <span className="inline-flex items-center mt-0.5 px-1.5 py-0.5 text-[10px] font-semibold rounded bg-purple-100 text-purple-700 border border-purple-200">
+                          OFFLINE ADJ
+                        </span>
+                      )}
                     </td>
                     <td className="px-5 py-3 align-middle font-medium text-slate-600">{fmtDate(c.os_date)}</td>
                     <td className="px-5 py-3 align-middle">

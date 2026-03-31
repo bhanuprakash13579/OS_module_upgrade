@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { Gavel, FileText, CheckCircle, LogOut, Menu, User, KeyRound, Users, ShieldAlert } from 'lucide-react';
+import { Gavel, FileText, CheckCircle, LogOut, Menu, User, KeyRound, Users, ShieldAlert, ClipboardCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useState, useEffect, useMemo } from 'react';
 
@@ -12,6 +12,7 @@ export default function AdjudicationLayout() {
   const { user, token, logout } = useAuth();
   const navigate = useNavigate();
   const [pendingCount, setPendingCount] = useState<number | null>(null);
+  const [offlinePendingCount, setOfflinePendingCount] = useState<number | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(true);
   const location = useLocation();
 
@@ -25,6 +26,9 @@ export default function AdjudicationLayout() {
     api.get('/os/pending/count', { headers: { Authorization: `Bearer ${token}` } })
       .then(res => setPendingCount(res.data.count))
       .catch(() => setPendingCount(null));
+    api.get('/os/offline-pending/count', { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => setOfflinePendingCount(res.data.count))
+      .catch(() => setOfflinePendingCount(null));
   }, [token]);
 
   const handleLogout = () => {
@@ -90,6 +94,14 @@ export default function AdjudicationLayout() {
                   icon={<ShieldAlert size={24} />}
                   label="Quashed O.S. Cases"
                   id="nav-quashed"
+                  collapsed={isCollapsed}
+                />
+                <AdjNavItem
+                  to="/adjudication/offline-pending"
+                  icon={<ClipboardCheck size={24} />}
+                  label="Offline Adjudication"
+                  id="nav-offline-pending"
+                  badge={offlinePendingCount}
                   collapsed={isCollapsed}
                 />
               </>

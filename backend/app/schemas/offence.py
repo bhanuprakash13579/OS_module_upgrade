@@ -97,6 +97,7 @@ class CopsMasterBase(BaseModel):
         return v
 
     is_draft: Optional[str] = "N"
+    is_offline_adjudication: Optional[str] = None
 
 
 class CopsMasterCreate(CopsMasterBase):
@@ -122,6 +123,7 @@ class CopsMasterOut(CopsMasterBase):
     online_adjn: Optional[str] = None
     
     os_printed: str = 'N'
+    is_offline_adjudication: Optional[str] = None
     entry_deleted: str = 'N'
     closure_ind: Optional[str] = None
 
@@ -203,3 +205,27 @@ class PostAdjUpdate(BaseModel):
     dr_no:      Optional[str]  = None
     dr_date:    Optional[date] = None
 
+
+class OfflineAdjudicationComplete(BaseModel):
+    """Payload to complete offline adjudication (capture officer details)."""
+    adj_offr_name: str          # MANDATORY
+    adj_offr_designation: str   # MANDATORY
+    adjudication_date: Optional[date] = None   # defaults to today if None
+    # Optional financial details
+    rf_amount: float = 0.0
+    pp_amount: float = 0.0
+    ref_amount: float = 0.0
+    confiscated_value: float = 0.0
+    redeemed_value: float = 0.0
+    re_export_value: float = 0.0
+    adjn_offr_remarks: Optional[str] = None
+    close_case: bool = False
+
+    @field_validator('adjn_offr_remarks')
+    @classmethod
+    def check_remarks_length(cls, v):
+        if v and len(v) > settings.ADJN_REMARKS_MAX_CHARS:
+            raise ValueError(
+                f"Remarks exceeds {settings.ADJN_REMARKS_MAX_CHARS} characters."
+            )
+        return v

@@ -67,7 +67,14 @@
       "Bash(find /home/bhanu -name *.venv -o -name venv -o -name .venv)",
       "Bash(ls /home/bhanu/Desktop/OS_module_upgrade/backend/*.db)",
       "Bash(ls ~/.local/share/gov.in.customs.cops/*.db)",
-      "Bash(sqlite3 ~/.local/share/gov.in.customs.cops/cops_br_database.db \".tables\")"
+      "Bash(sqlite3 ~/.local/share/gov.in.customs.cops/cops_br_database.db \".tables\")",
+      "Bash(git push:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git tag:*)",
+      "Bash(python -m py_compile backend/server_entry.py)",
+      "Bash(sudo apt:*)",
+      "Bash(/tmp/backend_routes.txt:*)"
     ]
   }
 }

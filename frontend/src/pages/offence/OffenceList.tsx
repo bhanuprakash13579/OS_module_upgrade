@@ -358,6 +358,11 @@ export default function OffenceList() {
                         <td className="px-5 py-3 align-middle">
                           <div className="font-bold text-brand-700">{row.os_no}/{row.os_year}</div>
                           <div className="text-xs text-slate-400 mt-0.5">{row.location_code || 'CHN'}</div>
+                          {row.is_offline_adjudication === 'Y' && (
+                            <span className="inline-flex items-center mt-0.5 px-1.5 py-0.5 text-[10px] font-semibold rounded bg-purple-100 text-purple-700 border border-purple-200">
+                              OFFLINE ADJ
+                            </span>
+                          )}
                         </td>
                         <td className="px-5 py-3 align-middle font-medium text-slate-600">{fmtDate(row.os_date)}</td>
                         <td className="px-5 py-3 align-middle">
