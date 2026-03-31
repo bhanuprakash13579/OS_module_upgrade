@@ -1012,7 +1012,11 @@ def get_br_detail(
 
     items = (
         db.query(BrItems)
-        .filter(BrItems.br_no == br_no, BrItems.entry_deleted != "Y")
+        .filter(
+            BrItems.br_no == br_no,
+            BrItems.br_date == br.br_date,  # pin to exact BR date to avoid mixing same-number BRs across years
+            BrItems.entry_deleted != "Y",
+        )
         .order_by(BrItems.items_sno)
         .all()
     )
@@ -1022,9 +1026,12 @@ def get_br_detail(
     if br.dr_no:
         try:
             dr_no_int = int(str(br.dr_no).strip())
-            dr = db.query(DrMaster).filter(
-                DrMaster.dr_no == dr_no_int, DrMaster.entry_deleted != "Y"
-            ).first()
+            dr = (
+                db.query(DrMaster)
+                .filter(DrMaster.dr_no == dr_no_int, DrMaster.entry_deleted != "Y")
+                .order_by(desc(DrMaster.dr_date))  # most recent if same dr_no exists across years
+                .first()
+            )
             if dr:
                 linked_dr = {
                     "dr_no": dr.dr_no, "dr_year": dr.dr_year,
@@ -1151,7 +1158,7 @@ def get_dr_detail(
 
     items = (
         db.query(DrItems)
-        .filter(DrItems.dr_no == dr_no)
+        .filter(DrItems.dr_no == dr_no, DrItems.dr_date == dr.dr_date)  # pin to exact DR date
         .order_by(DrItems.items_sno)
         .all()
     )

@@ -40,7 +40,13 @@ type DrDetail = DrRow & {
 
 function fmtDate(d: string | null | undefined) {
   if (!d) return '—';
-  try { const [y, m, dy] = d.split('-'); return `${dy}/${m}/${y}`; } catch { return d; }
+  try {
+    const parts = d.split('-');
+    if (parts.length !== 3) return d;
+    const [y, m, dy] = parts;
+    if (!y || !m || !dy) return d;
+    return `${dy}/${m}/${y}`;
+  } catch { return d; }
 }
 function fmtRs(n: number | undefined) {
   if (!n) return '—';
@@ -119,8 +125,8 @@ function ItemsTable({ items, hasDuty }: { items: (BrItem | DrItem)[]; hasDuty: b
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
-          {items.map((it, idx) => (
-            <tr key={idx} className="hover:bg-slate-50">
+          {items.map((it) => (
+            <tr key={it.items_sno} className="hover:bg-slate-50">
               <td className="px-3 py-2 text-slate-500">{it.items_sno}</td>
               <td className="px-3 py-2 font-medium text-slate-700 max-w-xs">{it.items_desc || '—'}</td>
               <td className="px-3 py-2 text-right">{it.items_qty || '—'} {it.items_uqc || ''}</td>
@@ -343,7 +349,8 @@ export default function BRDRLookupPage() {
     try {
       const params: Record<string, string | number> = { page: p, limit: LIMIT };
       if (q.trim()) params.q = q.trim();
-      if (year) params.year = parseInt(year);
+      const parsedYear = parseInt(year);
+      if (year && !isNaN(parsedYear)) params.year = parsedYear;
       if (typeFilter) params[tab === 'br' ? 'br_type' : 'dr_type'] = typeFilter;
 
       const res = await api.get(`/os-query/${tab}/search`, { params });
@@ -364,6 +371,7 @@ export default function BRDRLookupPage() {
     setBrResults([]); setDrResults([]);
     setBrDetail(null); setDrDetail(null);
     setSearched(false); setTotal(0); setPage(1);
+    setError(null);
   };
 
   const loadBrDetail = async (row: BrRow) => {
@@ -438,7 +446,8 @@ export default function BRDRLookupPage() {
           </div>
           <div className="w-28">
             <label className="block text-xs font-medium text-slate-500 mb-1">Year</label>
-            <input value={year} onChange={e => setYear(e.target.value)} maxLength={4}
+            <input value={year} onChange={e => setYear(e.target.value.replace(/\D/g, '').slice(0, 4))}
+              inputMode="numeric" pattern="[0-9]*"
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
               placeholder="e.g. 2023" />
           </div>
@@ -515,8 +524,8 @@ export default function BRDRLookupPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {tab === 'br' && brResults.map((row, i) => (
-                      <tr key={i} className="hover:bg-emerald-50/40 cursor-pointer" onClick={() => loadBrDetail(row)}>
+                    {tab === 'br' && brResults.map((row) => (
+                      <tr key={`${row.br_no}_${row.br_year}`} className="hover:bg-emerald-50/40 cursor-pointer" onClick={() => loadBrDetail(row)}>
                         <td className="px-5 py-3 font-mono font-semibold text-slate-800">{row.br_no}/{row.br_year ?? '—'}</td>
                         <td className="px-5 py-3 text-slate-600">{fmtDate(row.br_date)}</td>
                         <td className="px-5 py-3"><span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 text-emerald-700">{row.br_type}</span></td>
@@ -536,8 +545,8 @@ export default function BRDRLookupPage() {
                         </td>
                       </tr>
                     ))}
-                    {tab === 'dr' && drResults.map((row, i) => (
-                      <tr key={i} className="hover:bg-amber-50/40 cursor-pointer" onClick={() => loadDrDetail(row)}>
+                    {tab === 'dr' && drResults.map((row) => (
+                      <tr key={`${row.dr_no}_${row.dr_year}`} className="hover:bg-amber-50/40 cursor-pointer" onClick={() => loadDrDetail(row)}>
                         <td className="px-5 py-3 font-mono font-semibold text-slate-800">{row.dr_no}/{row.dr_year ?? '—'}</td>
                         <td className="px-5 py-3 text-slate-600">{fmtDate(row.dr_date)}</td>
                         <td className="px-5 py-3"><span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-700">{row.dr_type}</span></td>

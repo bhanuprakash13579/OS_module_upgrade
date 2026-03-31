@@ -24,6 +24,8 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db, get_cipher_module, get_db_key, get_db_path
 from app.models.offence import CopsMaster, CopsItems
+from app.models.baggage import BrMaster, BrItems
+from app.models.detention import DrMaster, DrItems
 from app.models.auth import User
 from app.security.admin_auth import require_admin
 from app.services.auth import get_adjn_user, get_current_active_user
@@ -370,6 +372,60 @@ _ITEMS_COLS = [
     "unique_no", "entry_deleted", "bkup_taken",
 ]
 
+# ── BR / DR export column lists ───────────────────────────────────────────────
+
+_BR_MASTER_COLS = [
+    "br_no", "br_date", "br_type", "br_year", "br_shift",
+    "flight_no", "flight_date",
+    "pax_name", "pax_nationality", "passport_no", "passport_date",
+    "passport_issue_place", "pax_address1", "pax_address2", "pax_address3",
+    "pax_date_of_birth", "pax_status", "residence_at",
+    "country_of_departure", "departure_date",
+    "os_no", "os_date", "dr_no", "dr_date",
+    "total_items_value", "total_fa_value", "total_duty_amount",
+    "rf_amount", "pp_amount", "ref_amount", "wh_amount", "other_amount", "br_amount",
+    "challan_no", "bank_date", "bank_shift", "batch_date", "batch_shift",
+    "dc_code", "unique_no", "location_code", "login_id",
+    "entry_deleted", "bkup_taken", "br_printed", "ff_ind",
+    "image_filename", "table_name", "arrived_from", "br_amount_str", "br_no_str",
+    "abroad_stay", "total_fa_availed", "actual_br_type", "total_payable",
+    "_availed_remarks",  # ORM attribute name; DB column is availed_remarks
+]
+
+_BR_ITEMS_COLS = [
+    "br_no", "br_date", "br_shift", "br_type",
+    "items_sno", "items_desc", "items_qty", "items_uqc", "items_value",
+    "items_fa", "items_bcd", "items_cvd", "items_cess", "items_hec", "items_duty",
+    "items_duty_type", "items_category",
+    "items_dr_no", "items_dr_year", "items_release_category",
+    "flight_no", "bank_date", "bank_shift", "batch_date", "batch_shift",
+    "unique_no", "location_code", "login_id", "entry_deleted", "bkup_taken",
+]
+
+_DR_MASTER_COLS = [
+    "dr_no", "dr_date", "dr_year", "dr_type",
+    "pax_name", "passport_no", "passport_date",
+    "pax_address1", "pax_address2", "pax_address3",
+    "port_of_departure", "flight_no", "flight_date",
+    "total_items_value",
+    "closure_ind", "closure_remarks", "closure_date",
+    "closed_batch_date", "closed_batch_shift",
+    "warehouse_no",
+    "entry_deleted", "unique_no", "location_code", "login_id",
+    "detained_by", "detained_pkg_no", "detained_pkg_type",
+    "seal_no", "dr_printed", "detention_reasons",
+    "seizure_date", "os_no", "receipt_by_who",
+]
+
+_DR_ITEMS_COLS = [
+    "dr_no", "dr_date", "dr_type",
+    "items_sno", "items_desc", "items_qty", "items_uqc", "items_value",
+    "items_fa", "items_release_category",
+    "receipt_by_who", "item_closure_remarks",
+    "detained_pkg_no", "detained_pkg_type",
+    "unique_no", "location_code",
+]
+
 
 @router.get("/export/csv")
 def export_csv(
@@ -415,6 +471,57 @@ def export_csv(
     for it in items:
         iw.writerow([_val(getattr(it, col, None)) for col in _ITEMS_COLS])
 
+    # ── BR tables (always full export — no meaningful date-range slice for BR) ──
+    q_br = db.query(BrMaster)
+    if from_date and to_date:
+        q_br = q_br.filter(BrMaster.br_date >= from_date, BrMaster.br_date <= to_date)
+    br_masters: List[BrMaster] = q_br.order_by(BrMaster.br_date, BrMaster.br_no).all()
+    br_nos = {b.br_no for b in br_masters}
+
+    q_br_items = db.query(BrItems)
+    if from_date and to_date:
+        q_br_items = q_br_items.filter(BrItems.br_date >= from_date, BrItems.br_date <= to_date)
+    br_items_list: List[BrItems] = q_br_items.order_by(BrItems.br_date, BrItems.br_no, BrItems.items_sno).all()
+    br_items_list = [it for it in br_items_list if it.br_no in br_nos]
+
+    br_master_buf = io.StringIO()
+    bmw = csv.writer(br_master_buf)
+    # Write header using display names (strip leading underscore for availed_remarks)
+    bmw.writerow([c.lstrip("_") for c in _BR_MASTER_COLS])
+    for b in br_masters:
+        bmw.writerow([_val(getattr(b, col, None)) for col in _BR_MASTER_COLS])
+
+    br_items_buf = io.StringIO()
+    biw = csv.writer(br_items_buf)
+    biw.writerow(_BR_ITEMS_COLS)
+    for it in br_items_list:
+        biw.writerow([_val(getattr(it, col, None)) for col in _BR_ITEMS_COLS])
+
+    # ── DR tables ──────────────────────────────────────────────────────────────
+    q_dr = db.query(DrMaster)
+    if from_date and to_date:
+        q_dr = q_dr.filter(DrMaster.dr_date >= from_date, DrMaster.dr_date <= to_date)
+    dr_masters: List[DrMaster] = q_dr.order_by(DrMaster.dr_date, DrMaster.dr_no).all()
+    dr_nos = {d.dr_no for d in dr_masters}
+
+    q_dr_items = db.query(DrItems)
+    if from_date and to_date:
+        q_dr_items = q_dr_items.filter(DrItems.dr_date >= from_date, DrItems.dr_date <= to_date)
+    dr_items_list: List[DrItems] = q_dr_items.order_by(DrItems.dr_date, DrItems.dr_no, DrItems.items_sno).all()
+    dr_items_list = [it for it in dr_items_list if it.dr_no in dr_nos]
+
+    dr_master_buf = io.StringIO()
+    dmw = csv.writer(dr_master_buf)
+    dmw.writerow(_DR_MASTER_COLS)
+    for d in dr_masters:
+        dmw.writerow([_val(getattr(d, col, None)) for col in _DR_MASTER_COLS])
+
+    dr_items_buf = io.StringIO()
+    diw = csv.writer(dr_items_buf)
+    diw.writerow(_DR_ITEMS_COLS)
+    for it in dr_items_list:
+        diw.writerow([_val(getattr(it, col, None)) for col in _DR_ITEMS_COLS])
+
     zip_buf = io.BytesIO()
     if _PYZIPPER_AVAILABLE:
         from app.security.device import get_zip_password
@@ -430,6 +537,10 @@ def export_csv(
     with zf_ctx as zf:
         zf.writestr("cops_master.csv", master_buf.getvalue())
         zf.writestr("cops_items.csv", items_buf.getvalue())
+        zf.writestr("br_master.csv", br_master_buf.getvalue())
+        zf.writestr("br_items.csv", br_items_buf.getvalue())
+        zf.writestr("dr_master.csv", dr_master_buf.getvalue())
+        zf.writestr("dr_items.csv", dr_items_buf.getvalue())
     zip_buf.seek(0)
 
     today = date.today().isoformat()
