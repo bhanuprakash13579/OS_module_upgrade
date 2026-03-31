@@ -490,11 +490,15 @@ export default function RestoreBackup() {
         headers: { ...adminHeaders(adminToken), 'Content-Type': 'multipart/form-data' },
         timeout: 600000, // 10 min — large file
       });
-      const { master_inserted, master_skipped, master_invalid, items_inserted, items_skipped, items_invalid } = res.data;
-      setMdbResult(
-        `Done — Cases: ${master_inserted} inserted, ${master_skipped} skipped, ${master_invalid} invalid. ` +
-        `Items: ${items_inserted} inserted, ${items_skipped} skipped, ${items_invalid} invalid.`
-      );
+      const d = res.data;
+      const lines: string[] = [
+        `OS: ${d.master_inserted} inserted, ${d.master_skipped} skipped, ${d.master_invalid} invalid — Items: ${d.items_inserted} ins / ${d.items_skipped} skip`,
+      ];
+      if ((d.br_inserted ?? 0) + (d.br_skipped ?? 0) + (d.br_invalid ?? 0) > 0)
+        lines.push(`BR: ${d.br_inserted} inserted, ${d.br_skipped} skipped, ${d.br_invalid} invalid — Items: ${d.br_items_inserted} ins / ${d.br_items_skipped} skip`);
+      if ((d.dr_inserted ?? 0) + (d.dr_skipped ?? 0) + (d.dr_invalid ?? 0) > 0)
+        lines.push(`DR: ${d.dr_inserted} inserted, ${d.dr_skipped} skipped, ${d.dr_invalid} invalid — Items: ${d.dr_items_inserted} ins / ${d.dr_items_skipped} skip`);
+      setMdbResult(`Done — ${lines.join(' | ')}`);
     } catch (err: any) {
       setMdbErr(err.response?.data?.detail || 'Import failed. Check the file and try again.');
     } finally {

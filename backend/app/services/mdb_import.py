@@ -32,6 +32,8 @@ logger = logging.getLogger(__name__)
 from sqlalchemy.orm import Session
 
 from app.models.offence import CopsMaster, CopsItems
+from app.models.baggage import BrMaster, BrItems
+from app.models.detention import DrMaster, DrItems
 from app.api.backup import _existing_os_keys, _existing_item_keys, _parse_date, _flt, post_import_optimise, set_bulk_pragma
 
 _CURRENT_YEAR = _date.today().year
@@ -679,16 +681,274 @@ def import_from_mdb(mdb_path: str, db: Session) -> dict:
 
     db.commit()
 
+    # ── br_master ──────────────────────────────────────────────────────────────
+    br_inserted = br_skipped = br_invalid = 0
+    existing_brs = {
+        (r[0], r[1] or 0)
+        for r in db.query(BrMaster.br_no, BrMaster.br_year).all()
+    }
+    try:
+        for row in _export_table(mdb_path, "br_master"):
+            br_no_val = _int_safe(row.get("br_no"))
+            if not br_no_val:
+                br_invalid += 1
+                continue
+            br_date_val = _parse_date(row.get("br_date"))
+            if br_date_val is None:
+                br_invalid += 1
+                continue
+            br_type_val = _str_safe(row.get("br_type"))
+            if not br_type_val:
+                br_invalid += 1
+                continue
+            br_year_val = br_date_val.year
+            key = (br_no_val, br_year_val)
+            if key in existing_brs:
+                br_skipped += 1
+                continue
+            db.add(BrMaster(
+                br_no=br_no_val,
+                br_date=br_date_val,
+                br_type=br_type_val,
+                br_year=br_year_val,
+                flight_no=_str_safe(row.get("flight_no")),
+                flight_date=_parse_date(row.get("flight_date")) if row.get("flight_date") else None,
+                pax_name=_str_safe(row.get("pax_name")),
+                pax_nationality=_str_safe(row.get("pax_nationality")),
+                passport_no=_str_safe(row.get("passport_no")),
+                passport_date=_parse_date(row.get("passport_date")) if row.get("passport_date") else None,
+                pax_address1=_str_safe(row.get("pax_address1")),
+                pax_address2=_str_safe(row.get("pax_address2")),
+                pax_address3=_str_safe(row.get("pax_address3")),
+                pax_date_of_birth=_parse_date(row.get("pax_date_of_birth")) if row.get("pax_date_of_birth") else None,
+                pax_status=_str_safe(row.get("pax_status")),
+                residence_at=_str_safe(row.get("residence_at")),
+                country_of_departure=_str_safe(row.get("country_of_departure")),
+                departure_date=_parse_date(row.get("departure_date")) if row.get("departure_date") else None,
+                os_no=_str_safe(row.get("os_no")),
+                os_date=_parse_date(row.get("os_date")) if row.get("os_date") else None,
+                dr_no=_str_safe(row.get("dr_no")),
+                dr_date=_parse_date(row.get("dr_date")) if row.get("dr_date") else None,
+                total_items_value=_flt_safe(row.get("total_items_value")) or 0.0,
+                total_fa_value=_flt_safe(row.get("total_fa_value")) or 0.0,
+                total_duty_amount=_flt_safe(row.get("total_duty_amount")) or 0.0,
+                rf_amount=_flt_safe(row.get("rf_amount")) or 0.0,
+                ref_amount=_flt_safe(row.get("ref_amount")) or 0.0,
+                pp_amount=_flt_safe(row.get("pp_amount")) or 0.0,
+                wh_amount=_flt_safe(row.get("wh_amount")) or 0.0,
+                other_amount=_flt_safe(row.get("other_amount")) or 0.0,
+                br_amount=_flt_safe(row.get("br_amount")) or 0.0,
+                challan_no=_str_safe(row.get("challan_no")),
+                bank_date=_parse_date(row.get("bank_date")) if row.get("bank_date") else None,
+                bank_shift=_str_safe(row.get("bank_shift")),
+                batch_date=_parse_date(row.get("batch_date")) if row.get("batch_date") else None,
+                batch_shift=_str_safe(row.get("batch_shift")),
+                dc_code=_str_safe(row.get("dc_code")),
+                unique_no=_int_safe(row.get("unique_no")),
+                location_code=_str_safe(row.get("location_code")),
+                login_id=_str_safe(row.get("login_id")),
+                entry_deleted=_str_safe(row.get("entry_deleted")) or "N",
+                bkup_taken=_str_safe(row.get("bkup_taken")),
+                br_printed=_str_safe(row.get("br_printed")),
+                ff_ind=_str_safe(row.get("ff_ind")),
+                image_filename=_str_safe(row.get("image_filename")),
+                table_name=_str_safe(row.get("table_name")),
+            ))
+            existing_brs.add(key)
+            br_inserted += 1
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.warning("br_master import error (partial data may have been saved): %s", e)
+
+    # ── br_items ───────────────────────────────────────────────────────────────
+    br_items_inserted = br_items_skipped = 0
+    existing_br_items = {
+        (r[0], str(r[1]), r[2])
+        for r in db.query(BrItems.br_no, BrItems.br_date, BrItems.items_sno).all()
+    }
+    try:
+        for row in _export_table(mdb_path, "br_items"):
+            br_no_val = _int_safe(row.get("br_no"))
+            if not br_no_val:
+                continue
+            br_date_val = _parse_date(row.get("br_date"))
+            if br_date_val is None:
+                continue
+            items_sno_val = _int_safe(row.get("items_sno")) or 0
+            if items_sno_val == 0:
+                continue  # skip items without serial numbers
+            item_key = (br_no_val, str(br_date_val), items_sno_val)
+            if item_key in existing_br_items:
+                br_items_skipped += 1
+                continue
+            br_type_val = _str_safe(row.get("br_type"))
+            if not br_type_val:
+                continue  # NOT NULL constraint — skip items without br_type
+            db.add(BrItems(
+                br_no=br_no_val,
+                br_date=br_date_val,
+                br_type=br_type_val,
+                items_sno=items_sno_val,
+                items_desc=_str_safe(row.get("items_desc")),
+                items_qty=_flt_safe(row.get("items_qty")) or 0.0,
+                items_uqc=_str_safe(row.get("items_uqc")),
+                items_value=_flt_safe(row.get("items_value")) or 0.0,
+                items_fa=_flt_safe(row.get("items_fa")) or 0.0,
+                items_bcd=_flt_safe(row.get("items_bcd")) or 0.0,
+                items_cvd=_flt_safe(row.get("items_cvd")) or 0.0,
+                items_cess=_flt_safe(row.get("items_cess")) or 0.0,
+                items_hec=_flt_safe(row.get("items_hec")) or 0.0,
+                items_duty=_flt_safe(row.get("items_duty")) or 0.0,
+                items_duty_type=_str_safe(row.get("items_duty_type")),
+                flight_no=_str_safe(row.get("flight_no")),
+                bank_date=_parse_date(row.get("bank_date")) if row.get("bank_date") else None,
+                bank_shift=_str_safe(row.get("bank_shift")),
+                batch_date=_parse_date(row.get("batch_date")) if row.get("batch_date") else None,
+                batch_shift=_str_safe(row.get("batch_shift")),
+                unique_no=_int_safe(row.get("unique_no")),
+                location_code=_str_safe(row.get("location_code")),
+                login_id=_str_safe(row.get("login_id")),
+                entry_deleted=_str_safe(row.get("entry_deleted")) or "N",
+                bkup_taken=_str_safe(row.get("bkup_taken")),
+            ))
+            existing_br_items.add(item_key)
+            br_items_inserted += 1
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.warning("br_items import error: %s", e)
+
+    # ── dr_master ──────────────────────────────────────────────────────────────
+    dr_inserted = dr_skipped = dr_invalid = 0
+    existing_drs = {
+        (r[0], r[1] or 0)
+        for r in db.query(DrMaster.dr_no, DrMaster.dr_year).all()
+    }
+    try:
+        for row in _export_table(mdb_path, "dr_master"):
+            dr_no_val = _int_safe(row.get("dr_no"))
+            if not dr_no_val:
+                dr_invalid += 1
+                continue
+            dr_date_val = _parse_date(row.get("dr_date"))
+            if dr_date_val is None:
+                dr_invalid += 1
+                continue
+            dr_type_val = _str_safe(row.get("dr_type"))
+            if not dr_type_val:
+                dr_invalid += 1
+                continue
+            dr_year_val = dr_date_val.year
+            key = (dr_no_val, dr_year_val)
+            if key in existing_drs:
+                dr_skipped += 1
+                continue
+            db.add(DrMaster(
+                dr_no=dr_no_val,
+                dr_date=dr_date_val,
+                dr_year=dr_year_val,
+                dr_type=dr_type_val,
+                pax_name=_str_safe(row.get("pax_name")),
+                passport_no=_str_safe(row.get("passport_no")),
+                passport_date=_parse_date(row.get("passport_date")) if row.get("passport_date") else None,
+                pax_address1=_str_safe(row.get("pax_address1")),
+                pax_address2=_str_safe(row.get("pax_address2")),
+                pax_address3=_str_safe(row.get("pax_address3")),
+                port_of_departure=_str_safe(row.get("port_of_departure")),
+                flight_no=_str_safe(row.get("flight_no")),
+                flight_date=_parse_date(row.get("flight_date")) if row.get("flight_date") else None,
+                total_items_value=_flt_safe(row.get("total_items_value")) or 0.0,
+                closure_ind=_str_safe(row.get("closure_ind")),
+                closure_remarks=_str_safe(row.get("closure_remarks")),
+                closure_date=_parse_date(row.get("return_flight_date")) if row.get("return_flight_date") else None,
+                closed_batch_date=_parse_date(row.get("closed_batch_date")) if row.get("closed_batch_date") else None,
+                closed_batch_shift=_str_safe(row.get("closed_batch_shift")),
+                warehouse_no=_str_safe(row.get("warehouse_no")),
+                entry_deleted=_str_safe(row.get("entry_deleted")) or "N",
+                unique_no=_int_safe(row.get("unique_no")),
+                location_code=_str_safe(row.get("location_code")),
+                login_id=_str_safe(row.get("login_id")),
+                detained_by=_str_safe(row.get("detained_by")),
+                detained_pkg_no=_str_safe(row.get("register_Ref_no")),
+                seal_no=_str_safe(row.get("seal_no")),
+                dr_printed=_str_safe(row.get("dr_printed")),
+                detention_reasons=_str_safe(row.get("detention_reasons")),
+                os_no=_str_safe(row.get("os_no")),
+            ))
+            existing_drs.add(key)
+            dr_inserted += 1
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.warning("dr_master import error: %s", e)
+
+    # ── dr_items ───────────────────────────────────────────────────────────────
+    dr_items_inserted = dr_items_skipped = 0
+    existing_dr_items = {
+        (r[0], str(r[1]), r[2])
+        for r in db.query(DrItems.dr_no, DrItems.dr_date, DrItems.items_sno).all()
+    }
+    try:
+        for row in _export_table(mdb_path, "dr_items"):
+            dr_no_val = _int_safe(row.get("dr_no"))
+            if not dr_no_val:
+                continue
+            dr_date_val = _parse_date(row.get("dr_date"))
+            if dr_date_val is None:
+                continue
+            items_sno_val = _int_safe(row.get("items_sno")) or 0
+            if items_sno_val == 0:
+                continue
+            item_key = (dr_no_val, str(dr_date_val), items_sno_val)
+            if item_key in existing_dr_items:
+                dr_items_skipped += 1
+                continue
+            db.add(DrItems(
+                dr_no=dr_no_val,
+                dr_date=dr_date_val,
+                dr_type=_str_safe(row.get("dr_type")),
+                items_sno=items_sno_val,
+                items_desc=_str_safe(row.get("items_desc")),
+                items_qty=_flt_safe(row.get("items_qty")) or 0.0,
+                items_uqc=_str_safe(row.get("items_uqc")),
+                items_value=_flt_safe(row.get("items_value")) or 0.0,
+                items_fa=_flt_safe(row.get("items_fa")) or 0.0,
+                items_release_category=_str_safe(row.get("items_release_category")),
+                receipt_by_who=_str_safe(row.get("receipt_by_who")),
+                item_closure_remarks=_str_safe(row.get("item_closure_remarks")),
+                detained_pkg_no=_str_safe(row.get("detained_pkg_no")),
+                detained_pkg_type=_str_safe(row.get("detained_pkg_type")),
+                unique_no=_int_safe(row.get("unique_no")),
+                location_code=_str_safe(row.get("location_code")),
+            ))
+            existing_dr_items.add(item_key)
+            dr_items_inserted += 1
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.warning("dr_items import error: %s", e)
+
     post_import_optimise(db)
 
     return {
-        "master_inserted":     master_inserted,
-        "master_skipped":      master_skipped,
-        "master_reactivated":  master_reactivated,
-        "master_invalid":      master_invalid,
-        "deleted_inserted":    deleted_inserted,
-        "deleted_skipped":     deleted_skipped,
-        "items_inserted":      items_inserted,
-        "items_skipped":       items_skipped,
-        "items_invalid":       items_invalid,
+        "master_inserted":      master_inserted,
+        "master_skipped":       master_skipped,
+        "master_reactivated":   master_reactivated,
+        "master_invalid":       master_invalid,
+        "deleted_inserted":     deleted_inserted,
+        "deleted_skipped":      deleted_skipped,
+        "items_inserted":       items_inserted,
+        "items_skipped":        items_skipped,
+        "items_invalid":        items_invalid,
+        "br_inserted":          br_inserted,
+        "br_skipped":           br_skipped,
+        "br_invalid":           br_invalid,
+        "br_items_inserted":    br_items_inserted,
+        "br_items_skipped":     br_items_skipped,
+        "dr_inserted":          dr_inserted,
+        "dr_skipped":           dr_skipped,
+        "dr_invalid":           dr_invalid,
+        "dr_items_inserted":    dr_items_inserted,
+        "dr_items_skipped":     dr_items_skipped,
     }
