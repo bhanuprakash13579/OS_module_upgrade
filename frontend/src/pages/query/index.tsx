@@ -1,6 +1,6 @@
 import { useState, Component, ReactNode } from 'react';
 import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
-import { FileSearch, LogOut, Menu, ChevronLeft, Download, FileText, Users, AlertTriangle, BarChart2 } from 'lucide-react';
+import { FileSearch, LogOut, Menu, ChevronLeft, Download, FileText, Users, AlertTriangle, BarChart2, Receipt } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import OSQueryPage from './OSQueryPage';
 import OSPrintView from './OSPrintView';
@@ -8,6 +8,7 @@ import ExportData from './ExportData';
 import CustomReport from './CustomReport';
 import AdjudicationSummaryReport from './AdjudicationSummaryReport';
 import MonthlyReportPage from './MonthlyReportPage';
+import BRDRLookupPage from './BRDRLookupPage';
 
 class QueryErrorBoundary extends Component<{ children: ReactNode }, { error: string | null }> {
   constructor(props: { children: ReactNode }) {
@@ -123,6 +124,15 @@ export default function QueryModule() {
               <BarChart2 className="w-5 h-5 shrink-0 opacity-90" />
               {!isCollapsed && <span className="font-medium leading-tight">Monthly Report</span>}
             </button>
+
+            <button
+              onClick={() => navigate('/query/br-dr')}
+              className={`mt-2 w-full flex items-center ${isCollapsed ? 'justify-center py-3' : 'gap-3 px-4 py-3'} rounded-lg text-base transition-colors text-emerald-200 bg-slate-900/40 border border-slate-700/60 hover:bg-slate-800/70`}
+              title={isCollapsed ? 'BR / DR Lookup' : undefined}
+            >
+              <Receipt className="w-5 h-5 shrink-0 opacity-90" />
+              {!isCollapsed && <span className="font-medium leading-tight">BR / DR Lookup</span>}
+            </button>
           </nav>
         </div>
         
@@ -171,6 +181,7 @@ export default function QueryModule() {
               <Route path="export" element={<ExportData />} />
               <Route path="adjn-summary" element={<AdjudicationSummaryReport />} />
               <Route path="monthly-report" element={<MonthlyReportPage />} />
+              <Route path="br-dr" element={<BRDRLookupPage />} />
             </Routes>
           </QueryErrorBoundary>
         </div>

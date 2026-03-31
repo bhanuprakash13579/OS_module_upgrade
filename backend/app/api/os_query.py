@@ -10,6 +10,8 @@ from pydantic import BaseModel
 
 from app.database import get_db
 from app.models.offence import CopsMaster, CopsItems
+from app.models.baggage import BrMaster, BrItems
+from app.models.detention import DrMaster, DrItems
 from app.services.auth import get_current_user, get_current_active_user
 from app.models.auth import User
 
@@ -926,4 +928,286 @@ def get_monthly_report(
         ))
 
     return rows
+
+
+# ── BR / DR Cross-Reference Lookup ───────────────────────────────────────────
+
+def _os_status(case: CopsMaster) -> str:
+    if case.adjudication_date or case.adj_offr_name:
+        return "Adjudicated"
+    if case.quashed == "Y":
+        return "Quashed"
+    if case.rejected == "Y":
+        return "Rejected"
+    return "Pending"
+
+
+@router.get("/br/search")
+def search_brs(
+    q: Optional[str] = QParam(None, description="BR No, Pax Name, or Passport No"),
+    year: Optional[int] = QParam(None),
+    br_type: Optional[str] = QParam(None),
+    page: int = QParam(1, ge=1),
+    limit: int = QParam(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    filt = [BrMaster.entry_deleted != "Y"]
+    if q:
+        if q.strip().lstrip("-").isdigit():
+            filt.append(BrMaster.br_no == int(q.strip()))
+        else:
+            filt.append(or_(
+                BrMaster.pax_name.ilike(f"%{q}%"),
+                BrMaster.passport_no.ilike(f"%{q}%"),
+            ))
+    if year:
+        filt.append(BrMaster.br_year == year)
+    if br_type:
+        filt.append(BrMaster.br_type == br_type)
+
+    total = db.query(func.count(BrMaster.id)).filter(*filt).scalar() or 0
+    rows = (
+        db.query(BrMaster)
+        .filter(*filt)
+        .order_by(desc(BrMaster.br_date), desc(BrMaster.br_no))
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
+    )
+    return {
+        "total": total,
+        "page": page,
+        "results": [
+            {
+                "br_no": r.br_no,
+                "br_year": r.br_year,
+                "br_date": r.br_date.isoformat() if r.br_date else None,
+                "br_type": r.br_type,
+                "pax_name": r.pax_name,
+                "passport_no": r.passport_no,
+                "total_duty_paid": r.br_amount or 0.0,
+                "dr_no": r.dr_no,
+                "os_no": r.os_no,
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.get("/br/{br_no}/{br_year}")
+def get_br_detail(
+    br_no: int,
+    br_year: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    br = (
+        db.query(BrMaster)
+        .filter(BrMaster.br_no == br_no, BrMaster.br_year == br_year, BrMaster.entry_deleted != "Y")
+        .first()
+    )
+    if not br:
+        raise HTTPException(status_code=404, detail="B.R. not found")
+
+    items = (
+        db.query(BrItems)
+        .filter(BrItems.br_no == br_no, BrItems.entry_deleted != "Y")
+        .order_by(BrItems.items_sno)
+        .all()
+    )
+
+    # Linked DR — br_master.dr_no stores the source DR number as a string
+    linked_dr = None
+    if br.dr_no:
+        try:
+            dr_no_int = int(str(br.dr_no).strip())
+            dr = db.query(DrMaster).filter(
+                DrMaster.dr_no == dr_no_int, DrMaster.entry_deleted != "Y"
+            ).first()
+            if dr:
+                linked_dr = {
+                    "dr_no": dr.dr_no, "dr_year": dr.dr_year,
+                    "dr_date": dr.dr_date.isoformat() if dr.dr_date else None,
+                    "dr_type": dr.dr_type, "pax_name": dr.pax_name,
+                    "total_items_value": dr.total_items_value or 0.0,
+                    "closure_ind": dr.closure_ind,
+                }
+        except (ValueError, TypeError):
+            pass
+
+    # Linked OS
+    linked_os = None
+    if br.os_no:
+        os_case = db.query(CopsMaster).filter(
+            CopsMaster.os_no == str(br.os_no), CopsMaster.entry_deleted != "Y"
+        ).first()
+        if os_case:
+            linked_os = {
+                "os_no": os_case.os_no, "os_year": os_case.os_year,
+                "os_date": os_case.os_date.isoformat() if os_case.os_date else None,
+                "pax_name": os_case.pax_name, "status": _os_status(os_case),
+                "total_items_value": os_case.total_items_value or 0.0,
+            }
+
+    return {
+        "br_no": br.br_no, "br_year": br.br_year,
+        "br_date": br.br_date.isoformat() if br.br_date else None,
+        "br_type": br.br_type, "br_shift": br.br_shift,
+        "flight_no": br.flight_no,
+        "flight_date": br.flight_date.isoformat() if br.flight_date else None,
+        "pax_name": br.pax_name, "pax_nationality": br.pax_nationality,
+        "passport_no": br.passport_no,
+        "passport_date": br.passport_date.isoformat() if br.passport_date else None,
+        "pax_address1": br.pax_address1, "pax_address2": br.pax_address2,
+        "pax_address3": br.pax_address3,
+        "total_items_value": br.total_items_value or 0.0,
+        "total_duty_amount": br.total_duty_amount or 0.0,
+        "rf_amount": br.rf_amount or 0.0, "pp_amount": br.pp_amount or 0.0,
+        "br_amount": br.br_amount or 0.0, "challan_no": br.challan_no,
+        "dr_no": br.dr_no, "dr_date": br.dr_date.isoformat() if br.dr_date else None,
+        "os_no": br.os_no, "os_date": br.os_date.isoformat() if br.os_date else None,
+        "batch_date": br.batch_date.isoformat() if br.batch_date else None,
+        "batch_shift": br.batch_shift, "login_id": br.login_id,
+        "items": [
+            {
+                "items_sno": it.items_sno, "items_desc": it.items_desc,
+                "items_qty": it.items_qty or 0.0, "items_uqc": it.items_uqc,
+                "items_value": it.items_value or 0.0, "items_fa": it.items_fa or 0.0,
+                "items_duty": it.items_duty or 0.0, "items_duty_type": it.items_duty_type,
+                "items_category": it.items_category,
+            }
+            for it in items
+        ],
+        "linked_dr": linked_dr,
+        "linked_os": linked_os,
+    }
+
+
+@router.get("/dr/search")
+def search_drs(
+    q: Optional[str] = QParam(None, description="DR No, Pax Name, or Passport No"),
+    year: Optional[int] = QParam(None),
+    dr_type: Optional[str] = QParam(None),
+    page: int = QParam(1, ge=1),
+    limit: int = QParam(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    filt = [DrMaster.entry_deleted != "Y"]
+    if q:
+        if q.strip().lstrip("-").isdigit():
+            filt.append(DrMaster.dr_no == int(q.strip()))
+        else:
+            filt.append(or_(
+                DrMaster.pax_name.ilike(f"%{q}%"),
+                DrMaster.passport_no.ilike(f"%{q}%"),
+            ))
+    if year:
+        filt.append(DrMaster.dr_year == year)
+    if dr_type:
+        filt.append(DrMaster.dr_type == dr_type)
+
+    total = db.query(func.count(DrMaster.id)).filter(*filt).scalar() or 0
+    rows = (
+        db.query(DrMaster)
+        .filter(*filt)
+        .order_by(desc(DrMaster.dr_date), desc(DrMaster.dr_no))
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
+    )
+    return {
+        "total": total,
+        "page": page,
+        "results": [
+            {
+                "dr_no": r.dr_no, "dr_year": r.dr_year,
+                "dr_date": r.dr_date.isoformat() if r.dr_date else None,
+                "dr_type": r.dr_type, "pax_name": r.pax_name,
+                "passport_no": r.passport_no,
+                "total_items_value": r.total_items_value or 0.0,
+                "closure_ind": r.closure_ind, "os_no": r.os_no,
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.get("/dr/{dr_no}/{dr_year}")
+def get_dr_detail(
+    dr_no: int,
+    dr_year: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    # Allow dr_year=0 as "any year" fallback
+    q = db.query(DrMaster).filter(DrMaster.dr_no == dr_no, DrMaster.entry_deleted != "Y")
+    if dr_year:
+        q = q.filter(DrMaster.dr_year == dr_year)
+    dr = q.order_by(desc(DrMaster.dr_date)).first()
+    if not dr:
+        raise HTTPException(status_code=404, detail="D.R. not found")
+
+    items = (
+        db.query(DrItems)
+        .filter(DrItems.dr_no == dr_no)
+        .order_by(DrItems.items_sno)
+        .all()
+    )
+
+    # BRs that were issued against this DR (br_master.dr_no = str(dr_no))
+    dr_no_str = str(dr_no)
+    linked_brs = []
+    brs = (
+        db.query(BrMaster)
+        .filter(BrMaster.dr_no == dr_no_str, BrMaster.entry_deleted != "Y")
+        .order_by(desc(BrMaster.br_date))
+        .all()
+    )
+    for b in brs:
+        linked_brs.append({
+            "br_no": b.br_no, "br_year": b.br_year,
+            "br_date": b.br_date.isoformat() if b.br_date else None,
+            "br_type": b.br_type, "total_duty_paid": b.br_amount or 0.0,
+        })
+
+    # Linked OS
+    linked_os = None
+    if dr.os_no:
+        os_case = db.query(CopsMaster).filter(
+            CopsMaster.os_no == str(dr.os_no), CopsMaster.entry_deleted != "Y"
+        ).first()
+        if os_case:
+            linked_os = {
+                "os_no": os_case.os_no, "os_year": os_case.os_year,
+                "os_date": os_case.os_date.isoformat() if os_case.os_date else None,
+                "pax_name": os_case.pax_name, "status": _os_status(os_case),
+                "total_items_value": os_case.total_items_value or 0.0,
+            }
+
+    return {
+        "dr_no": dr.dr_no, "dr_year": dr.dr_year,
+        "dr_date": dr.dr_date.isoformat() if dr.dr_date else None,
+        "dr_type": dr.dr_type, "flight_no": dr.flight_no,
+        "flight_date": dr.flight_date.isoformat() if dr.flight_date else None,
+        "pax_name": dr.pax_name, "passport_no": dr.passport_no,
+        "passport_date": dr.passport_date.isoformat() if dr.passport_date else None,
+        "pax_address1": dr.pax_address1, "pax_address2": dr.pax_address2,
+        "pax_address3": dr.pax_address3,
+        "total_items_value": dr.total_items_value or 0.0,
+        "closure_ind": dr.closure_ind, "closure_remarks": dr.closure_remarks,
+        "closure_date": dr.closure_date.isoformat() if dr.closure_date else None,
+        "os_no": dr.os_no, "unique_no": dr.unique_no, "login_id": dr.login_id,
+        "items": [
+            {
+                "items_sno": it.items_sno, "items_desc": it.items_desc,
+                "items_qty": it.items_qty or 0.0, "items_uqc": it.items_uqc,
+                "items_value": it.items_value or 0.0,
+            }
+            for it in items
+        ],
+        "linked_brs": linked_brs,
+        "linked_os": linked_os,
+    }
 
