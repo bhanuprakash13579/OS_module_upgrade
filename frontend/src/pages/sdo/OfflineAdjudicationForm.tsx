@@ -435,7 +435,7 @@ export default function OfflineAdjudicationForm() {
     setSuccessInfo(null);
     setFormData({
       os_no: '', os_date: new Date().toISOString().split('T')[0], booked_by: 'Batch A',
-      flight_no: '', pax_name: '', pax_nationality: '', passport_no: '', pax_address1: '',
+      flight_no: '', pax_name: '', pax_nationality: '', passport_no: '', pax_address1: '', file_spot: '',
     });
     setOptionalData({
       pax_date_of_birth: '', passport_date: '', pp_issue_place: '', father_name: '',
