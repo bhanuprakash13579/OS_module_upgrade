@@ -358,8 +358,8 @@ export default function BRDRLookupPage() {
       else setDrResults(res.data.results);
       setTotal(res.data.total);
       setPage(p);
-    } catch {
-      setError('Search failed. Please try again.');
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || 'Search failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -375,24 +375,34 @@ export default function BRDRLookupPage() {
   };
 
   const loadBrDetail = async (row: BrRow) => {
+    setBrDetail(null);
+    setError(null);
     setDetailLoading(true);
     try {
       const res = await api.get(`/os-query/br/${row.br_no}/${row.br_year ?? 0}`);
       setBrDetail(res.data);
-    } catch {
-      setError('Failed to load B.R. details.');
+    } catch (err: any) {
+      if (err?.response?.status === 404)
+        setError(`B.R. No. ${row.br_no} not found in the database.`);
+      else
+        setError(err?.response?.data?.detail || 'Failed to load B.R. details. Please try again.');
     } finally {
       setDetailLoading(false);
     }
   };
 
   const loadDrDetail = async (row: DrRow) => {
+    setDrDetail(null);
+    setError(null);
     setDetailLoading(true);
     try {
       const res = await api.get(`/os-query/dr/${row.dr_no}/${row.dr_year ?? 0}`);
       setDrDetail(res.data);
-    } catch {
-      setError('Failed to load D.R. details.');
+    } catch (err: any) {
+      if (err?.response?.status === 404)
+        setError(`D.R. No. ${row.dr_no} not found in the database.`);
+      else
+        setError(err?.response?.data?.detail || 'Failed to load D.R. details. Please try again.');
     } finally {
       setDetailLoading(false);
     }

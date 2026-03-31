@@ -19,6 +19,7 @@ const API_URL = _resolveApiUrl();
 
 const api = axios.create({
   baseURL: API_URL,
+  timeout: 30000, // 30 s — individual requests override this for large uploads (backup/restore)
   headers: {
     'Content-Type': 'application/json',
   },

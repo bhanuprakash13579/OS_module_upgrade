@@ -1002,11 +1002,11 @@ def get_br_detail(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    br = (
-        db.query(BrMaster)
-        .filter(BrMaster.br_no == br_no, BrMaster.br_year == br_year, BrMaster.entry_deleted != "Y")
-        .first()
-    )
+    # Allow br_year=0 as "any year" fallback (matches legacy records with NULL br_year)
+    q = db.query(BrMaster).filter(BrMaster.br_no == br_no, BrMaster.entry_deleted != "Y")
+    if br_year:
+        q = q.filter(BrMaster.br_year == br_year)
+    br = q.order_by(desc(BrMaster.br_date)).first()
     if not br:
         raise HTTPException(status_code=404, detail="B.R. not found")
 
