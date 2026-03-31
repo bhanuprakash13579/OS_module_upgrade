@@ -159,7 +159,7 @@ export default function AdjudicationLayout() {
       <main className="flex-1 flex flex-col h-screen overflow-hidden print:h-auto print:overflow-visible">
 
 
-        <div className="flex-1 overflow-y-auto overscroll-contain p-5 md:p-7 bg-amber-50 print:overflow-visible">
+        <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 p-5 md:p-7 bg-amber-50 print:overflow-visible print:p-0">
           {user?.user_status === 'TEMP' && !location.pathname.endsWith('/users') ? (
             <Navigate to="/adjudication/users" replace />
           ) : (

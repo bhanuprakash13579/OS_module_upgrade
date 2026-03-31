@@ -143,7 +143,7 @@ export default function OfflineAdjudicationComplete() {
 
   if (loadError) {
     return (
-      <div className="space-y-4 pt-2 w-full px-2">
+      <div className="space-y-4 w-full">
         <div className="flex items-center bg-white px-4 py-3 border-b border-slate-200 rounded-xl border">
           <button onClick={() => navigate('/adjudication/offline-pending')} className="p-2 bg-slate-50 border border-slate-200 rounded-md hover:bg-slate-100 transition-colors mr-4">
             <ArrowLeft size={20} className="text-slate-600" />
@@ -161,7 +161,7 @@ export default function OfflineAdjudicationComplete() {
   // ── Success state ─────────────────────────────────────────────────────────
   if (successSaved) {
     return (
-      <div className="space-y-4 pt-2 w-full px-2 pb-20">
+      <div className="space-y-4 w-full pb-20">
         <div className="flex items-center bg-white px-4 py-3 border-b border-slate-200 rounded-xl border">
           <button onClick={() => navigate('/adjudication/offline-pending')} className="p-2 bg-slate-50 border border-slate-200 rounded-md hover:bg-slate-100 transition-colors mr-4">
             <ArrowLeft size={20} className="text-slate-600" />

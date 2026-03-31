@@ -1048,7 +1048,7 @@ export default function OffenceForm() {
   }, []);
 
   return (
-    <div className="space-y-4 pt-2 w-full px-2 pb-20">
+    <div className="space-y-4 w-full pb-20">
       {/* Header Panel */}
       <div className="flex justify-between items-center bg-white px-4 py-3 border-b border-slate-200 rounded-xl border">
         <div className="flex items-center space-x-4">

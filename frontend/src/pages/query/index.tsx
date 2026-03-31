@@ -161,7 +161,7 @@ export default function QueryModule() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50/50 print:bg-white relative print:h-auto print:min-h-0 print:overflow-visible print:block">
         <div className="h-[2px] w-full bg-gradient-to-r from-emerald-500 via-emerald-400 to-transparent fixed top-0 z-50 print:hidden print-hide-bar" data-print-hide="true"></div>
-        <div className="flex-1 overflow-auto p-4 md:p-8 pt-10 print:p-0 print:overflow-visible print-content-wrap">
+        <div className="flex-1 overflow-auto min-h-0 p-4 md:p-8 pt-10 print:p-0 print:overflow-visible print-content-wrap">
           <QueryErrorBoundary>
             <Routes>
               <Route path="/" element={<Navigate to="/query/os" replace />} />
