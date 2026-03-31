@@ -59,6 +59,7 @@ from app.api.backup import (
     _existing_os_keys, _existing_item_keys,
     _LEGACY_DEFAULT_FIELDS,
     post_import_optimise, set_bulk_pragma,
+    _BR_MASTER_COLS, _BR_ITEMS_COLS, _DR_MASTER_COLS, _DR_ITEMS_COLS,
 )
 from app.security.admin_auth import (
     verify_admin_credentials,
@@ -1044,6 +1045,169 @@ def admin_restore_backup(
             ins += 1
         registry_counts[csv_name] = {"inserted": ins, "skipped": skp}
 
+    # ── Restore br_master ─────────────────────────────────────────────────────
+    br_inserted = br_skipped = 0
+    if "br_master.csv" in zf.namelist():
+        existing_brs = {
+            (r[0], r[1] or 0)
+            for r in db.query(BrMaster.br_no, BrMaster.br_year).all()
+        }
+        br_text = zf.read("br_master.csv").decode("utf-8-sig")
+        for row in csv.DictReader(io.StringIO(br_text)):
+            try:
+                br_no_val = int(row.get("br_no") or 0)
+            except ValueError:
+                continue
+            if not br_no_val:
+                continue
+            br_date_val = _coerce((row.get("br_date") or "").strip(), "date")
+            if br_date_val is None:
+                continue
+            br_type_val = (row.get("br_type") or "").strip()
+            if not br_type_val:
+                continue
+            br_year_val = _coerce((row.get("br_year") or "").strip(), "int") or 0
+            key = (br_no_val, br_year_val)
+            if key in existing_brs:
+                br_skipped += 1
+                continue
+            kwargs: dict = {"br_no": br_no_val, "br_date": br_date_val, "br_type": br_type_val}
+            for col in _BR_MASTER_COLS:
+                csv_key = col.lstrip("_")
+                if csv_key in ("br_no", "br_date", "br_type"):
+                    continue
+                raw = (row.get(csv_key) or "").strip()
+                if not raw:
+                    continue
+                kind = _col_type(BrMaster, csv_key)
+                coerced = _coerce(raw, kind)
+                if coerced is not None:
+                    kwargs[col] = coerced  # Python attr name (handles _availed_remarks)
+            db.add(BrMaster(**kwargs))
+            existing_brs.add(key)
+            br_inserted += 1
+        db.flush()
+
+    # ── Restore br_items ──────────────────────────────────────────────────────
+    br_items_inserted = br_items_skipped = 0
+    if "br_items.csv" in zf.namelist():
+        existing_br_items = {
+            (r[0], str(r[1]), r[2])
+            for r in db.query(BrItems.br_no, BrItems.br_date, BrItems.items_sno).all()
+        }
+        bi_text = zf.read("br_items.csv").decode("utf-8-sig")
+        for row in csv.DictReader(io.StringIO(bi_text)):
+            try:
+                br_no_val = int(row.get("br_no") or 0)
+                items_sno_val = int(row.get("items_sno") or 0)
+            except ValueError:
+                continue
+            if not br_no_val:
+                continue
+            br_date_val = _coerce((row.get("br_date") or "").strip(), "date")
+            if br_date_val is None:
+                continue
+            item_key = (br_no_val, str(br_date_val), items_sno_val)
+            if item_key in existing_br_items:
+                br_items_skipped += 1
+                continue
+            kwargs = {"br_no": br_no_val, "br_date": br_date_val, "items_sno": items_sno_val}
+            for col in _BR_ITEMS_COLS:
+                if col in ("br_no", "br_date", "items_sno"):
+                    continue
+                raw = (row.get(col) or "").strip()
+                if not raw:
+                    continue
+                kind = _col_type(BrItems, col)
+                coerced = _coerce(raw, kind)
+                if coerced is not None:
+                    kwargs[col] = coerced
+            db.add(BrItems(**kwargs))
+            existing_br_items.add(item_key)
+            br_items_inserted += 1
+        db.flush()
+
+    # ── Restore dr_master ─────────────────────────────────────────────────────
+    dr_inserted = dr_skipped = 0
+    if "dr_master.csv" in zf.namelist():
+        existing_drs = {
+            (r[0], r[1] or 0)
+            for r in db.query(DrMaster.dr_no, DrMaster.dr_year).all()
+        }
+        dr_text = zf.read("dr_master.csv").decode("utf-8-sig")
+        for row in csv.DictReader(io.StringIO(dr_text)):
+            try:
+                dr_no_val = int(row.get("dr_no") or 0)
+            except ValueError:
+                continue
+            if not dr_no_val:
+                continue
+            dr_date_val = _coerce((row.get("dr_date") or "").strip(), "date")
+            if dr_date_val is None:
+                continue
+            dr_type_val = (row.get("dr_type") or "").strip()
+            if not dr_type_val:
+                continue
+            dr_year_val = _coerce((row.get("dr_year") or "").strip(), "int") or 0
+            key = (dr_no_val, dr_year_val)
+            if key in existing_drs:
+                dr_skipped += 1
+                continue
+            kwargs = {"dr_no": dr_no_val, "dr_date": dr_date_val, "dr_type": dr_type_val}
+            for col in _DR_MASTER_COLS:
+                if col in ("dr_no", "dr_date", "dr_type"):
+                    continue
+                raw = (row.get(col) or "").strip()
+                if not raw:
+                    continue
+                kind = _col_type(DrMaster, col)
+                coerced = _coerce(raw, kind)
+                if coerced is not None:
+                    kwargs[col] = coerced
+            db.add(DrMaster(**kwargs))
+            existing_drs.add(key)
+            dr_inserted += 1
+        db.flush()
+
+    # ── Restore dr_items ──────────────────────────────────────────────────────
+    dr_items_inserted = dr_items_skipped = 0
+    if "dr_items.csv" in zf.namelist():
+        existing_dr_items = {
+            (r[0], str(r[1]), r[2])
+            for r in db.query(DrItems.dr_no, DrItems.dr_date, DrItems.items_sno).all()
+        }
+        di_text = zf.read("dr_items.csv").decode("utf-8-sig")
+        for row in csv.DictReader(io.StringIO(di_text)):
+            try:
+                dr_no_val = int(row.get("dr_no") or 0)
+                items_sno_val = int(row.get("items_sno") or 0)
+            except ValueError:
+                continue
+            if not dr_no_val:
+                continue
+            dr_date_val = _coerce((row.get("dr_date") or "").strip(), "date")
+            if dr_date_val is None:
+                continue
+            item_key = (dr_no_val, str(dr_date_val), items_sno_val)
+            if item_key in existing_dr_items:
+                dr_items_skipped += 1
+                continue
+            kwargs = {"dr_no": dr_no_val, "dr_date": dr_date_val, "items_sno": items_sno_val}
+            for col in _DR_ITEMS_COLS:
+                if col in ("dr_no", "dr_date", "items_sno"):
+                    continue
+                raw = (row.get(col) or "").strip()
+                if not raw:
+                    continue
+                kind = _col_type(DrItems, col)
+                coerced = _coerce(raw, kind)
+                if coerced is not None:
+                    kwargs[col] = coerced
+            db.add(DrItems(**kwargs))
+            existing_dr_items.add(item_key)
+            dr_items_inserted += 1
+        db.flush()
+
     db.commit()
     post_import_optimise(db)
     # Close the zip before unlinking — required on Windows (open handles block delete)
@@ -1072,6 +1236,14 @@ def admin_restore_backup(
         "sia_skipped": sia_skipped,
         "users_inserted": users_inserted,
         "users_skipped": users_skipped,
+        "br_inserted": br_inserted,
+        "br_skipped": br_skipped,
+        "br_items_inserted": br_items_inserted,
+        "br_items_skipped": br_items_skipped,
+        "dr_inserted": dr_inserted,
+        "dr_skipped": dr_skipped,
+        "dr_items_inserted": dr_items_inserted,
+        "dr_items_skipped": dr_items_skipped,
         "tables": registry_counts,
     }
 
