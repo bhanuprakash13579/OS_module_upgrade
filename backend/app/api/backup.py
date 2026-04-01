@@ -160,8 +160,14 @@ def upload_legacy(
     If the CSV has no header row, set no_header=true and optionally provide
     a comma-separated list of field names in fieldnames matching the CSV column order.
     """
+    _CSV_SIZE_LIMIT = 50 * 1024 * 1024  # 50 MB
     try:
-        raw = file.file.read().decode("utf-8-sig")
+        raw_bytes = file.file.read(_CSV_SIZE_LIMIT + 1)
+        if len(raw_bytes) > _CSV_SIZE_LIMIT:
+            raise HTTPException(status_code=413, detail="File too large. Maximum allowed size is 50 MB.")
+        raw = raw_bytes.decode("utf-8-sig")
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=400, detail="Unable to read uploaded file.")
 
@@ -244,8 +250,14 @@ def upload_new(
     Import CSV exported from the new system.
     Behaviour: only INSERT new OS cases; skip existing os_no/os_year/location_code.
     """
+    _CSV_SIZE_LIMIT = 50 * 1024 * 1024  # 50 MB
     try:
-        raw = file.file.read().decode("utf-8-sig")
+        raw_bytes = file.file.read(_CSV_SIZE_LIMIT + 1)
+        if len(raw_bytes) > _CSV_SIZE_LIMIT:
+            raise HTTPException(status_code=413, detail="File too large. Maximum allowed size is 50 MB.")
+        raw = raw_bytes.decode("utf-8-sig")
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=400, detail="Unable to read uploaded file.")
 

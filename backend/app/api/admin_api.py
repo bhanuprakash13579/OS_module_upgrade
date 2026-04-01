@@ -24,7 +24,7 @@ except ImportError:
     _pyzipper = None               # type: ignore[assignment]
     _PYZIPPER_AVAILABLE = False
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form, status
 from fastapi.responses import StreamingResponse, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -75,6 +75,25 @@ from app.security.device import (
 )
 from app.database import get_cipher_module, get_db_key, get_db_path, migrate_plaintext_to_encrypted
 from app.security.passwords import pwd_context
+from app.services.auth import get_current_active_user
+from collections import defaultdict as _defaultdict
+
+# ── Admin login rate limiting ─────────────────────────────────────────────────
+_admin_login_attempts: dict = _defaultdict(list)
+_ADMIN_RATE_WINDOW = 300   # 5 minutes
+_ADMIN_RATE_MAX    = 10    # max failed attempts per window
+
+def _admin_check_rate_limit(ip: str) -> bool:
+    if not state.prod_mode:
+        return True
+    now = time.time()
+    window_start = now - _ADMIN_RATE_WINDOW
+    attempts = [t for t in _admin_login_attempts[ip] if t > window_start]
+    _admin_login_attempts[ip] = attempts
+    if len(attempts) >= _ADMIN_RATE_MAX:
+        return False
+    _admin_login_attempts[ip].append(now)
+    return True
 
 # ── Generic table registry ────────────────────────────────────────────────────
 # Each entry: (csv_name, model, unique_cols_tuple, order_cols_tuple)
@@ -218,12 +237,18 @@ class UpdateUserRequest(BaseModel):
 # ── Admin login ───────────────────────────────────────────────────────────────
 
 @router.post("/login")
-def admin_login(body: AdminLoginRequest):
+def admin_login(body: AdminLoginRequest, request: Request):
     """
     Verify the hardcoded system-admin credentials and return a JWT.
     The credentials are validated against the bcrypt hash compiled into
     the binary — never against the database.
     """
+    client_ip = request.client.host if request.client else "unknown"
+    if not _admin_check_rate_limit(client_ip):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Too many login attempts. Please wait {_ADMIN_RATE_WINDOW // 60} minutes before trying again.",
+        )
     if not verify_admin_credentials(body.username, body.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -435,6 +460,8 @@ def update_user(user_id: str, body: UpdateUserRequest, db: Session = Depends(get
     if body.user_status is not None:
         user.user_status = body.user_status
     if body.user_role is not None:
+        if body.user_role not in _VALID_ROLES:
+            raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {', '.join(sorted(_VALID_ROLES))}")
         user.user_role = body.user_role
     db.commit()
     return {"message": f"User '{user_id}' updated."}
@@ -1259,8 +1286,14 @@ def admin_upload_legacy(
     Auto-detects header row; falls back to legacy column order if no header found.
     Inserts new records only — skips duplicates.
     """
+    _CSV_SIZE_LIMIT = 50 * 1024 * 1024  # 50 MB
     try:
-        raw = file.file.read().decode("utf-8-sig")
+        raw_bytes = file.file.read(_CSV_SIZE_LIMIT + 1)
+        if len(raw_bytes) > _CSV_SIZE_LIMIT:
+            raise HTTPException(status_code=413, detail="File too large. Maximum allowed size is 50 MB.")
+        raw = raw_bytes.decode("utf-8-sig")
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=400, detail="Cannot read uploaded file.")
 
@@ -1356,8 +1389,14 @@ def admin_upload_legacy_items(
     Auto-detects header row; falls back to legacy column order if no header found.
     Inserts new records only — skips duplicates on (os_no, os_year, location_code, items_sno).
     """
+    _CSV_SIZE_LIMIT = 50 * 1024 * 1024  # 50 MB
     try:
-        raw = file.file.read().decode("utf-8-sig")
+        raw_bytes = file.file.read(_CSV_SIZE_LIMIT + 1)
+        if len(raw_bytes) > _CSV_SIZE_LIMIT:
+            raise HTTPException(status_code=413, detail="File too large. Maximum allowed size is 50 MB.")
+        raw = raw_bytes.decode("utf-8-sig")
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=400, detail="Cannot read uploaded file.")
 
@@ -1491,7 +1530,8 @@ def admin_import_mdb(
     try:
         result = import_from_mdb(tmp_path, db)
     except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        _log.error("MDB import failed: %s", e)
+        raise HTTPException(status_code=500, detail="MDB import failed. Check server logs for details.")
     finally:
         try:
             os.unlink(tmp_path)
@@ -1601,8 +1641,8 @@ def _pit_config(db: Session, ref_date: date) -> dict:
 # ── Public: point-in-time config lookup (used by print + preview) ─────────────
 
 @router.get("/config/pit")
-def get_pit_config(ref_date: date, db: Session = Depends(get_db)):
-    """Return the active config as of ref_date. No auth required (read-only)."""
+def get_pit_config(ref_date: date, db: Session = Depends(get_db), _user=Depends(get_current_active_user)):
+    """Return the active config as of ref_date. Requires active user session."""
     return _pit_config(db, ref_date)
 
 
