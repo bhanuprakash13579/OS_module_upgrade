@@ -1,9 +1,21 @@
 # -*- mode: python ; coding: utf-8 -*-
+import glob, os
+
+# Bundle sqlcipher3-binary's self-contained OpenSSL libs so the Linux binary
+# works without libsqlcipher installed on the target machine.
+_sqlcipher_bins = []
+try:
+    import sqlcipher3 as _sc
+    _libs_dir = os.path.join(os.path.dirname(_sc.__file__), '..', 'sqlcipher3_binary.libs')
+    for _lib in glob.glob(os.path.join(_libs_dir, '*.so*')):
+        _sqlcipher_bins.append((_lib, 'sqlcipher3_binary.libs'))
+except ImportError:
+    pass
 
 a = Analysis(
     ['server_entry.py'],
     pathex=[],
-    binaries=[],
+    binaries=_sqlcipher_bins,
     datas=[
         ('app', 'app'),
         ('../frontend/dist', 'frontend_dist'),  # React build — served to LAN browser clients
