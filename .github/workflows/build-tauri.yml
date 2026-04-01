@@ -106,7 +106,7 @@ jobs:
         working-directory: ./backend
         run: |
           python -m pip install --prefer-binary sqlcipher3-binary \
-            || python -m pip install --prefer-binary sqlcipher3 \
+            || python -m pip install sqlcipher3 \
             || echo "sqlcipher3 not available — DB encryption disabled for this build"
 
       - name: Bake admin password hash into source
