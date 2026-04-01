@@ -12,67 +12,111 @@ export default function ExportData() {
   const [dbMsg, setDbMsg] = useState('');
   const [dbError, setDbError] = useState('');
 
-  const downloadCsv = async () => {
+  const handleDownloadCsv = async () => {
     setCsvMsg(''); setCsvError('');
     setCsvLoading(true);
     try {
-      const res = await api.get('/backup/export/csv', { responseType: 'blob' });
+      const res = await api.get('/backup/export/csv', { 
+        responseType: 'blob',
+        timeout: 0 // Do not timeout on large database exports
+      });
       const today = new Date().toISOString().slice(0, 10);
       const defaultName = `cops_full_backup_${today}.zip`;
 
       try {
         const { save } = await import('@tauri-apps/plugin-dialog');
         const { writeFile } = await import('@tauri-apps/plugin-fs');
-        const savePath = await save({ title: 'Save CSV Backup', defaultPath: defaultName, filters: [{ name: 'ZIP', extensions: ['zip'] }] });
+        const savePath = await save({ 
+          title: 'Save CSV Backup (Includes all modules e.g. BR/DR)', 
+          defaultPath: defaultName, 
+          filters: [{ name: 'ZIP', extensions: ['zip'] }] 
+        });
+        
         if (savePath) {
           const arrayBuf = await (res.data as Blob).arrayBuffer();
           await writeFile(savePath, new Uint8Array(arrayBuf));
           setCsvMsg(`Backup saved successfully.`);
           showDownloadToast(`Backup saved to ${savePath}`);
+        } else {
+          setCsvMsg('Save cancelled.');
         }
-      } catch {
-        const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/zip' }));
-        const a = document.createElement('a');
-        a.href = url; a.download = defaultName; a.click();
-        window.URL.revokeObjectURL(url);
-        setCsvMsg(`Downloaded successfully.`);
-        showDownloadToast(`Downloaded as ${defaultName}`);
+      } catch (fsErr) {
+        if (String(fsErr).includes('plugin-dialog') || String(fsErr).includes('__TAURI_IPC__')) {
+          // Fallback only if Tauri environment is missing (running in browser)
+          const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/zip' }));
+          const a = document.createElement('a');
+          a.href = url; a.download = defaultName; a.click();
+          window.URL.revokeObjectURL(url);
+          setCsvMsg(`Downloaded successfully.`);
+          showDownloadToast(`Downloaded as ${defaultName}`);
+        } else {
+          throw new Error(`Disk write failed: ${fsErr}`);
+        }
       }
     } catch (err: any) {
-      setCsvError(err.response?.data?.detail || 'Download failed.');
+      // In blob responseType, error data is wrapped in a blob
+      let errMsg = 'Download failed.';
+      if (err.response?.data instanceof Blob) {
+        const text = await err.response.data.text();
+        try { errMsg = JSON.parse(text).detail || errMsg; } catch { errMsg = text; }
+      } else {
+        errMsg = err.response?.data?.detail || err.message;
+      }
+      setCsvError(errMsg);
     } finally {
       setCsvLoading(false);
     }
   };
 
-  const downloadDb = async () => {
+  const handleDownloadDb = async () => {
     setDbMsg(''); setDbError('');
     setDbLoading(true);
     try {
-      const res = await api.get('/backup/export/db', { responseType: 'blob' });
+      const res = await api.get('/backup/export/db', { 
+        responseType: 'blob',
+        timeout: 0 // Do not timeout on large database exports
+      });
       const today = new Date().toISOString().slice(0, 10);
       const defaultName = `cops_fulldb_${today}.db`;
 
       try {
         const { save } = await import('@tauri-apps/plugin-dialog');
         const { writeFile } = await import('@tauri-apps/plugin-fs');
-        const savePath = await save({ title: 'Save Database Backup', defaultPath: defaultName, filters: [{ name: 'Database', extensions: ['db'] }] });
+        const savePath = await save({ 
+          title: 'Save Database Backup (Includes all modules e.g. BR/DR)', 
+          defaultPath: defaultName, 
+          filters: [{ name: 'Database', extensions: ['db'] }] 
+        });
+        
         if (savePath) {
           const arrayBuf = await (res.data as Blob).arrayBuffer();
           await writeFile(savePath, new Uint8Array(arrayBuf));
           setDbMsg(`Database saved successfully.`);
           showDownloadToast(`Database saved to ${savePath}`);
+        } else {
+          setDbMsg('Save cancelled.');
         }
-      } catch {
-        const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/octet-stream' }));
-        const a = document.createElement('a');
-        a.href = url; a.download = defaultName; a.click();
-        window.URL.revokeObjectURL(url);
-        setDbMsg(`Downloaded successfully.`);
-        showDownloadToast(`Downloaded as ${defaultName}`);
+      } catch (fsErr) {
+        if (String(fsErr).includes('plugin-dialog') || String(fsErr).includes('__TAURI_IPC__')) {
+          const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/octet-stream' }));
+          const a = document.createElement('a');
+          a.href = url; a.download = defaultName; a.click();
+          window.URL.revokeObjectURL(url);
+          setDbMsg(`Downloaded successfully.`);
+          showDownloadToast(`Downloaded as ${defaultName}`);
+        } else {
+          throw new Error(`Disk write failed: ${fsErr}`);
+        }
       }
     } catch (err: any) {
-      setDbError(err.response?.data?.detail || 'Download failed.');
+      let errMsg = 'Download failed.';
+      if (err.response?.data instanceof Blob) {
+        const text = await err.response.data.text();
+        try { errMsg = JSON.parse(text).detail || errMsg; } catch { errMsg = text; }
+      } else {
+        errMsg = err.response?.data?.detail || err.message;
+      }
+      setDbError(errMsg);
     } finally {
       setDbLoading(false);
     }
@@ -96,7 +140,7 @@ export default function ExportData() {
         <button
           type="button"
           disabled={dbLoading}
-          onClick={downloadDb}
+          onClick={handleDownloadDb}
           className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
         >
           <Database size={14} />
@@ -120,7 +164,7 @@ export default function ExportData() {
         <button
           type="button"
           disabled={csvLoading}
-          onClick={downloadCsv}
+          onClick={handleDownloadCsv}
           className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
         >
           <Download size={14} />

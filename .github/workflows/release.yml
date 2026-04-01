@@ -102,6 +102,12 @@ jobs:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         run: python bake_hash.py
 
+      - name: Bake binding secret (XOR-obfuscated) into source
+        working-directory: backend
+        env:
+          BINDING_SECRET: ${{ secrets.BINDING_SECRET }}
+        run: python bake_binding_secret.py
+
       # WeasyPrint needs Cairo + Pango DLLs to be present when PyInstaller runs
       # so the hook can find and bundle them into the binary. Must come AFTER pip
       # install — adding C:\msys64\mingw64\bin to PATH before pip would shadow

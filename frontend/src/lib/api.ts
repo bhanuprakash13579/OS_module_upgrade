@@ -5,10 +5,13 @@ import axios from 'axios';
 // automatically resolves to the master PC's IP (e.g. http://192.168.1.100:8000).
 function _resolveApiUrl(): string {
   if (typeof window === 'undefined') return 'http://127.0.0.1:8000/api';
+  const host = window.location.hostname;
+  const port = window.location.port;
+  // Vite dev server: use relative URL so the Vite proxy handles it (avoids CORS)
+  if (port === '5173') return '/api';
   // Tauri webview always reports hostname as 'localhost', 'tauri.localhost', or
   // '127.0.0.1' — never a real LAN IP. Use this instead of window.__TAURI__
   // which may not be injected yet at module-load time.
-  const host = window.location.hostname;
   const isTauri = host === 'localhost' || host === 'tauri.localhost' || host === '127.0.0.1';
   if (isTauri) return 'http://127.0.0.1:8000/api';
   // Browser on a LAN client machine — same origin as the page

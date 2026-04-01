@@ -1519,7 +1519,7 @@ def admin_import_mdb(
         result = import_from_mdb(tmp_path, db)
     except RuntimeError as e:
         _log.error("MDB import failed: %s", e)
-        raise HTTPException(status_code=500, detail="MDB import failed. Check server logs for details.")
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         try:
             os.unlink(tmp_path)

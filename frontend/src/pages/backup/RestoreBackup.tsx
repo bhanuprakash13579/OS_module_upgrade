@@ -333,12 +333,17 @@ export default function RestoreBackup() {
       const res = await api.get('/admin/backup/export', {
         headers: adminHeaders(adminToken),
         responseType: 'blob',
+        timeout: 0,
       });
       const defaultName = `cops_backup_${new Date().toISOString().slice(0, 10)}.zip`;
       try {
         const { save } = await import('@tauri-apps/plugin-dialog');
         const { writeFile } = await import('@tauri-apps/plugin-fs');
-        const savePath = await save({ title: 'Save Backup', defaultPath: defaultName, filters: [{ name: 'ZIP', extensions: ['zip'] }] });
+        const savePath = await save({ 
+          title: 'Save Backup (Includes all modules e.g. BR/DR)', 
+          defaultPath: defaultName, 
+          filters: [{ name: 'ZIP', extensions: ['zip'] }] 
+        });
         if (savePath) {
           const arrayBuf = await (res.data as Blob).arrayBuffer();
           await writeFile(savePath, new Uint8Array(arrayBuf));
@@ -347,13 +352,17 @@ export default function RestoreBackup() {
         } else {
           setBackupMsg('Save cancelled.');
         }
-      } catch {
-        const url = URL.createObjectURL(res.data);
-        const a = document.createElement('a');
-        a.href = url; a.download = defaultName; a.click();
-        URL.revokeObjectURL(url);
-        setBackupMsg('Backup downloaded successfully.');
-        showDownloadToast(`Backup downloaded as ${defaultName}`);
+      } catch (fsErr) {
+        if (String(fsErr).includes('plugin-dialog') || String(fsErr).includes('__TAURI_IPC__')) {
+          const url = URL.createObjectURL(res.data);
+          const a = document.createElement('a');
+          a.href = url; a.download = defaultName; a.click();
+          URL.revokeObjectURL(url);
+          setBackupMsg('Backup downloaded successfully.');
+          showDownloadToast(`Backup downloaded as ${defaultName}`);
+        } else {
+          throw new Error(`Disk write failed: ${fsErr}`);
+        }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -371,12 +380,17 @@ export default function RestoreBackup() {
       const res = await api.get('/admin/backup/export-fulldb', {
         headers: adminHeaders(adminToken),
         responseType: 'blob',
+        timeout: 0,
       });
       const defaultName = `cops_fulldb_${new Date().toISOString().slice(0, 10)}.db`;
       try {
         const { save } = await import('@tauri-apps/plugin-dialog');
         const { writeFile } = await import('@tauri-apps/plugin-fs');
-        const savePath = await save({ title: 'Save Database', defaultPath: defaultName, filters: [{ name: 'Database', extensions: ['db'] }] });
+        const savePath = await save({ 
+          title: 'Save Database (Includes all modules e.g. BR/DR)', 
+          defaultPath: defaultName, 
+          filters: [{ name: 'Database', extensions: ['db'] }] 
+        });
         if (savePath) {
           const arrayBuf = await (res.data as Blob).arrayBuffer();
           await writeFile(savePath, new Uint8Array(arrayBuf));
@@ -385,13 +399,17 @@ export default function RestoreBackup() {
         } else {
           setFullDbMsg('Save cancelled.');
         }
-      } catch {
-        const url = URL.createObjectURL(res.data);
-        const a = document.createElement('a');
-        a.href = url; a.download = defaultName; a.click();
-        URL.revokeObjectURL(url);
-        setFullDbMsg('Full database backup downloaded.');
-        showDownloadToast(`Database downloaded as ${defaultName}`);
+      } catch (fsErr) {
+        if (String(fsErr).includes('plugin-dialog') || String(fsErr).includes('__TAURI_IPC__')) {
+          const url = URL.createObjectURL(res.data);
+          const a = document.createElement('a');
+          a.href = url; a.download = defaultName; a.click();
+          URL.revokeObjectURL(url);
+          setFullDbMsg('Full database backup downloaded.');
+          showDownloadToast(`Database downloaded as ${defaultName}`);
+        } else {
+          throw new Error(`Disk write failed: ${fsErr}`);
+        }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);

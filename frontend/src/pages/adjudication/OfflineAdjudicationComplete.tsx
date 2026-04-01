@@ -13,7 +13,7 @@ const fmtDate = (d: string | null | undefined): string => {
 };
 
 export default function OfflineAdjudicationComplete() {
-  const { osNo, osYear } = useParams<{ osNo: string; osYear: string }>();
+  const { os_no, os_year } = useParams<{ os_no: string; os_year: string }>();
   const navigate = useNavigate();
 
   const [caseData, setCaseData] = useState<any>(null);
@@ -41,9 +41,9 @@ export default function OfflineAdjudicationComplete() {
 
   // ── Load case details ─────────────────────────────────────────────────────
   useEffect(() => {
-    if (!osNo || !osYear) return;
+    if (!os_no || !os_year) return;
     setLoadingCase(true);
-    api.get(`/os/${osNo}/${osYear}`)
+    api.get(`/os/${os_no}/${os_year}`)
       .then(res => {
         setCaseData(res.data);
       })
@@ -51,7 +51,7 @@ export default function OfflineAdjudicationComplete() {
         setLoadError(err.response?.data?.detail || 'Failed to load case details.');
       })
       .finally(() => setLoadingCase(false));
-  }, [osNo, osYear]);
+  }, [os_no, os_year]);
 
   // Pre-populate form if already completed
   useEffect(() => {
@@ -117,7 +117,7 @@ export default function OfflineAdjudicationComplete() {
       if (formData.adjn_offr_remarks.trim()) payload.adjn_offr_remarks = formData.adjn_offr_remarks.trim();
       if (formData.close_case) payload.close_case = true;
 
-      await api.patch(`/os/${osNo}/${osYear}/complete-offline-adj`, payload);
+      await api.patch(`/os/${os_no}/${os_year}/complete-offline-adj`, payload);
       setSuccessSaved(true);
     } catch (err: any) {
       let errMsg = err.response?.data?.detail || err.message || 'Failed to save adjudication details.';
@@ -173,7 +173,7 @@ export default function OfflineAdjudicationComplete() {
           <h2 className="text-xl font-bold text-slate-800">Adjudication Details Saved</h2>
           <p className="text-slate-600 text-sm">
             Officer details for case{' '}
-            <span className="font-bold text-amber-700">O.S. {osNo}/{osYear}</span>{' '}
+            <span className="font-bold text-amber-700">O.S. {os_no}/{os_year}</span>{' '}
             have been recorded successfully.
           </p>
           <div className="pt-2">
@@ -202,7 +202,7 @@ export default function OfflineAdjudicationComplete() {
           </button>
           <div>
             <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Complete Offline Adjudication</h1>
-            <p className="text-slate-500 text-sm mt-0.5">O.S. {osNo}/{osYear} — Fill in the adjudicating officer details</p>
+            <p className="text-slate-500 text-sm mt-0.5">O.S. {os_no}/{os_year} — Fill in the adjudicating officer details</p>
           </div>
         </div>
         {isAlreadyCompleted && (

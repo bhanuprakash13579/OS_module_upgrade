@@ -84,6 +84,8 @@ class Settings(BaseSettings):
                 "http://127.0.0.1:5173",
                 "http://localhost:3000",
                 "http://127.0.0.1:3000",
+                "http://localhost:1420",
+                "http://127.0.0.1:1420",
             ]
             if os.environ.get("COPS_ENV", "production").strip().lower() != "production"
             else []
