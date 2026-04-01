@@ -16,7 +16,8 @@ except ImportError:
     _PYZIPPER_AVAILABLE = False
 
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from starlette.background import BackgroundTask
 from pydantic import BaseModel
 from sqlalchemy import text, or_, and_, func
 from sqlalchemy.orm import Session
@@ -32,6 +33,25 @@ from app.services.auth import get_adjn_user, get_current_active_user
 
 
 router = APIRouter()
+
+
+# ── Streaming helpers ────────────────────────────────────────────────────────
+
+def _cleanup_temp(path: str):
+    """Delete a temp file; silently ignore errors (already gone, etc.)."""
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
+
+
+def _iter_bytesio(buf: io.BytesIO, chunk_size: int = 1024 * 1024):
+    """Yield *chunk_size* byte slices from a BytesIO (default 1 MB)."""
+    while True:
+        chunk = buf.read(chunk_size)
+        if not chunk:
+            break
+        yield chunk
 
 
 # ── Shared bulk-import optimiser ─────────────────────────────────────────────
@@ -528,11 +548,13 @@ def export_csv(
         zf_ctx = _pyzipper.AESZipFile(
             zip_buf, mode="w",
             compression=_pyzipper.ZIP_DEFLATED,
+            compresslevel=1,               # fastest deflate — ~3-4× faster
             encryption=_pyzipper.WZ_AES,
         )
         zf_ctx.setpassword(get_zip_password())
     else:
-        zf_ctx = zipfile.ZipFile(zip_buf, mode="w", compression=zipfile.ZIP_DEFLATED)
+        zf_ctx = zipfile.ZipFile(zip_buf, mode="w", compression=zipfile.ZIP_DEFLATED,
+                                compresslevel=1)
 
     with zf_ctx as zf:
         zf.writestr("cops_master.csv", master_buf.getvalue())
@@ -541,6 +563,7 @@ def export_csv(
         zf.writestr("br_items.csv", br_items_buf.getvalue())
         zf.writestr("dr_master.csv", dr_master_buf.getvalue())
         zf.writestr("dr_items.csv", dr_items_buf.getvalue())
+    content_length = zip_buf.tell()
     zip_buf.seek(0)
 
     today = date.today().isoformat()
@@ -550,9 +573,12 @@ def export_csv(
         filename = f"cops_full_backup_{today}.zip"
 
     return StreamingResponse(
-        iter([zip_buf.read()]),
+        _iter_bytesio(zip_buf),
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Length": str(content_length),
+        },
     )
 
 
@@ -582,6 +608,7 @@ def export_db(
     db_key = get_db_key()
 
     tmp_fd, tmp_path = tempfile.mkstemp(suffix=".db")
+    src = dst = None
     try:
         os.close(tmp_fd)
 
@@ -593,30 +620,37 @@ def export_db(
             dst = cipher.connect(tmp_path)
             dst.execute(hex_pragma)
             src.backup(dst)
-            src.close()
-            dst.close()
         else:
             # ── Plaintext fallback ────────────────────────────────────────────
             src = sqlite3.connect(db_path)
             dst = sqlite3.connect(tmp_path)
             src.backup(dst)
-            src.close()
-            dst.close()
-
-        with open(tmp_path, "rb") as f:
-            data = f.read()
+    except Exception:
+        for conn in (src, dst):
+            try:
+                if conn is not None:
+                    conn.close()
+            except Exception:
+                pass
+        _cleanup_temp(tmp_path)
+        raise
     finally:
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
+        for conn in (src, dst):
+            try:
+                if conn is not None:
+                    conn.close()
+            except Exception:
+                pass
 
+    # Stream directly from disk — no memory copy.  BackgroundTask deletes
+    # the temp file after the last byte has been sent to the client.
     today = date.today().isoformat()
     suffix = "_enc" if (cipher and db_key) else ""
-    return StreamingResponse(
-        iter([data]),
+    return FileResponse(
+        tmp_path,
         media_type="application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="cops_fulldb_{today}{suffix}.db"'},
+        filename=f"cops_fulldb_{today}{suffix}.db",
+        background=BackgroundTask(_cleanup_temp, tmp_path),
     )
 
 

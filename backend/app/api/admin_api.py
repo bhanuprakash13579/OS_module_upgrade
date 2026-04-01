@@ -25,7 +25,8 @@ except ImportError:
     _PYZIPPER_AVAILABLE = False
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form, status
-from fastapi.responses import StreamingResponse, Response
+from fastapi.responses import FileResponse, StreamingResponse, Response
+from starlette.background import BackgroundTask
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -609,12 +610,14 @@ def admin_export_full(db: Session = Depends(get_db), _=Depends(require_admin)):
         zf_ctx = _pyzipper.AESZipFile(
             zip_buf, mode="w",
             compression=_pyzipper.ZIP_DEFLATED,
+            compresslevel=1,               # fastest deflate — ~3-4× faster
             encryption=_pyzipper.WZ_AES,
         )
         zf_ctx.setpassword(_pwd)
     else:
         _log.warning("ZIP backup: pyzipper NOT available — backup is UNENCRYPTED plain ZIP")
-        zf_ctx = zipfile.ZipFile(zip_buf, mode="w", compression=zipfile.ZIP_DEFLATED)
+        zf_ctx = zipfile.ZipFile(zip_buf, mode="w", compression=zipfile.ZIP_DEFLATED,
+                                compresslevel=1)
 
     with zf_ctx as zf:
         zf.writestr("cops_master.csv", master_buf.getvalue())
@@ -638,13 +641,24 @@ def admin_export_full(db: Session = Depends(get_db), _=Depends(require_admin)):
             for r in rows:
                 w.writerow([_val(getattr(r, col, None)) for col in cols])
             zf.writestr(csv_name, buf.getvalue())
+    content_length = zip_buf.tell()
     zip_buf.seek(0)
+
+    def _iter_bytes(b: io.BytesIO, chunk: int = 1024 * 1024):
+        while True:
+            data = b.read(chunk)
+            if not data:
+                break
+            yield data
 
     filename = f"cops_full_backup_{date.today().isoformat()}.zip"
     return StreamingResponse(
-        iter([zip_buf.read()]),
+        _iter_bytes(zip_buf),
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Length": str(content_length),
+        },
     )
 
 
@@ -1854,8 +1868,6 @@ def admin_export_fulldb(_=Depends(require_admin)):
         # Close before reading so WAL is fully flushed to tmp_path
         src.close(); src = None
         dst.close(); dst = None
-        with open(tmp_path, "rb") as f:
-            data = f.read()
     finally:
         # Always close connections before unlink — open handles block delete on Windows
         for conn in (src, dst):
@@ -1864,17 +1876,22 @@ def admin_export_fulldb(_=Depends(require_admin)):
                     conn.close()
             except Exception:
                 pass
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
 
     suffix = "_enc" if (cipher and db_key) else ""
     filename = f"cops_fulldb_{date.today().isoformat()}{suffix}.db"
-    return Response(
-        content=data,
+    # Stream directly from disk — no memory copy.  BackgroundTask deletes
+    # the temp file after the last byte has been sent to the client.
+    def _safe_unlink(p: str):
+        try:
+            os.unlink(p)
+        except OSError:
+            pass
+
+    return FileResponse(
+        tmp_path,
         media_type="application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        filename=filename,
+        background=BackgroundTask(_safe_unlink, tmp_path),
     )
 
 

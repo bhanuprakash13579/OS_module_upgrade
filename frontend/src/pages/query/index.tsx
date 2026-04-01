@@ -50,9 +50,9 @@ export default function QueryModule() {
   };
 
   return (
-    <div className="flex h-screen w-full bg-slate-50 min-h-screen overflow-hidden text-slate-800 print:h-auto print:min-h-0 print:overflow-visible print:block print-layout-root">
+    <div className="flex min-h-screen w-full bg-slate-50 text-slate-800 print:h-auto print:min-h-0 print:overflow-visible print:block print-layout-root">
       {/* Sidebar - hidden when printing */}
-      <aside className={`${isCollapsed ? 'w-16' : 'w-64'} flex flex-col h-full bg-slate-900 border-r border-slate-700 shadow-xl shadow-slate-900/20 transition-[width] duration-200 print:hidden shrink-0 z-50`}>
+      <aside className={`${isCollapsed ? 'w-16' : 'w-64'} flex flex-col bg-slate-900 border-r border-slate-700 shadow-xl shadow-slate-900/20 transition-[width] duration-200 print:hidden shrink-0 z-50 sticky top-0 h-screen overflow-y-auto`}>
         <div className="p-3 border-b border-slate-700/50 flex items-center justify-between min-h-[72px] shrink-0">
             {!isCollapsed && (
               <div className="flex items-center gap-3">
@@ -169,9 +169,9 @@ export default function QueryModule() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50/50 print:bg-white relative print:h-auto print:min-h-0 print:overflow-visible print:block">
+      <main className="flex-1 flex flex-col min-h-screen bg-slate-50/50 print:bg-white relative print:h-auto print:min-h-0 print:overflow-visible print:block">
         <div className="h-[2px] w-full bg-gradient-to-r from-emerald-500 via-emerald-400 to-transparent fixed top-0 z-50 print:hidden print-hide-bar" data-print-hide="true"></div>
-        <div className="flex-1 overflow-auto min-h-0 p-4 md:p-8 pt-10 print:p-0 print:overflow-visible print-content-wrap">
+        <div className="flex-1 min-h-0 p-4 md:p-8 pt-10 print:p-0 print:overflow-visible print-content-wrap">
           <QueryErrorBoundary>
             <Routes>
               <Route path="/" element={<Navigate to="/query/os" replace />} />

@@ -37,10 +37,10 @@ export default function AdjudicationLayout() {
   };
 
   return (
-    <div className="flex h-screen w-full overflow-hidden print:h-auto print:overflow-visible" style={MAIN_STYLE}>
+    <div className="flex min-h-screen w-full print:bg-white print:overflow-visible" style={MAIN_STYLE}>
       {/* Sidebar */}
       <aside
-        className={`${isCollapsed ? 'w-16' : 'w-64'} flex flex-col h-full shadow-xl transition-[width] duration-200 z-50 shrink-0 print:!hidden`}
+        className={`${isCollapsed ? 'w-16' : 'w-64'} flex flex-col shadow-xl transition-[width] duration-200 z-50 shrink-0 print:!hidden sticky top-0 h-screen overflow-y-auto`}
         style={SIDEBAR_STYLE}
       >
         {/* Logo */}
@@ -156,10 +156,8 @@ export default function AdjudicationLayout() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden print:h-auto print:overflow-visible">
-
-
-        <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 p-5 md:p-7 bg-amber-50 print:overflow-visible print:p-0">
+      <main className="flex-1 flex flex-col min-h-screen print:h-auto print:overflow-visible">
+        <div className="flex-1 min-h-0 p-5 md:p-7 bg-amber-50 print:overflow-visible print:p-0">
           {user?.user_status === 'TEMP' && !location.pathname.endsWith('/users') ? (
             <Navigate to="/adjudication/users" replace />
           ) : (

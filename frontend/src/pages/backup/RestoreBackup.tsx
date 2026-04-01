@@ -11,6 +11,16 @@ import { showDownloadToast } from '@/components/DownloadToast';
 import StatutesAdmin from './StatutesAdmin';
 import OSTemplateEditor from './OSTemplateEditor';
 
+function formatProgress(loaded: number, total: number | undefined): string {
+  const mb = (loaded / (1024 * 1024)).toFixed(1);
+  if (total && total > 0) {
+    const pct = Math.round((loaded / total) * 100);
+    const totalMb = (total / (1024 * 1024)).toFixed(1);
+    return `Downloading… ${pct}%  (${mb} / ${totalMb} MB)`;
+  }
+  return `Downloading… ${mb} MB`;
+}
+
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -103,6 +113,8 @@ export default function RestoreBackup() {
   // Backup download
   const [backupLoading, setBackupLoading] = useState(false);
   const [backupMsg, setBackupMsg] = useState('');
+  const [backupProgress, setBackupProgress] = useState('');
+  const backupAbort = useRef<AbortController | null>(null);
 
   // Legacy CSV upload — cops_master (from old MDB)
   const legacyRef = useRef<HTMLInputElement>(null);
@@ -134,6 +146,8 @@ export default function RestoreBackup() {
   // Full SQLite DB backup / restore
   const [fullDbLoading, setFullDbLoading] = useState(false);
   const [fullDbMsg, setFullDbMsg] = useState('');
+  const [fullDbProgress, setFullDbProgress] = useState('');
+  const fullDbAbort = useRef<AbortController | null>(null);
   const fullDbRestoreRef = useRef<HTMLInputElement>(null);
   const [fullDbRestoreFile, setFullDbRestoreFile] = useState<File | null>(null);
   const [fullDbRestoreLoading, setFullDbRestoreLoading] = useState(false);
@@ -329,12 +343,19 @@ export default function RestoreBackup() {
   const downloadBackup = async () => {
     setBackupLoading(true);
     setBackupMsg('');
+    setBackupProgress('Preparing…');
+    backupAbort.current = new AbortController();
     try {
       const res = await api.get('/admin/backup/export', {
         headers: adminHeaders(adminToken),
         responseType: 'blob',
         timeout: 0,
+        signal: backupAbort.current.signal,
+        onDownloadProgress: (evt) => {
+          setBackupProgress(formatProgress(evt.loaded, evt.total));
+        },
       });
+      setBackupProgress('');
       const defaultName = `cops_backup_${new Date().toISOString().slice(0, 10)}.zip`;
       try {
         const { save } = await import('@tauri-apps/plugin-dialog');
@@ -345,8 +366,10 @@ export default function RestoreBackup() {
           filters: [{ name: 'ZIP', extensions: ['zip'] }] 
         });
         if (savePath) {
+          setBackupProgress('Writing to disk…');
           const arrayBuf = await (res.data as Blob).arrayBuffer();
           await writeFile(savePath, new Uint8Array(arrayBuf));
+          setBackupProgress('');
           setBackupMsg('Backup saved successfully.');
           showDownloadToast(`Backup saved to ${savePath}`);
         } else {
@@ -365,10 +388,17 @@ export default function RestoreBackup() {
         }
       }
     } catch (err: unknown) {
+      if ((err as any)?.name === 'CanceledError' || (err as any)?.code === 'ERR_CANCELED') {
+        setBackupMsg('Download cancelled.');
+        setBackupProgress('');
+        return;
+      }
       const msg = err instanceof Error ? err.message : String(err);
       setBackupMsg(`Download failed: ${msg}`);
+      setBackupProgress('');
     } finally {
       setBackupLoading(false);
+      backupAbort.current = null;
     }
   };
 
@@ -376,12 +406,19 @@ export default function RestoreBackup() {
   const downloadFullDb = async () => {
     setFullDbLoading(true);
     setFullDbMsg('');
+    setFullDbProgress('Preparing…');
+    fullDbAbort.current = new AbortController();
     try {
       const res = await api.get('/admin/backup/export-fulldb', {
         headers: adminHeaders(adminToken),
         responseType: 'blob',
         timeout: 0,
+        signal: fullDbAbort.current.signal,
+        onDownloadProgress: (evt) => {
+          setFullDbProgress(formatProgress(evt.loaded, evt.total));
+        },
       });
+      setFullDbProgress('');
       const defaultName = `cops_fulldb_${new Date().toISOString().slice(0, 10)}.db`;
       try {
         const { save } = await import('@tauri-apps/plugin-dialog');
@@ -392,8 +429,10 @@ export default function RestoreBackup() {
           filters: [{ name: 'Database', extensions: ['db'] }] 
         });
         if (savePath) {
+          setFullDbProgress('Writing to disk…');
           const arrayBuf = await (res.data as Blob).arrayBuffer();
           await writeFile(savePath, new Uint8Array(arrayBuf));
+          setFullDbProgress('');
           setFullDbMsg('Full database backup saved.');
           showDownloadToast(`Database saved to ${savePath}`);
         } else {
@@ -412,10 +451,17 @@ export default function RestoreBackup() {
         }
       }
     } catch (err: unknown) {
+      if ((err as any)?.name === 'CanceledError' || (err as any)?.code === 'ERR_CANCELED') {
+        setFullDbMsg('Download cancelled.');
+        setFullDbProgress('');
+        return;
+      }
       const msg = err instanceof Error ? err.message : String(err);
       setFullDbMsg(`Download failed: ${msg}`);
+      setFullDbProgress('');
     } finally {
       setFullDbLoading(false);
+      fullDbAbort.current = null;
     }
   };
 
@@ -657,7 +703,7 @@ export default function RestoreBackup() {
   };
 
   return (
-    <div className="h-screen overflow-y-auto overscroll-contain bg-slate-100">
+    <div className="min-h-screen bg-slate-100">
     <div className="max-w-4xl mx-auto py-6 px-4 space-y-5 pb-12">
 
       {/* Header */}
@@ -1089,11 +1135,25 @@ export default function RestoreBackup() {
                 <p className="text-xs text-slate-500 mt-0.5">Complete snapshot of every table — OS cases, BR register, detention, warehouse, users, settings, template history, statutes, all masters. One file restores everything exactly.</p>
               </div>
             </div>
-            <button onClick={downloadFullDb} disabled={fullDbLoading}
-              className="flex items-center gap-2 px-4 py-2 text-xs rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60">
-              <Download size={13} />
-              {fullDbLoading ? 'Preparing…' : 'Download Full DB Backup (.db)'}
-            </button>
+            <div className="flex items-center gap-3">
+              <button onClick={downloadFullDb} disabled={fullDbLoading}
+                className="flex items-center gap-2 px-4 py-2 text-xs rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60">
+                <Download size={13} />
+                {fullDbLoading ? (fullDbProgress || 'Preparing…') : 'Download Full DB Backup (.db)'}
+              </button>
+              {fullDbLoading && (
+                <button onClick={() => fullDbAbort.current?.abort()}
+                  className="px-3 py-2 text-xs rounded-lg border border-red-300 text-red-600 hover:bg-red-50">
+                  Cancel
+                </button>
+              )}
+            </div>
+            {fullDbLoading && fullDbProgress && fullDbProgress.includes('%') && (
+              <div className="w-full max-w-sm bg-slate-200 rounded-full h-1.5 overflow-hidden mt-1">
+                <div className="bg-emerald-500 h-1.5 rounded-full transition-all duration-300"
+                     style={{ width: fullDbProgress.match(/(\d+)%/)?.[1] + '%' }} />
+              </div>
+            )}
             {fullDbMsg && <p className={`text-xs ${fullDbMsg.includes('failed') ? 'text-red-600' : 'text-emerald-700'}`}>{fullDbMsg}</p>}
           </section>
 
@@ -1131,11 +1191,25 @@ export default function RestoreBackup() {
                 <p className="text-xs text-slate-500 mt-0.5">ZIP with CSV files for OS cases, settings, template history, statutes, users. Use for merging data between machines.</p>
               </div>
             </div>
-            <button onClick={downloadBackup} disabled={backupLoading}
-              className="flex items-center gap-2 px-4 py-2 text-xs rounded-lg bg-slate-700 text-white hover:bg-slate-800 disabled:opacity-60">
-              <Download size={13} />
-              {backupLoading ? 'Preparing…' : 'Download Backup ZIP'}
-            </button>
+            <div className="flex items-center gap-3">
+              <button onClick={downloadBackup} disabled={backupLoading}
+                className="flex items-center gap-2 px-4 py-2 text-xs rounded-lg bg-slate-700 text-white hover:bg-slate-800 disabled:opacity-60">
+                <Download size={13} />
+                {backupLoading ? (backupProgress || 'Preparing…') : 'Download Backup ZIP'}
+              </button>
+              {backupLoading && (
+                <button onClick={() => backupAbort.current?.abort()}
+                  className="px-3 py-2 text-xs rounded-lg border border-red-300 text-red-600 hover:bg-red-50">
+                  Cancel
+                </button>
+              )}
+            </div>
+            {backupLoading && backupProgress && backupProgress.includes('%') && (
+              <div className="w-full max-w-sm bg-slate-200 rounded-full h-1.5 overflow-hidden mt-1">
+                <div className="bg-slate-500 h-1.5 rounded-full transition-all duration-300"
+                     style={{ width: backupProgress.match(/(\d+)%/)?.[1] + '%' }} />
+              </div>
+            )}
             {backupMsg && <p className={`text-xs ${backupMsg.includes('failed') ? 'text-red-600' : 'text-emerald-700'}`}>{backupMsg}</p>}
           </section>
 
