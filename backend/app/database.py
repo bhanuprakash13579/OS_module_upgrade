@@ -162,6 +162,8 @@ if settings.DATABASE_URL.startswith("sqlite"):
             """
             conn = _cipher_module.connect(_db_path, check_same_thread=False)  # type: ignore[union-attr]
             conn.execute(_hex_pragma)
+            # Explicitly state page size 4096 since the DB was migrated from a stock SQLite database
+            conn.execute("PRAGMA cipher_page_size = 4096")
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA foreign_keys=ON")
             conn.execute("PRAGMA synchronous=NORMAL")

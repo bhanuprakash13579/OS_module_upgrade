@@ -122,12 +122,16 @@ pub fn run() {
                 c.0.fetch_add(1, Ordering::SeqCst) + 1
               } else { 1 };
               if spawn_fails >= 4 {
-                let _ = app_handle.emit("sidecar-startup-failed",
+                let error_msg = if cfg!(target_os = "windows") {
                   format!("Cannot start the backend server: {e}. \
                     Windows Defender may have quarantined python-server.exe. \
                     Go to Windows Security → Virus & threat protection → \
                     Protection history, find python-server.exe and click Allow. \
-                    Then restart COPS."));
+                    Then restart COPS.")
+                } else {
+                  format!("Cannot start the backend server: {e}. Please check backend/cops_startup.log for reasons.")
+                };
+                let _ = app_handle.emit("sidecar-startup-failed", error_msg);
                 if let Some(c) = app_handle.try_state::<FastCrashCount>() {
                   c.0.store(0, Ordering::SeqCst);
                 }
@@ -185,12 +189,16 @@ pub fn run() {
             } else { 1 };
             eprintln!("[cops] Sidecar fast-crash #{crashes} (up for {uptime}s).");
             if crashes >= 4 {
-              let _ = app_handle.emit("sidecar-startup-failed",
+              let error_msg = if cfg!(target_os = "windows") {
                 "The backend server crashed on startup. This is often caused by \
                  Windows Defender blocking the server binary. \
                  Please check Windows Security → Virus & threat protection → \
                  Protection history and restore/allow 'python-server.exe'. \
-                 Then restart COPS.");
+                 Then restart COPS."
+              } else {
+                "The backend server crashed on startup. Please check the backend/cops_startup.log file for error details."
+              };
+              let _ = app_handle.emit("sidecar-startup-failed", error_msg);
               // Keep the restart loop running in case the user fixes it
               if let Some(c) = app_handle.try_state::<FastCrashCount>() {
                 c.0.store(0, Ordering::SeqCst); // reset so we alert again after another 4
