@@ -1,16 +1,45 @@
 # -*- mode: python ; coding: utf-8 -*-
-import glob, os
+import glob, os, subprocess, sys
 
-# Bundle sqlcipher3-binary's self-contained OpenSSL libs so the Linux binary
-# works without libsqlcipher installed on the target machine.
+# Bundle sqlcipher3's native shared libraries so DB encryption works on the
+# target machine without libsqlcipher installed system-wide.
+#
+# Two cases:
+#  1. sqlcipher3-binary  — ships its own OpenSSL in sqlcipher3_binary.libs/
+#  2. sqlcipher3 (system-linked) — libsqlcipher.so.0 must be found via ldd
+#     and bundled explicitly; PyInstaller excludes it as an "unknown" lib.
 _sqlcipher_bins = []
 try:
     import sqlcipher3 as _sc
-    _libs_dir = os.path.join(os.path.dirname(_sc.__file__), '..', 'sqlcipher3_binary.libs')
+    _sc_ext = glob.glob(
+        os.path.join(os.path.dirname(_sc.__file__), '_sqlite3*.so')
+    )
+
+    # Case 1: sqlcipher3-binary bundled libs
+    _libs_dir = os.path.normpath(
+        os.path.join(os.path.dirname(_sc.__file__), '..', 'sqlcipher3_binary.libs')
+    )
     for _lib in glob.glob(os.path.join(_libs_dir, '*.so*')):
         _sqlcipher_bins.append((_lib, 'sqlcipher3_binary.libs'))
+
+    # Case 2: system-linked — walk ldd output to find libsqlcipher.so
+    if not _sqlcipher_bins and _sc_ext:
+        try:
+            _ldd = subprocess.check_output(['ldd', _sc_ext[0]], text=True)
+            for _line in _ldd.splitlines():
+                if 'libsqlcipher' in _line and '=>' in _line:
+                    _path = _line.split('=>')[1].strip().split()[0]
+                    if os.path.exists(_path):
+                        _sqlcipher_bins.append((_path, '.'))
+        except Exception:
+            pass
+
+    if _sqlcipher_bins:
+        print(f'[spec] Bundling sqlcipher3 native libs: {_sqlcipher_bins}')
+    else:
+        print('[spec] WARNING: sqlcipher3 found but no native libs detected — encryption may fail at runtime')
 except ImportError:
-    pass
+    print('[spec] sqlcipher3 not installed — DB encryption will be disabled in this build')
 
 a = Analysis(
     ['server_entry.py'],

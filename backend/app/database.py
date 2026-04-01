@@ -40,13 +40,16 @@ if settings.DATABASE_URL.startswith("sqlite"):
         from app.security.device import derive_db_key
         _DB_KEY = derive_db_key()
         logger.info("SQLCipher available — database encryption is ENABLED.")
-    except ImportError:
+    except ImportError as _ie:
+        import traceback as _tb
         _cipher_module = None
         _DB_KEY = None
         logger.warning(
             "sqlcipher3 package not found — database will NOT be encrypted. "
-            "Install 'sqlcipher3-binary' to enable AES-256 at-rest encryption."
+            "Install 'sqlcipher3-binary' to enable AES-256 at-rest encryption. "
+            "Import error detail: %s", _ie
         )
+        logger.debug("sqlcipher3 import traceback:\n%s", _tb.format_exc())
 
 
 # ── One-time plaintext → encrypted migration ─────────────────────────────────
