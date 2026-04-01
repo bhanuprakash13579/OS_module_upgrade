@@ -1286,14 +1286,8 @@ def admin_upload_legacy(
     Auto-detects header row; falls back to legacy column order if no header found.
     Inserts new records only — skips duplicates.
     """
-    _CSV_SIZE_LIMIT = 50 * 1024 * 1024  # 50 MB
     try:
-        raw_bytes = file.file.read(_CSV_SIZE_LIMIT + 1)
-        if len(raw_bytes) > _CSV_SIZE_LIMIT:
-            raise HTTPException(status_code=413, detail="File too large. Maximum allowed size is 50 MB.")
-        raw = raw_bytes.decode("utf-8-sig")
-    except HTTPException:
-        raise
+        raw = file.file.read().decode("utf-8-sig")
     except Exception:
         raise HTTPException(status_code=400, detail="Cannot read uploaded file.")
 
@@ -1389,14 +1383,8 @@ def admin_upload_legacy_items(
     Auto-detects header row; falls back to legacy column order if no header found.
     Inserts new records only — skips duplicates on (os_no, os_year, location_code, items_sno).
     """
-    _CSV_SIZE_LIMIT = 50 * 1024 * 1024  # 50 MB
     try:
-        raw_bytes = file.file.read(_CSV_SIZE_LIMIT + 1)
-        if len(raw_bytes) > _CSV_SIZE_LIMIT:
-            raise HTTPException(status_code=413, detail="File too large. Maximum allowed size is 50 MB.")
-        raw = raw_bytes.decode("utf-8-sig")
-    except HTTPException:
-        raise
+        raw = file.file.read().decode("utf-8-sig")
     except Exception:
         raise HTTPException(status_code=400, detail="Cannot read uploaded file.")
 
