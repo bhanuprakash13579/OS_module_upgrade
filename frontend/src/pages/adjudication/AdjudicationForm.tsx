@@ -371,6 +371,7 @@ export default function AdjudicationForm() {
   // Each adjData field is its own state so only the affected input re-renders
   const [adjDate, setAdjDate]   = useState(() => new Date().toISOString().split('T')[0]);
   const [offrName, setOffrName] = useState(() => user?.user_name || '');
+  const [offrDesig, setOffrDesig] = useState(() => user?.user_desig || '');
   const [remarks, setRemarks]   = useState('');
   const [rfAmt, setRfAmt]       = useState(0);
   const [refAmt, setRefAmt]     = useState(0);
@@ -419,6 +420,7 @@ export default function AdjudicationForm() {
 
         if (data.adj_offr_name) {
           setOffrName(data.adj_offr_name || user?.user_name || '');
+          setOffrDesig(data.adj_offr_designation || user?.user_desig || '');
           setRemarks(data.adjn_offr_remarks || '');
           setRfAmt(data.rf_amount || 0);
           setRefAmt(data.ref_amount || 0);
@@ -446,6 +448,7 @@ export default function AdjudicationForm() {
 
   const handleSave = async () => {
     if (!offrName.trim()) { setError('Adjudicating Officer Name is required.'); return; }
+    if (!offrDesig.trim()) { setError('Adjudicating Officer Designation is required.'); return; }
     if (remarksLen > REMARKS_MAX) { setError(`Remarks exceeds ${REMARKS_MAX} character limit.`); return; }
     
     // Validate: if any Under OS items exist, they must all be categorized by SDO
@@ -472,7 +475,7 @@ export default function AdjudicationForm() {
     try {
       await api.post(`/os/${os_no}/${os_year}/adjudicate`, {
         adj_offr_name: offrName,
-        adj_offr_designation: user?.user_desig || '',
+        adj_offr_designation: offrDesig,
         adjudication_date: adjDate,
         adjn_offr_remarks: remarks,
         rf_amount: rfAmt,
@@ -697,6 +700,17 @@ export default function AdjudicationForm() {
                 value={offrName}
                 onChange={e => setOffrName(e.target.value.toUpperCase())}
                 placeholder="Officer Name"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-amber-800 uppercase tracking-wider mb-1.5">Designation *</label>
+              <input
+                id="input-offr-desig"
+                type="text"
+                className="w-full px-3 py-2.5 border border-amber-300 rounded-lg bg-amber-50 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-slate-800 font-medium"
+                value={offrDesig}
+                onChange={e => setOffrDesig(e.target.value.toUpperCase())}
+                placeholder="Officer Designation"
               />
             </div>
           </div>

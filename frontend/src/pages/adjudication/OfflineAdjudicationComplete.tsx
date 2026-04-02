@@ -60,12 +60,12 @@ export default function OfflineAdjudicationComplete() {
       setFormData(prev => ({
         ...prev,
         adj_offr_name: caseData.adj_offr_name || '',
-        adj_designation: caseData.adj_designation || caseData.adjn_designation || '',
+        adj_designation: caseData.adj_offr_designation || caseData.adj_designation || caseData.adjn_designation || '',
         adjudication_date: caseData.adjudication_date || prev.adjudication_date,
         rf_amount: caseData.rf_amount != null ? String(caseData.rf_amount) : '',
         pp_amount: caseData.pp_amount != null ? String(caseData.pp_amount) : '',
         ref_amount: caseData.ref_amount != null ? String(caseData.ref_amount) : '',
-        conf_value: caseData.conf_value != null ? String(caseData.conf_value) : '',
+        conf_value: caseData.confiscated_value != null ? String(caseData.confiscated_value) : (caseData.conf_value != null ? String(caseData.conf_value) : ''),
         redeemed_value: caseData.redeemed_value != null ? String(caseData.redeemed_value) : '',
         re_export_value: caseData.re_export_value != null ? String(caseData.re_export_value) : '',
         adjn_offr_remarks: caseData.adjn_offr_remarks || '',
@@ -103,7 +103,7 @@ export default function OfflineAdjudicationComplete() {
       const isDateValid = (d: string) => d && /^\d{4}-\d{2}-\d{2}$/.test(d);
       const payload: any = {
         adj_offr_name: formData.adj_offr_name.trim(),
-        adj_designation: formData.adj_designation.trim(),
+        adj_offr_designation: formData.adj_designation.trim(),
       };
       if (formData.adjudication_date && isDateValid(formData.adjudication_date)) {
         payload.adjudication_date = formData.adjudication_date;
@@ -111,7 +111,7 @@ export default function OfflineAdjudicationComplete() {
       if (formData.rf_amount !== '') payload.rf_amount = Number(formData.rf_amount) || 0;
       if (formData.pp_amount !== '') payload.pp_amount = Number(formData.pp_amount) || 0;
       if (formData.ref_amount !== '') payload.ref_amount = Number(formData.ref_amount) || 0;
-      if (formData.conf_value !== '') payload.conf_value = Number(formData.conf_value) || 0;
+      if (formData.conf_value !== '') payload.confiscated_value = Number(formData.conf_value) || 0;
       if (formData.redeemed_value !== '') payload.redeemed_value = Number(formData.redeemed_value) || 0;
       if (formData.re_export_value !== '') payload.re_export_value = Number(formData.re_export_value) || 0;
       if (formData.adjn_offr_remarks.trim()) payload.adjn_offr_remarks = formData.adjn_offr_remarks.trim();
