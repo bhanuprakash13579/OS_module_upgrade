@@ -57,7 +57,7 @@ export default function AdjudicatedList() {
   const showing = { from: total === 0 ? 0 : (currentPage - 1) * PER_PAGE + 1, to: Math.min(currentPage * PER_PAGE, total) };
 
   return (
-    <div className="space-y-6 h-full flex flex-col max-w-7xl mx-auto pt-2">
+    <div className="space-y-6 flex flex-col max-w-7xl mx-auto pt-2 pb-12">
       {/* Header */}
       <div className="flex justify-between items-center bg-green-700 text-white p-5 rounded-xl shadow-md border border-green-600">
         <div>
@@ -116,8 +116,8 @@ export default function AdjudicatedList() {
       )}
 
       {/* Table */}
-      <div className="bg-white rounded-xl flex-1 overflow-hidden flex flex-col border border-slate-200">
-        <div className="overflow-auto overscroll-contain flex-1">
+      <div className="bg-white rounded-xl flex-1 flex flex-col border border-slate-200">
+        <div className="w-full relative">
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-green-800 uppercase bg-green-50 border-b border-green-200 sticky top-0 z-10">
               <tr>

@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useState } from 'react';
-import { ShieldAlert, FileText, Plus, LogOut, Menu, User, KeyRound, Users, ClipboardList } from 'lucide-react';
+import { ShieldAlert, FileText, Plus, LogOut, Menu, User, KeyRound, Users } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function SDOLayout() {
@@ -19,10 +19,10 @@ export default function SDOLayout() {
   };
 
   return (
-    <div className="flex min-h-screen w-full print:bg-white print:overflow-visible" style={{ background: '#f0f4f8' }}>
+    <div className="flex min-h-screen w-full print:h-auto print:overflow-visible" style={{ background: '#f0f4f8' }}>
       {/* Sidebar */}
       <aside
-        className={`${isCollapsed ? 'w-16' : 'w-64'} flex flex-col shadow-xl transition-[width] duration-200 z-50 shrink-0 print:!hidden sticky top-0 h-screen overflow-y-auto`}
+        className={`${isCollapsed ? 'w-16' : 'w-64'} flex flex-col h-screen sticky top-0 overflow-y-auto shadow-xl transition-[width] duration-200 z-50 shrink-0 print:!hidden`}
         style={{ background: 'linear-gradient(180deg, #1e3a5f 0%, #0f2340 100%)' }}
       >
         {/* Logo Area & Toggle */}
@@ -50,7 +50,7 @@ export default function SDOLayout() {
           </div>
 
         {/* Navigation */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain min-h-0">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
           <nav className="p-3 space-y-1 mt-2">
             
             {user?.user_status !== 'TEMP' && (
@@ -59,7 +59,6 @@ export default function SDOLayout() {
                   <p className="text-blue-400/70 text-xs uppercase tracking-widest font-semibold px-3 mb-3">Offence Cases</p>
                 )}
                 <NavItem to="/sdo/offence/new" icon={<Plus size={24}/>} label="Register New O/S Case" color="blue" id="nav-new-os" end={false} collapsed={isCollapsed} />
-                <NavItem to="/sdo/offline-adjudication" icon={<ClipboardList size={24}/>} label="Offline Adjudication" color="blue" id="nav-offline-adj" end={false} collapsed={isCollapsed} />
                 <NavItem to="/sdo/offence" icon={<FileText size={24}/>} label="View All O/S Cases" color="blue" id="nav-list-os" end collapsed={isCollapsed} />
               </>
             )}
@@ -113,7 +112,7 @@ export default function SDOLayout() {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-h-screen print:h-auto print:overflow-visible">
-        <div className="flex-1 min-h-0 p-4 md:p-6 print:overflow-visible print:p-0">
+        <div className="flex-1 print:overflow-visible">
           {user?.user_status === 'TEMP' && !location.pathname.endsWith('/users') ? (
             <Navigate to="/sdo/users" replace />
           ) : (
