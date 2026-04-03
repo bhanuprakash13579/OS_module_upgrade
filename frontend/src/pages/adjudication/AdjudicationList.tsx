@@ -44,7 +44,10 @@ export default function AdjudicationList() {
       } else if (status === 403) {
         setErrorMsg('Access denied. Only DC/AC role can access adjudication.');
       } else {
-        setErrorMsg(err.response?.data?.detail || `Server error (${status || 'unknown'}). Please try refreshing.`);
+        let detail = err.response?.data?.detail || `Server error (${status || 'unknown'}). Please try refreshing.`;
+        if (Array.isArray(detail)) detail = detail.map((e: any) => `${e.loc?.join('.')} - ${e.msg}`).join(', ');
+        else if (typeof detail === 'object') detail = JSON.stringify(detail);
+        setErrorMsg(detail);
       }
     } finally {
       setLoading(false);

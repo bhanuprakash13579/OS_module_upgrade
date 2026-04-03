@@ -129,7 +129,12 @@ export default function OffenceList() {
       await api.delete(`/os/${os_no}/${os_year}`, { params: { reason: reason.trim() } });
       fetchCases(currentPage, searchTerm);
     } catch (err: any) {
-      const detail = err.response?.data?.detail || err.message;
+      let detail = err.response?.data?.detail || err.message || 'Unknown error';
+      if (Array.isArray(detail)) {
+        detail = detail.map((e: any) => `${e.loc?.join('.')} - ${e.msg}`).join(', ');
+      } else if (typeof detail === 'object') {
+        detail = JSON.stringify(detail);
+      }
       setErrorMsg(`Deletion failed: ${detail}`);
     }
   };
@@ -163,15 +168,21 @@ export default function OffenceList() {
       const payload = {
         br_entries: brDrData.brEntries
           .filter(e => e.no.trim())
-          .map(e => ({ no: e.no.trim(), date: e.date || null })),
+          .map(e => ({ no: e.no.trim(), date: e.date?.trim() || null })),
         dr_no: brDrData.drNo.trim() || null,
-        dr_date: brDrData.drDate || null,
+        dr_date: brDrData.drDate?.trim() || null,
       };
       await api.patch(`/os/${os_no}/${os_year}/post-adj`, payload);
       setExpandedBrDr(null);
       fetchCases(currentPage, searchTerm);
     } catch (err: any) {
-      setBrDrError(err.response?.data?.detail || err.message);
+      let errMsg = err.response?.data?.detail || err.message || 'Failed to save';
+      if (Array.isArray(errMsg)) {
+        errMsg = errMsg.map((e: any) => `${e.loc?.join('.')} - ${e.msg}`).join(', ');
+      } else if (typeof errMsg === 'object') {
+        errMsg = JSON.stringify(errMsg);
+      }
+      setBrDrError(errMsg);
     } finally {
       setBrDrSaving(false);
     }
@@ -422,7 +433,13 @@ export default function OffenceList() {
                             ) : (
                               <div className="flex items-center gap-1.5">
                                 <button
-                                  onClick={() => navigate(`/sdo/offence/${row.os_no}/${row.os_year}/edit`)}
+                                  onClick={() => {
+                                    if (row.is_offline_adjudication === 'Y') {
+                                      navigate(`/sdo/offline-adjudication/${row.os_no}/${row.os_year}/edit`);
+                                    } else {
+                                      navigate(`/sdo/offence/${row.os_no}/${row.os_year}/edit`);
+                                    }
+                                  }}
                                   title={row.is_draft === 'Y' ? 'Edit Draft' : 'Edit Pending Case'}
                                   className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-brand-700 hover:bg-brand-50 border border-slate-200 hover:border-brand-200 rounded-md transition-colors"
                                 >

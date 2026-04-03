@@ -38,6 +38,7 @@ export default function OfflineAdjudicationComplete() {
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successSaved, setSuccessSaved] = useState(false);
+  const [confirmSave, setConfirmSave] = useState(false);
 
   // ── Load case details ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -85,6 +86,11 @@ export default function OfflineAdjudicationComplete() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!confirmSave) {
+      setErrorMsg('Please tick the confirmation checkbox before saving.');
+      return;
+    }
     setErrorMsg('');
     setFieldErrors({});
 
@@ -305,7 +311,11 @@ export default function OfflineAdjudicationComplete() {
       )}
 
       {/* ── Adjudication Officer Form ─────────────────────────────────────── */}
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form
+        onSubmit={handleSubmit}
+        onKeyDown={e => { if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'BUTTON') e.preventDefault(); }}
+        className="space-y-6"
+      >
         <div className="bg-white p-5 rounded-xl border border-slate-200 relative overflow-hidden">
           <div className="absolute top-0 left-0 w-1 h-full bg-amber-600"></div>
           <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2 flex items-center">
@@ -461,6 +471,21 @@ export default function OfflineAdjudicationComplete() {
         </div>
 
         {/* ── Submit bar ────────────────────────────────────────────────────── */}
+        {!isAlreadyCompleted && (
+          <div className="border-t border-slate-200 pt-4 mt-2">
+            <label className="flex items-center gap-2.5 cursor-pointer select-none mb-3">
+              <input
+                type="checkbox"
+                className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                checked={confirmSave}
+                onChange={e => setConfirmSave(e.target.checked)}
+              />
+              <span className="text-sm font-medium text-slate-700">
+                I confirm the above details are correct and wish to save.
+              </span>
+            </label>
+          </div>
+        )}
         <div className="flex items-center justify-between pt-2">
           <button
             type="button"
@@ -472,7 +497,7 @@ export default function OfflineAdjudicationComplete() {
           {!isAlreadyCompleted && (
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !confirmSave}
               className="px-6 py-2 bg-amber-700 text-white font-semibold rounded-lg hover:bg-amber-600 transition-colors text-sm disabled:opacity-60 flex items-center gap-2"
             >
               {isSubmitting ? (

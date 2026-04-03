@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Plus, Trash2, FileText, User, Plane, AlertCircle, CheckCircle, Info } from 'lucide-react';
 import DatePicker from '@/components/DatePicker';
 import api from '@/lib/api';
@@ -155,6 +155,8 @@ let _offlineDescCache: string[] | null = null;
 // ─────────────────────────────────────────────────────────────────────────────
 export default function OfflineAdjudicationForm() {
   const navigate = useNavigate();
+  const { osNo, osYear } = useParams<{ osNo?: string; osYear?: string }>();
+  const isEditing = !!(osNo && osYear);
 
   // ── Item description suggestions ─────────────────────────────────────────
   const [descSuggestions, setDescSuggestions] = useState<string[]>(_offlineDescCache ?? STATIC_ITEM_SUGGESTIONS);
@@ -219,6 +221,57 @@ export default function OfflineAdjudicationForm() {
   const [successInfo, setSuccessInfo] = useState<{ os_no: string; os_year: number } | null>(null);
   const [autoFillBanner, setAutoFillBanner] = useState(false);
   const [additionalOpen, setAdditionalOpen] = useState(false);
+  const [confirmSave, setConfirmSave] = useState(false);
+  const [editLoading, setEditLoading] = useState(isEditing);
+
+  // ── Load existing case when editing ───────────────────────────────────────
+  useEffect(() => {
+    if (!isEditing) return;
+    setEditLoading(true);
+    api.get(`/os/${osNo}/${osYear}`)
+      .then(res => {
+        const d = res.data;
+        setFormData({
+          os_no: d.os_no || '',
+          os_date: d.os_date || new Date().toISOString().split('T')[0],
+          booked_by: d.booked_by || 'Batch A',
+          flight_no: d.flight_no || '',
+          pax_name: d.pax_name || '',
+          pax_nationality: d.pax_nationality || '',
+          passport_no: d.passport_no || '',
+          pax_address1: d.pax_address1 || '',
+          file_spot: d.file_spot || '',
+        });
+        setOptionalData({
+          pax_date_of_birth: d.pax_date_of_birth || '',
+          passport_date: d.passport_date || '',
+          pp_issue_place: d.pp_issue_place || '',
+          father_name: d.father_name || '',
+          residence_at: d.residence_at || '',
+          old_passport_no: d.old_passport_no || '',
+          case_type: d.case_type || 'Non-Bonafide',
+          shift: d.shift || 'Day',
+          supdts_remarks: d.supdts_remarks || '',
+        });
+        if (d.items && d.items.length > 0) {
+          setItems(d.items.map((itm: any) => ({
+            items_desc: itm.items_desc || '',
+            items_qty: itm.items_qty ?? 1,
+            items_uqc: itm.items_uqc || 'NOS',
+            items_value: itm.items_value ?? 0,
+            items_duty_type: itm.items_duty_type || 'Miscellaneous-22',
+          })));
+        }
+      })
+      .catch(err => {
+        let detail = err.response?.data?.detail || 'Failed to load case for editing.';
+        if (Array.isArray(detail)) detail = detail.map((e: any) => `${e.loc?.join('.')} - ${e.msg}`).join(', ');
+        else if (typeof detail === 'object') detail = JSON.stringify(detail);
+        setErrorMsg(detail);
+      })
+      .finally(() => setEditLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing, osNo, osYear]);
 
   const osNoCheckTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const ppLookupAbort = useRef<AbortController | null>(null);
@@ -325,6 +378,11 @@ export default function OfflineAdjudicationForm() {
   // ── Validation & submit ───────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!confirmSave) {
+      setErrorMsg('Please tick the confirmation checkbox before saving.');
+      return;
+    }
     setErrorMsg('');
     setFieldErrors({});
     setItemErrors({});
@@ -417,10 +475,19 @@ export default function OfflineAdjudicationForm() {
       if (optionalData.shift) payload.shift = optionalData.shift;
       if (optionalData.supdts_remarks.trim()) payload.supdts_remarks = optionalData.supdts_remarks;
 
-      const res = await api.post('/os/offline', payload);
-      const savedOsNo = res.data?.os_no || formData.os_no;
-      const savedOsYear = res.data?.os_year || new Date(formData.os_date).getFullYear();
+      let savedOsNo: string;
+      let savedOsYear: number;
+      if (isEditing) {
+        await api.put(`/os/${osNo}/${osYear}`, payload);
+        savedOsNo = osNo!;
+        savedOsYear = Number(osYear);
+      } else {
+        const res = await api.post('/os/offline', payload);
+        savedOsNo = res.data?.os_no || formData.os_no;
+        savedOsYear = res.data?.os_year || new Date(formData.os_date).getFullYear();
+      }
       setSuccessInfo({ os_no: savedOsNo, os_year: savedOsYear });
+      setConfirmSave(false);
     } catch (err: any) {
       let errMsg = err.response?.data?.detail || err.message || 'Failed to save offline case.';
       if (Array.isArray(errMsg)) errMsg = errMsg.map((e: any) => `${e.loc?.join('.')} - ${e.msg}`).join(', ');
@@ -491,6 +558,17 @@ export default function OfflineAdjudicationForm() {
     );
   }
 
+  if (editLoading) {
+    return (
+      <div className="flex items-center justify-center h-64 text-slate-500">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+          <span className="font-medium text-sm">Loading case details...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4 w-full pb-20">
       {descDatalist}
@@ -498,12 +576,18 @@ export default function OfflineAdjudicationForm() {
       {/* Header */}
       <div className="flex justify-between items-center bg-white px-4 py-3 border-b border-slate-200 rounded-xl border">
         <div className="flex items-center space-x-4">
-          <button onClick={() => navigate('/sdo')} className="p-2 bg-slate-50 border border-slate-200 rounded-md hover:bg-slate-100 transition-colors">
+          <button onClick={() => navigate(isEditing ? '/sdo/offence' : '/sdo')} className="p-2 bg-slate-50 border border-slate-200 rounded-md hover:bg-slate-100 transition-colors">
             <ArrowLeft size={20} className="text-slate-600" />
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Register Offline Adjudication Case</h1>
-            <p className="text-slate-500 text-sm mt-0.5">Fill in the case details and seized goods. Officer details will be added by the adjudication module.</p>
+            <h1 className="text-2xl font-bold text-slate-800 tracking-tight">
+              {isEditing ? `Edit Offline Case — O.S. ${osNo}/${osYear}` : 'Register Offline Adjudication Case'}
+            </h1>
+            <p className="text-slate-500 text-sm mt-0.5">
+              {isEditing
+                ? 'Update the case details and seized goods below.'
+                : 'Fill in the case details and seized goods. Officer details will be added by the adjudication module.'}
+            </p>
           </div>
         </div>
         <span className="bg-blue-100 text-blue-800 border border-blue-300 px-3 py-1.5 rounded-lg text-xs font-bold">
@@ -543,7 +627,11 @@ export default function OfflineAdjudicationForm() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form
+        onSubmit={handleSubmit}
+        onKeyDown={e => { if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'BUTTON') e.preventDefault(); }}
+        className="space-y-6"
+      >
         {/* ── Top Details Grid ─────────────────────────────────────────────── */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
 
@@ -911,27 +999,40 @@ export default function OfflineAdjudicationForm() {
           )}
         </div>
 
-        {/* ── Submit ────────────────────────────────────────────────────────── */}
-        <div className="flex items-center justify-end gap-3 pt-2">
-          <button
-            type="button"
-            onClick={() => navigate('/sdo')}
-            className="px-5 py-2 border border-slate-300 bg-white text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors text-sm"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="px-6 py-2 bg-blue-700 text-white font-semibold rounded-lg hover:bg-blue-600 transition-colors text-sm disabled:opacity-60 flex items-center gap-2"
-          >
-            {isSubmitting ? (
-              <>
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                Saving...
-              </>
-            ) : 'Save Offline Case'}
-          </button>
+        {/* ── Confirmation + Submit ──────────────────────────────────────── */}
+        <div className="border-t border-slate-200 pt-4 mt-2 space-y-3">
+          <label className="flex items-center gap-2.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              checked={confirmSave}
+              onChange={e => setConfirmSave(e.target.checked)}
+            />
+            <span className="text-sm font-medium text-slate-700">
+              I confirm the above details are correct and wish to save.
+            </span>
+          </label>
+          <div className="flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => navigate(isEditing ? '/sdo/offence' : '/sdo')}
+              className="px-5 py-2 border border-slate-300 bg-white text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors text-sm"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting || !confirmSave}
+              className="px-6 py-2 bg-blue-700 text-white font-semibold rounded-lg hover:bg-blue-600 transition-colors text-sm disabled:opacity-60 flex items-center gap-2"
+            >
+              {isSubmitting ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                  Saving...
+                </>
+              ) : isEditing ? 'Update Case' : 'Save Offline Case'}
+            </button>
+          </div>
         </div>
       </form>
     </div>

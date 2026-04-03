@@ -35,7 +35,10 @@ export default function AdjudicatedList() {
       setCases(res.data.items);
       setTotal(res.data.total);
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.detail || `Error loading adjudicated cases (${err.response?.status || 'network error'})`);
+      let detail = err.response?.data?.detail || `Error loading adjudicated cases (${err.response?.status || 'network error'})`;
+      if (Array.isArray(detail)) detail = detail.map((e: any) => `${e.loc?.join('.')} - ${e.msg}`).join(', ');
+      else if (typeof detail === 'object') detail = JSON.stringify(detail);
+      setErrorMsg(detail);
     }
     finally { setLoading(false); }
   // eslint-disable-next-line react-hooks/exhaustive-deps

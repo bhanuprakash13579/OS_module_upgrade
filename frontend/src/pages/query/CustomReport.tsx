@@ -245,7 +245,10 @@ export default function CustomReport() {
       });
       setResult(res.data);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to generate report.');
+      let detail = err.response?.data?.detail || 'Failed to generate report.';
+      if (Array.isArray(detail)) detail = detail.map((e: any) => `${e.loc?.join('.')} - ${e.msg}`).join(', ');
+      else if (typeof detail === 'object') detail = JSON.stringify(detail);
+      setError(detail);
     } finally {
       setLoading(false);
     }

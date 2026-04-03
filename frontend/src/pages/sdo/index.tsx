@@ -19,6 +19,7 @@ export default function SDOModule() {
         <Route path="offence" element={<OffenceList />} />
         <Route path="offence/new" element={<Suspense fallback={<RouteSpinner />}><OffenceForm /></Suspense>} />
         <Route path="offline-adjudication" element={<Suspense fallback={<RouteSpinner />}><OfflineAdjudicationForm /></Suspense>} />
+        <Route path="offline-adjudication/:osNo/:osYear/edit" element={<Suspense fallback={<RouteSpinner />}><OfflineAdjudicationForm /></Suspense>} />
         <Route path="offence/:osNo/:osYear/edit" element={<Suspense fallback={<RouteSpinner />}><OffenceForm /></Suspense>} />
         <Route path="offence/:osNo/:osYear/view" element={<Suspense fallback={<RouteSpinner />}><OffenceForm /></Suspense>} />
         <Route path="users" element={<UserManagement moduleType="sdo" />} />

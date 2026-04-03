@@ -378,6 +378,7 @@ export default function AdjudicationForm() {
   const [ppAmt, setPpAmt]       = useState(0);
   
   const [closeCase, setCloseCase] = useState(false);
+  const [confirmSave, setConfirmSave] = useState(false);
 
   const REMARKS_MAX = 3000;
   const remarksLen  = remarks.length;
@@ -439,14 +440,16 @@ export default function AdjudicationForm() {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
-        handleSave();
+        if (confirmSave) handleSave();
+        else setError('Please tick the confirmation checkbox before saving.');
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [confirmSave]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSave = async () => {
+    if (!confirmSave) { setError('Please tick the confirmation checkbox before saving.'); return; }
     if (!offrName.trim()) { setError('Adjudicating Officer Name is required.'); return; }
     if (!offrDesig.trim()) { setError('Adjudicating Officer Designation is required.'); return; }
     if (remarksLen > REMARKS_MAX) { setError(`Remarks exceeds ${REMARKS_MAX} character limit.`); return; }
@@ -490,7 +493,10 @@ export default function AdjudicationForm() {
       const refreshed = await api.get(`/os/${os_no}/${os_year}`);
       setOsCase(refreshed.data);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to save adjudication.');
+      let detail = err.response?.data?.detail || 'Failed to save adjudication.';
+      if (Array.isArray(detail)) detail = detail.map((e: any) => `${e.loc?.join('.')} - ${e.msg}`).join(', ');
+      else if (typeof detail === 'object') detail = JSON.stringify(detail);
+      setError(detail);
     } finally {
       setSubmitting(false);
     }
@@ -526,7 +532,10 @@ export default function AdjudicationForm() {
         showDownloadToast(`PDF downloaded as OS_${os_no}_${os_year}.pdf`);
       }
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to download OS PDF.');
+      let detail = err.response?.data?.detail || 'Failed to download OS PDF.';
+      if (Array.isArray(detail)) detail = detail.map((e: any) => `${e.loc?.join('.')} - ${e.msg}`).join(', ');
+      else if (typeof detail === 'object') detail = JSON.stringify(detail);
+      setError(detail);
     } finally {
       setSubmitting(false);
     }
@@ -541,7 +550,10 @@ export default function AdjudicationForm() {
       setSuccess('O.S. Case Rejected Successfully.');
       setTimeout(() => navigate('/adjudication/quashed'), 500);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to reject case.');
+      let detail = err.response?.data?.detail || 'Failed to reject case.';
+      if (Array.isArray(detail)) detail = detail.map((e: any) => `${e.loc?.join('.')} - ${e.msg}`).join(', ');
+      else if (typeof detail === 'object') detail = JSON.stringify(detail);
+      setError(detail);
       setSubmitting(false);
     }
   };
@@ -555,7 +567,10 @@ export default function AdjudicationForm() {
       setSuccess('O.S. Case Quashed Successfully.');
       setTimeout(() => navigate('/adjudication/quashed'), 500);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to quash case.');
+      let detail = err.response?.data?.detail || 'Failed to quash case.';
+      if (Array.isArray(detail)) detail = detail.map((e: any) => `${e.loc?.join('.')} - ${e.msg}`).join(', ');
+      else if (typeof detail === 'object') detail = JSON.stringify(detail);
+      setError(detail);
       setSubmitting(false);
     }
   };
@@ -867,6 +882,23 @@ export default function AdjudicationForm() {
               </label>
             </div>
           )}
+
+          {!isAlreadyAdjudicated && (
+            <div className="border-t border-amber-100 pt-4">
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  id="chk-confirm-adjn"
+                  className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                  checked={confirmSave}
+                  onChange={e => setConfirmSave(e.target.checked)}
+                />
+                <span className="text-sm font-medium text-slate-700">
+                  I confirm the above details are correct and wish to save the adjudication order.
+                </span>
+              </label>
+            </div>
+          )}
         </fieldset>
 
         <div className="p-6 pt-0">
@@ -877,7 +909,7 @@ export default function AdjudicationForm() {
                 <button
                   id="btn-save-adjn"
                   onClick={handleSave}
-                  disabled={submitting || remarksLen > REMARKS_MAX}
+                  disabled={submitting || remarksLen > REMARKS_MAX || !confirmSave}
                   className="flex items-center gap-2 bg-amber-700 hover:bg-amber-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Save size={17} />

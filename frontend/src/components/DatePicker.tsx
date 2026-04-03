@@ -28,7 +28,17 @@ function displayToIso(str: string): string | null {
   if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) {
     const [d, m, y] = str.split('/');
     const date = new Date(`${y}-${m}-${d}T00:00:00`);
-    if (!isNaN(date.getTime())) return `${y}-${m}-${d}`;
+    if (!isNaN(date.getTime())) {
+      // Prevent Javascript from silently overflowing (e.g. 31/02/2026 -> 03/03/2026)
+      // by ensuring the generated Date parts strictly match the user's input.
+      if (
+        String(date.getDate()).padStart(2, '0') === d &&
+        String(date.getMonth() + 1).padStart(2, '0') === m &&
+        String(date.getFullYear()) === y
+      ) {
+        return `${y}-${m}-${d}`;
+      }
+    }
   }
   return null;
 }

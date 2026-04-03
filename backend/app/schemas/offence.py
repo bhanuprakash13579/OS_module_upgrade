@@ -1,3 +1,4 @@
+import datetime as ext_datetime
 from datetime import date, datetime
 from typing import Optional, List, Dict
 from pydantic import BaseModel, ConfigDict, constr, field_validator
@@ -194,7 +195,7 @@ class AdjudicationCreate(BaseModel):
 class PostAdjBrEntry(BaseModel):
     """A single Bank Receipt entry linked to a post-adjudication payment."""
     no:   str
-    date: Optional[date] = None
+    date: Optional[ext_datetime.date] = None
 
 
 class PostAdjUpdate(BaseModel):
