@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ClipboardEdit, Gavel, ArrowRight, Search, ScanLine } from 'lucide-react';
+import { open as openUrl } from '@tauri-apps/plugin-shell';
 import api from '@/lib/api';
 
 export default function ModuleSelection() {
@@ -176,11 +177,26 @@ export default function ModuleSelection() {
       </div>
 
       {/* Footer */}
-      <div className="absolute bottom-0 left-0 right-0 flex justify-center items-center py-3 z-0 pointer-events-none">
+      <div className="absolute bottom-0 left-0 right-0 flex flex-col justify-center items-center py-3 gap-1 z-0 pointer-events-none">
         <p className="text-white/30 text-xs tracking-widest uppercase select-none">
           Powered by{' '}
           <span className="text-white/50 font-semibold">Get Some Idea Technologies</span>
         </p>
+        <div className="flex items-center gap-3 pointer-events-auto">
+          <button
+            onClick={() => openUrl('https://www.gsicorp.in')}
+            className="text-white/40 hover:text-blue-300 text-xs transition-colors duration-200"
+          >
+            www.gsicorp.in
+          </button>
+          <span className="text-white/20 text-xs select-none">·</span>
+          <button
+            onClick={() => openUrl('mailto:contact@gsicorp.in')}
+            className="text-white/40 hover:text-blue-300 text-xs transition-colors duration-200"
+          >
+            contact@gsicorp.in
+          </button>
+        </div>
       </div>
 
     </div>
