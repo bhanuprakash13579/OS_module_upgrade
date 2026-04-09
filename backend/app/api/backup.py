@@ -25,8 +25,6 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db, get_cipher_module, get_db_key, get_db_path
 from app.models.offence import CopsMaster, CopsItems
-from app.models.baggage import BrMaster, BrItems
-from app.models.detention import DrMaster, DrItems
 from app.models.auth import User
 from app.security.admin_auth import require_admin
 from app.services.auth import get_adjn_user, get_current_active_user
@@ -460,126 +458,94 @@ def export_csv(
     - If neither is provided: exports the full database (all records).
     The ZIP can be restored via the admin panel Restore section.
     """
-    q_master = db.query(CopsMaster)
+    def _sc(cols):
+        """Map ORM attribute names to SQL column names (strips leading underscore)."""
+        return ", ".join(c.lstrip("_") for c in cols)
+
+    # ── Raw SQL queries — bypass ORM hydration overhead ───────────────────────
     if from_date and to_date:
-        q_master = q_master.filter(
-            CopsMaster.os_date >= from_date, CopsMaster.os_date <= to_date
-        )
-    masters: List[CopsMaster] = q_master.order_by(CopsMaster.os_date, CopsMaster.os_no).all()
-
-    os_keys = {(m.os_no, m.os_year, m.location_code or "") for m in masters}
-
-    q_items = db.query(CopsItems)
-    if from_date and to_date:
-        q_items = q_items.filter(
-            CopsItems.os_date >= from_date, CopsItems.os_date <= to_date
-        )
-    items: List[CopsItems] = q_items.order_by(
-        CopsItems.os_date, CopsItems.os_no, CopsItems.items_sno
-    ).all()
-    items = [it for it in items if (it.os_no, it.os_year, it.location_code or "") in os_keys]
-
-    master_buf = io.StringIO()
-    mw = csv.writer(master_buf)
-    mw.writerow(_MASTER_COLS)
-    for m in masters:
-        mw.writerow([_val(getattr(m, col, None)) for col in _MASTER_COLS])
-
-    items_buf = io.StringIO()
-    iw = csv.writer(items_buf)
-    iw.writerow(_ITEMS_COLS)
-    for it in items:
-        iw.writerow([_val(getattr(it, col, None)) for col in _ITEMS_COLS])
-
-    # ── BR tables (always full export — no meaningful date-range slice for BR) ──
-    q_br = db.query(BrMaster)
-    if from_date and to_date:
-        q_br = q_br.filter(BrMaster.br_date >= from_date, BrMaster.br_date <= to_date)
-    br_masters: List[BrMaster] = q_br.order_by(BrMaster.br_date, BrMaster.br_no).all()
-    br_nos = {b.br_no for b in br_masters}
-
-    q_br_items = db.query(BrItems)
-    if from_date and to_date:
-        q_br_items = q_br_items.filter(BrItems.br_date >= from_date, BrItems.br_date <= to_date)
-    br_items_list: List[BrItems] = q_br_items.order_by(BrItems.br_date, BrItems.br_no, BrItems.items_sno).all()
-    br_items_list = [it for it in br_items_list if it.br_no in br_nos]
-
-    br_master_buf = io.StringIO()
-    bmw = csv.writer(br_master_buf)
-    # Write header using display names (strip leading underscore for availed_remarks)
-    bmw.writerow([c.lstrip("_") for c in _BR_MASTER_COLS])
-    for b in br_masters:
-        bmw.writerow([_val(getattr(b, col, None)) for col in _BR_MASTER_COLS])
-
-    br_items_buf = io.StringIO()
-    biw = csv.writer(br_items_buf)
-    biw.writerow(_BR_ITEMS_COLS)
-    for it in br_items_list:
-        biw.writerow([_val(getattr(it, col, None)) for col in _BR_ITEMS_COLS])
-
-    # ── DR tables ──────────────────────────────────────────────────────────────
-    q_dr = db.query(DrMaster)
-    if from_date and to_date:
-        q_dr = q_dr.filter(DrMaster.dr_date >= from_date, DrMaster.dr_date <= to_date)
-    dr_masters: List[DrMaster] = q_dr.order_by(DrMaster.dr_date, DrMaster.dr_no).all()
-    dr_nos = {d.dr_no for d in dr_masters}
-
-    q_dr_items = db.query(DrItems)
-    if from_date and to_date:
-        q_dr_items = q_dr_items.filter(DrItems.dr_date >= from_date, DrItems.dr_date <= to_date)
-    dr_items_list: List[DrItems] = q_dr_items.order_by(DrItems.dr_date, DrItems.dr_no, DrItems.items_sno).all()
-    dr_items_list = [it for it in dr_items_list if it.dr_no in dr_nos]
-
-    dr_master_buf = io.StringIO()
-    dmw = csv.writer(dr_master_buf)
-    dmw.writerow(_DR_MASTER_COLS)
-    for d in dr_masters:
-        dmw.writerow([_val(getattr(d, col, None)) for col in _DR_MASTER_COLS])
-
-    dr_items_buf = io.StringIO()
-    diw = csv.writer(dr_items_buf)
-    diw.writerow(_DR_ITEMS_COLS)
-    for it in dr_items_list:
-        diw.writerow([_val(getattr(it, col, None)) for col in _DR_ITEMS_COLS])
-
-    zip_buf = io.BytesIO()
-    if _PYZIPPER_AVAILABLE:
-        from app.security.device import get_zip_password
-        zf_ctx = _pyzipper.AESZipFile(
-            zip_buf, mode="w",
-            compression=_pyzipper.ZIP_DEFLATED,
-            compresslevel=1,               # fastest deflate — ~3-4× faster
-            encryption=_pyzipper.WZ_AES,
-        )
-        zf_ctx.setpassword(get_zip_password())
+        p = {"fd": from_date, "td": to_date}
+        master_rows    = db.execute(text(
+            f"SELECT {_sc(_MASTER_COLS)} FROM cops_master "
+            "WHERE os_date >= :fd AND os_date <= :td ORDER BY os_date, os_no"
+        ), p).fetchall()
+        # JOIN pushes item filtering into the DB — no Python-level set filtering
+        items_rows     = db.execute(text(
+            f"SELECT {', '.join('ci.' + c for c in _ITEMS_COLS)} "
+            "FROM cops_items ci "
+            "INNER JOIN cops_master cm ON ci.os_no = cm.os_no AND ci.os_year = cm.os_year "
+            "WHERE cm.os_date >= :fd AND cm.os_date <= :td "
+            "ORDER BY ci.os_date, ci.os_no, ci.items_sno"
+        ), p).fetchall()
+        br_master_rows = db.execute(text(
+            f"SELECT {_sc(_BR_MASTER_COLS)} FROM br_master "
+            "WHERE br_date >= :fd AND br_date <= :td ORDER BY br_date, br_no"
+        ), p).fetchall()
+        br_items_rows  = db.execute(text(
+            f"SELECT {_sc(_BR_ITEMS_COLS)} FROM br_items "
+            "WHERE br_date >= :fd AND br_date <= :td ORDER BY br_date, br_no, items_sno"
+        ), p).fetchall()
+        dr_master_rows = db.execute(text(
+            f"SELECT {_sc(_DR_MASTER_COLS)} FROM dr_master "
+            "WHERE dr_date >= :fd AND dr_date <= :td ORDER BY dr_date, dr_no"
+        ), p).fetchall()
+        dr_items_rows  = db.execute(text(
+            f"SELECT {_sc(_DR_ITEMS_COLS)} FROM dr_items "
+            "WHERE dr_date >= :fd AND dr_date <= :td ORDER BY dr_date, dr_no, items_sno"
+        ), p).fetchall()
     else:
-        zf_ctx = zipfile.ZipFile(zip_buf, mode="w", compression=zipfile.ZIP_DEFLATED,
-                                compresslevel=1)
+        master_rows    = db.execute(text(f"SELECT {_sc(_MASTER_COLS)} FROM cops_master ORDER BY os_date, os_no")).fetchall()
+        items_rows     = db.execute(text(f"SELECT {_sc(_ITEMS_COLS)} FROM cops_items ORDER BY os_date, os_no, items_sno")).fetchall()
+        br_master_rows = db.execute(text(f"SELECT {_sc(_BR_MASTER_COLS)} FROM br_master ORDER BY br_date, br_no")).fetchall()
+        br_items_rows  = db.execute(text(f"SELECT {_sc(_BR_ITEMS_COLS)} FROM br_items ORDER BY br_date, br_no, items_sno")).fetchall()
+        dr_master_rows = db.execute(text(f"SELECT {_sc(_DR_MASTER_COLS)} FROM dr_master ORDER BY dr_date, dr_no")).fetchall()
+        dr_items_rows  = db.execute(text(f"SELECT {_sc(_DR_ITEMS_COLS)} FROM dr_items ORDER BY dr_date, dr_no, items_sno")).fetchall()
 
-    with zf_ctx as zf:
-        zf.writestr("cops_master.csv", master_buf.getvalue())
-        zf.writestr("cops_items.csv", items_buf.getvalue())
-        zf.writestr("br_master.csv", br_master_buf.getvalue())
-        zf.writestr("br_items.csv", br_items_buf.getvalue())
-        zf.writestr("dr_master.csv", dr_master_buf.getvalue())
-        zf.writestr("dr_items.csv", dr_items_buf.getvalue())
-    content_length = zip_buf.tell()
-    zip_buf.seek(0)
+    def _to_csv(headers, rows) -> bytes:
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(headers)
+        for row in rows:
+            w.writerow([_val(v) for v in row])
+        return buf.getvalue().encode("utf-8")
+
+    # ── Write ZIP to temp file (same pattern as export_db — no BytesIO bloat) ─
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=".zip")
+    try:
+        os.close(tmp_fd)
+        if _PYZIPPER_AVAILABLE:
+            from app.security.device import get_zip_password
+            zf_ctx = _pyzipper.AESZipFile(
+                tmp_path, mode="w",
+                compression=_pyzipper.ZIP_DEFLATED,
+                compresslevel=1,
+                encryption=_pyzipper.WZ_AES,
+            )
+            zf_ctx.setpassword(get_zip_password())
+        else:
+            zf_ctx = zipfile.ZipFile(tmp_path, mode="w",
+                                     compression=zipfile.ZIP_DEFLATED,
+                                     compresslevel=1)
+        with zf_ctx as zf:
+            zf.writestr("cops_master.csv",  _to_csv(_MASTER_COLS,                             master_rows))
+            zf.writestr("cops_items.csv",   _to_csv(_ITEMS_COLS,                              items_rows))
+            zf.writestr("br_master.csv",    _to_csv([c.lstrip("_") for c in _BR_MASTER_COLS], br_master_rows))
+            zf.writestr("br_items.csv",     _to_csv(_BR_ITEMS_COLS,                           br_items_rows))
+            zf.writestr("dr_master.csv",    _to_csv(_DR_MASTER_COLS,                          dr_master_rows))
+            zf.writestr("dr_items.csv",     _to_csv(_DR_ITEMS_COLS,                           dr_items_rows))
+    except Exception:
+        _cleanup_temp(tmp_path)
+        raise
 
     today = date.today().isoformat()
-    if from_date and to_date:
-        filename = f"os_backup_{from_date}_{to_date}.zip"
-    else:
-        filename = f"cops_full_backup_{today}.zip"
-
-    return StreamingResponse(
-        _iter_bytesio(zip_buf),
+    filename = (f"os_backup_{from_date}_{to_date}.zip" if from_date and to_date
+                else f"cops_full_backup_{today}.zip")
+    return FileResponse(
+        tmp_path,
         media_type="application/zip",
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
-            "Content-Length": str(content_length),
-            "Content-Encoding": "identity",
-        },
+        filename=filename,
+        headers={"Content-Encoding": "identity"},
+        background=BackgroundTask(_cleanup_temp, tmp_path),
     )
 
 
