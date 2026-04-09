@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ClipboardEdit, Gavel, ArrowRight, Search, ScanLine } from 'lucide-react';
+import { ClipboardEdit, Gavel, ArrowRight, Search, ScanLine, ExternalLink, Mail } from 'lucide-react';
 import { open as openUrl } from '@tauri-apps/plugin-shell';
 import api from '@/lib/api';
 
@@ -182,18 +182,24 @@ export default function ModuleSelection() {
           Powered by{' '}
           <span className="text-white/50 font-semibold">Get Some Idea Technologies</span>
         </p>
-        <div className="flex items-center gap-3 pointer-events-auto">
+        <div className="flex items-center gap-4 pointer-events-auto">
           <button
-            onClick={() => openUrl('https://www.gsicorp.in')}
-            className="text-white/40 hover:text-blue-300 text-xs transition-colors duration-200"
+            onClick={() => openUrl('https://www.gsicorp.in').catch(() => {})}
+            title="Opens gsicorp.in in your browser"
+            aria-label="Visit GSI Corp website (opens in browser)"
+            className="flex items-center gap-1 text-white/55 hover:text-blue-300 hover:underline text-xs transition-colors duration-200 focus:outline-none focus:ring-1 focus:ring-blue-400 focus:ring-offset-1 focus:ring-offset-transparent rounded"
           >
+            <ExternalLink size={11} />
             www.gsicorp.in
           </button>
           <span className="text-white/20 text-xs select-none">·</span>
           <button
-            onClick={() => openUrl('mailto:contact@gsicorp.in')}
-            className="text-white/40 hover:text-blue-300 text-xs transition-colors duration-200"
+            onClick={() => openUrl('mailto:contact@gsicorp.in').catch(() => {})}
+            title="Opens your mail client to contact us"
+            aria-label="Send email to contact@gsicorp.in"
+            className="flex items-center gap-1 text-white/55 hover:text-blue-300 hover:underline text-xs transition-colors duration-200 focus:outline-none focus:ring-1 focus:ring-blue-400 focus:ring-offset-1 focus:ring-offset-transparent rounded"
           >
+            <Mail size={11} />
             contact@gsicorp.in
           </button>
         </div>
