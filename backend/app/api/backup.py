@@ -505,8 +505,7 @@ def export_csv(
         buf = io.StringIO()
         w = csv.writer(buf)
         w.writerow(headers)
-        for row in rows:
-            w.writerow([_val(v) for v in row])
+        w.writerows(([_val(v) for v in row] for row in rows))
         return buf.getvalue().encode("utf-8")
 
     # ── Write ZIP to temp file (same pattern as export_db — no BytesIO bloat) ─
@@ -517,15 +516,13 @@ def export_csv(
             from app.security.device import get_zip_password
             zf_ctx = _pyzipper.AESZipFile(
                 tmp_path, mode="w",
-                compression=_pyzipper.ZIP_DEFLATED,
-                compresslevel=1,
+                compression=zipfile.ZIP_STORED,
                 encryption=_pyzipper.WZ_AES,
             )
             zf_ctx.setpassword(get_zip_password())
         else:
             zf_ctx = zipfile.ZipFile(tmp_path, mode="w",
-                                     compression=zipfile.ZIP_DEFLATED,
-                                     compresslevel=1)
+                                     compression=zipfile.ZIP_STORED)
         with zf_ctx as zf:
             zf.writestr("cops_master.csv",  _to_csv(_MASTER_COLS,                             master_rows))
             zf.writestr("cops_items.csv",   _to_csv(_ITEMS_COLS,                              items_rows))
