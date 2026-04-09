@@ -23,6 +23,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write   # required to create GitHub Releases and upload assets
+      actions: write    # required to delete stale artifacts
     strategy:
       fail-fast: false   # if one platform fails, others still complete
       matrix:
@@ -46,6 +47,25 @@ jobs:
             rust_targets: "aarch64-apple-darwin"
 
     steps:
+      - name: Delete stale artifacts to free storage
+        uses: actions/github-script@v7
+        continue-on-error: true
+        with:
+          script: |
+            const { data } = await github.rest.actions.listArtifactsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100,
+            });
+            await Promise.all(data.artifacts.map(a =>
+              github.rest.actions.deleteArtifact({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                artifact_id: a.id,
+              }).catch(() => {})
+            ));
+            core.info(`Cleaned up ${data.artifacts.length} artifact(s).`);
+
       - name: Checkout code
         uses: actions/checkout@v4
 
