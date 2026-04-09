@@ -578,6 +578,7 @@ def export_csv(
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
             "Content-Length": str(content_length),
+            "Content-Encoding": "identity",
         },
     )
 
@@ -650,6 +651,7 @@ def export_db(
         tmp_path,
         media_type="application/octet-stream",
         filename=f"cops_fulldb_{today}{suffix}.db",
+        headers={"Content-Encoding": "identity"},
         background=BackgroundTask(_cleanup_temp, tmp_path),
     )
 

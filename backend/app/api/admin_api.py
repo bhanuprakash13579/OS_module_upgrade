@@ -658,6 +658,7 @@ def admin_export_full(db: Session = Depends(get_db), _=Depends(require_admin)):
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
             "Content-Length": str(content_length),
+            "Content-Encoding": "identity",
         },
     )
 
@@ -1891,6 +1892,7 @@ def admin_export_fulldb(_=Depends(require_admin)):
         tmp_path,
         media_type="application/octet-stream",
         filename=filename,
+        headers={"Content-Encoding": "identity"},
         background=BackgroundTask(_safe_unlink, tmp_path),
     )
 
