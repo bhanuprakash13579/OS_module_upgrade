@@ -179,6 +179,19 @@ def apply_sqlite_migrations():
                 if col_name not in items_cols:
                     conn.execute(text(col_ddl))
 
+            # ── Performance indexes (v3 optimisation pass) ────────────────────
+            # CREATE INDEX IF NOT EXISTS is idempotent — safe to run every startup.
+            # Applied here so upgraded installs get them without a backup restore.
+            for idx_ddl in [
+                "CREATE INDEX IF NOT EXISTS ix_cops_master_os_year           ON cops_master (os_year)",
+                "CREATE INDEX IF NOT EXISTS ix_cops_master_adj_offr_name     ON cops_master (adj_offr_name)",
+                "CREATE INDEX IF NOT EXISTS ix_cops_master_online_adjn       ON cops_master (online_adjn)",
+                "CREATE INDEX IF NOT EXISTS ix_cops_master_adjudication_time ON cops_master (adjudication_time)",
+                "CREATE INDEX IF NOT EXISTS ix_cops_master_closure_ind       ON cops_master (closure_ind)",
+                "CREATE INDEX IF NOT EXISTS ix_cops_master_pending_composite ON cops_master (entry_deleted, is_draft, adjudication_date, adj_offr_name)",
+            ]:
+                conn.execute(text(idx_ddl))
+
             conn.commit()
         except Exception as e:
             conn.rollback()

@@ -683,15 +683,28 @@ def search_os_cases(
     offset = (page - 1) * limit
     results = q.offset(offset).limit(limit).all()
 
-    # Bulk-load items for all results in ONE query (eliminates N+1)
+    # Bulk-load items for all results (eliminates N+1).
+    # Use the same _attach_items-style JOIN on master IDs to avoid the SQLite
+    # expression-tree depth limit that hits with a raw OR chain > ~500 pairs.
+    _ITEM_CHUNK = 900
     items_map: dict = defaultdict(list)
     if results:
-        keys = list({(r.os_no, r.os_year) for r in results})
-        pair_filter = or_(*[and_(CopsItems.os_no == no, CopsItems.os_year == yr) for no, yr in keys])
-        all_items = db.query(CopsItems).filter(
-            pair_filter,
-            or_(CopsItems.entry_deleted.is_(None), CopsItems.entry_deleted != "Y")
-        ).order_by(CopsItems.os_no, CopsItems.os_year, CopsItems.items_sno).all()
+        master_ids = list({r.id for r in results})
+        all_items = []
+        for i in range(0, len(master_ids), _ITEM_CHUNK):
+            chunk = master_ids[i:i + _ITEM_CHUNK]
+            rows = (
+                db.query(CopsItems)
+                .join(CopsMaster, and_(CopsItems.os_no == CopsMaster.os_no,
+                                       CopsItems.os_year == CopsMaster.os_year))
+                .filter(
+                    CopsMaster.id.in_(chunk),
+                    or_(CopsItems.entry_deleted.is_(None), CopsItems.entry_deleted != "Y")
+                )
+                .order_by(CopsItems.os_no, CopsItems.os_year, CopsItems.items_sno)
+                .all()
+            )
+            all_items.extend(rows)
         for item in all_items:
             items_map[(item.os_no, item.os_year)].append(item)
 
@@ -835,20 +848,26 @@ def get_monthly_report(
     if not cases:
         return []
 
-    # Bulk-load items (N+1 prevention)
-    keys = [(c.os_no, c.os_year) for c in cases]
-    pair_filter = or_(*[
-        and_(CopsItems.os_no == no, CopsItems.os_year == yr) for no, yr in keys
-    ])
-    all_items = (
-        db.query(CopsItems)
-        .filter(
-            pair_filter,
-            or_(CopsItems.entry_deleted.is_(None), CopsItems.entry_deleted != "Y"),
+    # Bulk-load items (N+1 prevention).
+    # Use JOIN on master IDs (chunked) — avoids SQLite OR-chain depth limit
+    # which can be hit when a month has 900+ cases.
+    _CHUNK = 900
+    master_ids = [c.id for c in cases]
+    all_items = []
+    for i in range(0, len(master_ids), _CHUNK):
+        chunk = master_ids[i:i + _CHUNK]
+        rows_chunk = (
+            db.query(CopsItems)
+            .join(CopsMaster, and_(CopsItems.os_no == CopsMaster.os_no,
+                                   CopsItems.os_year == CopsMaster.os_year))
+            .filter(
+                CopsMaster.id.in_(chunk),
+                or_(CopsItems.entry_deleted.is_(None), CopsItems.entry_deleted != "Y"),
+            )
+            .order_by(CopsItems.os_no, CopsItems.os_year, CopsItems.items_sno)
+            .all()
         )
-        .order_by(CopsItems.os_no, CopsItems.os_year, CopsItems.items_sno)
-        .all()
-    )
+        all_items.extend(rows_chunk)
     items_map: dict = defaultdict(list)
     for item in all_items:
         items_map[(item.os_no, item.os_year)].append(item)

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, case
 from datetime import date
 
 from app.database import get_db
@@ -28,18 +28,23 @@ def get_dashboard_stats(db: Session = Depends(get_db), _: User = Depends(get_cur
     br_count   = br_stats.count
     br_revenue = float(br_stats.revenue)
 
-    # 2. OS stats today — two count queries (total + pending)
-    os_count = db.query(func.count(CopsMaster.id)).filter(
-        CopsMaster.os_date == today, CopsMaster.entry_deleted != 'Y'
-    ).scalar() or 0
-
-    os_pending = db.query(func.count(CopsMaster.id)).filter(
+    # 2. OS stats today — single query with conditional aggregation (was two queries)
+    os_stats = db.query(
+        func.count(CopsMaster.id).label("total"),
+        func.sum(case(
+            (
+                CopsMaster.adjudication_date.is_(None) &
+                CopsMaster.adj_offr_name.is_(None),
+                1
+            ),
+            else_=0
+        )).label("pending"),
+    ).filter(
         CopsMaster.os_date == today,
         CopsMaster.entry_deleted != 'Y',
-        CopsMaster.adjudication_date.is_(None),
-        # Must also check adj_offr_name — see _pending_filters() in offence.py
-        CopsMaster.adj_offr_name.is_(None),
-    ).scalar() or 0
+    ).one()
+    os_count   = os_stats.total   or 0
+    os_pending = int(os_stats.pending or 0)
 
     # 3. DR active today — one count query
     dr_active = db.query(func.count(DrMaster.id)).filter(

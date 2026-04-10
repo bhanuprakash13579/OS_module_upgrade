@@ -145,6 +145,20 @@ class CopsMaster(Base):
         Index('ix_cops_master_adjudication_date', 'adjudication_date'),
         # Quashed/rejected filter used in quashed endpoint and pending filter
         Index('ix_cops_master_quashed_rejected', 'quashed', 'rejected'),
+        # os_year: used in every list/filter/order-by query — was missing
+        Index('ix_cops_master_os_year', 'os_year'),
+        # adj_offr_name IS NULL is the IS NULL check in _pending_filters()
+        Index('ix_cops_master_adj_offr_name', 'adj_offr_name'),
+        # online_adjn: filtered in offline-pending queries
+        Index('ix_cops_master_online_adjn', 'online_adjn'),
+        # adjudication_time: used in _within_edit_window() 24-hour window check
+        Index('ix_cops_master_adjudication_time', 'adjudication_time'),
+        # closure_ind: used in dashboard DR query and OS closure checks
+        Index('ix_cops_master_closure_ind', 'closure_ind'),
+        # Composite covering the full _pending_filters() query in one seek:
+        # entry_deleted='N', is_draft='N', adjudication_date IS NULL, adj_offr_name IS NULL
+        Index('ix_cops_master_pending_composite',
+              'entry_deleted', 'is_draft', 'adjudication_date', 'adj_offr_name'),
     )
 
 

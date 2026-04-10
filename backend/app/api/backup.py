@@ -55,11 +55,18 @@ def _iter_bytesio(buf: io.BytesIO, chunk_size: int = 1024 * 1024):
 # ── Shared bulk-import optimiser ─────────────────────────────────────────────
 
 _COPS_INDEXES = [
-    "CREATE INDEX IF NOT EXISTS ix_cops_master_os_no_year       ON cops_master (os_no, os_year)",
-    "CREATE INDEX IF NOT EXISTS ix_cops_master_draft_deleted     ON cops_master (entry_deleted, is_draft)",
-    "CREATE INDEX IF NOT EXISTS ix_cops_master_adjudication_date ON cops_master (adjudication_date)",
-    "CREATE INDEX IF NOT EXISTS ix_cops_master_quashed_rejected  ON cops_master (quashed, rejected)",
-    "CREATE INDEX IF NOT EXISTS ix_cops_items_os_no_year         ON cops_items  (os_no, os_year)",
+    "CREATE INDEX IF NOT EXISTS ix_cops_master_os_no_year          ON cops_master (os_no, os_year)",
+    "CREATE INDEX IF NOT EXISTS ix_cops_master_draft_deleted        ON cops_master (entry_deleted, is_draft)",
+    "CREATE INDEX IF NOT EXISTS ix_cops_master_adjudication_date    ON cops_master (adjudication_date)",
+    "CREATE INDEX IF NOT EXISTS ix_cops_master_quashed_rejected     ON cops_master (quashed, rejected)",
+    # New performance indexes added in v3 optimisation pass
+    "CREATE INDEX IF NOT EXISTS ix_cops_master_os_year             ON cops_master (os_year)",
+    "CREATE INDEX IF NOT EXISTS ix_cops_master_adj_offr_name       ON cops_master (adj_offr_name)",
+    "CREATE INDEX IF NOT EXISTS ix_cops_master_online_adjn         ON cops_master (online_adjn)",
+    "CREATE INDEX IF NOT EXISTS ix_cops_master_adjudication_time   ON cops_master (adjudication_time)",
+    "CREATE INDEX IF NOT EXISTS ix_cops_master_closure_ind         ON cops_master (closure_ind)",
+    "CREATE INDEX IF NOT EXISTS ix_cops_master_pending_composite   ON cops_master (entry_deleted, is_draft, adjudication_date, adj_offr_name)",
+    "CREATE INDEX IF NOT EXISTS ix_cops_items_os_no_year           ON cops_items  (os_no, os_year)",
 ]
 
 
@@ -725,24 +732,19 @@ def custom_report(
     all_cols = body.master_cols + body.item_cols
     rows = []
 
-    # Bulk-load all items for the filtered masters in a single query (avoids N+1)
+    # Bulk-load all items for the filtered masters in a single query (avoids N+1).
+    # Use JOIN on master IDs (chunked at 900) — safer than a raw OR chain.
     items_map = defaultdict(list)
     if include_items and masters:
         _CHUNK = 900
-        os_keys_list = [(m.os_no, m.os_year, m.location_code or "") for m in masters]
-        for i in range(0, len(os_keys_list), _CHUNK):
-            chunk = os_keys_list[i:i + _CHUNK]
-            pair_filter = or_(*[
-                and_(
-                    CopsItems.os_no == no,
-                    CopsItems.os_year == yr,
-                    CopsItems.location_code == lc,
-                )
-                for no, yr, lc in chunk
-            ])
+        master_ids = [m.id for m in masters]
+        for i in range(0, len(master_ids), _CHUNK):
+            chunk = master_ids[i:i + _CHUNK]
             for it in (
                 db.query(CopsItems)
-                .filter(pair_filter)
+                .join(CopsMaster, and_(CopsItems.os_no == CopsMaster.os_no,
+                                       CopsItems.os_year == CopsMaster.os_year))
+                .filter(CopsMaster.id.in_(chunk))
                 .order_by(CopsItems.os_no, CopsItems.os_year, CopsItems.items_sno)
                 .all()
             ):

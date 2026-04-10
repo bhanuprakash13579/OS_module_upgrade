@@ -1,6 +1,12 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle, Search, Filter, RefreshCw, X, AlertCircle } from 'lucide-react';
+import { CheckCircle, Search, Filter, RefreshCw, X, AlertCircle, Clock } from 'lucide-react';
+
+/** Returns true if the 24-hour post-adjudication modification window is still open. */
+const isWithin24hWindow = (adjudicationTime: string | null | undefined): boolean => {
+  if (!adjudicationTime) return false;
+  return new Date().getTime() - new Date(adjudicationTime).getTime() < 86400000;
+};
 import api from '@/lib/api';
 
 const PER_PAGE = 20;
@@ -151,6 +157,7 @@ export default function AdjudicatedList() {
                 </td></tr>
               ) : cases.map((c, idx) => {
                 const totalDemand = c.total_payable || ((c.total_duty_amount || 0) + (c.rf_amount || 0) + (c.pp_amount || 0) + (c.ref_amount || 0) + (c.br_amount || 0));
+                const modifiable = isWithin24hWindow(c.adjudication_time);
                 return (
                   <tr key={`${c.os_no}-${c.os_year}-${idx}`} onClick={() => navigate(`/adjudication/case/${c.os_no}/${c.os_year}`)}
                     className="hover:bg-green-50 cursor-pointer group">
@@ -160,6 +167,11 @@ export default function AdjudicatedList() {
                       {c.is_offline_adjudication === 'Y' && (
                         <span className="inline-flex items-center mt-0.5 px-1.5 py-0.5 text-[10px] font-semibold rounded bg-purple-100 text-purple-700 border border-purple-200">
                           OFFLINE ADJ
+                        </span>
+                      )}
+                      {modifiable && (
+                        <span className="inline-flex items-center gap-0.5 mt-0.5 px-1.5 py-0.5 text-[10px] font-bold rounded bg-amber-100 text-amber-700 border border-amber-300" title="Within 24-hour modification window — click to edit or delete">
+                          <Clock size={9} /> Modifiable
                         </span>
                       )}
                     </td>

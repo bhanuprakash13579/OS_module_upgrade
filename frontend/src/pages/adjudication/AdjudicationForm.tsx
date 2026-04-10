@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, memo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Gavel, ArrowLeft, Save, XCircle, User, Package, FileText, AlertCircle, CheckCircle, Edit, Printer, Wand2 } from 'lucide-react';
+import { Gavel, ArrowLeft, Save, XCircle, User, Package, FileText, AlertCircle, CheckCircle, Edit, Printer, Wand2, Trash2, Clock } from 'lucide-react';
 import DatePicker from '@/components/DatePicker';
 import api from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -379,6 +379,7 @@ export default function AdjudicationForm() {
   
   const [closeCase, setCloseCase] = useState(false);
   const [confirmSave, setConfirmSave] = useState(false);
+  const [isReAdjudicating, setIsReAdjudicating] = useState(false);
 
   const REMARKS_MAX = 3000;
   const remarksLen  = remarks.length;
@@ -426,6 +427,11 @@ export default function AdjudicationForm() {
           setRfAmt(data.rf_amount || 0);
           setRefAmt(data.ref_amount || 0);
           setPpAmt(data.pp_amount || 0);
+          // Pre-fill adjudication date from the existing record so that
+          // re-adjudication defaults to the original date, not today.
+          if (data.adjudication_date) setAdjDate(data.adjudication_date);
+          // Pre-tick "Close Case" if the existing order was already closed.
+          if (data.closure_ind === 'Y') setCloseCase(true);
         }
         setLoading(false);
       })
@@ -476,7 +482,8 @@ export default function AdjudicationForm() {
     setError('');
     setSubmitting(true);
     try {
-      await api.post(`/os/${os_no}/${os_year}/adjudicate`, {
+      // POST now returns the full updated case — no follow-up GET needed
+      const { data: updatedCase } = await api.post(`/os/${os_no}/${os_year}/adjudicate`, {
         adj_offr_name: offrName,
         adj_offr_designation: offrDesig,
         adjudication_date: adjDate,
@@ -489,9 +496,14 @@ export default function AdjudicationForm() {
         re_export_value: reExportVal,
         close_case: closeCase,
       });
-      setSuccess('Case adjudicated successfully. You can now print the O.S. using the button above.');
-      const refreshed = await api.get(`/os/${os_no}/${os_year}`);
-      setOsCase(refreshed.data);
+      setOsCase(updatedCase);
+      setSuccess(
+        isReAdjudicating
+          ? 'Adjudication updated successfully. The new adjudication order is now active.'
+          : 'Case adjudicated successfully. You can now print the O.S. using the button above.'
+      );
+      setIsReAdjudicating(false);
+      setConfirmSave(false);
     } catch (err: any) {
       let detail = err.response?.data?.detail || 'Failed to save adjudication.';
       if (Array.isArray(detail)) detail = detail.map((e: any) => `${e.loc?.join('.')} - ${e.msg}`).join(', ');
@@ -558,16 +570,18 @@ export default function AdjudicationForm() {
     }
   };
 
-  const handleQuashOS = async () => {
-    const reason = window.prompt('WARNING: Enter the reason for QUASHING this adjudicated O.S.:');
-    if (!reason || !reason.trim()) return;
+  const handleDeleteOS = async () => {
+    if (!window.confirm(
+      `WARNING: This will PERMANENTLY DELETE O.S. No. ${os_no}/${os_year}.\n\nAll records will be removed as if this case never existed. This cannot be undone.\n\nProceed with deletion?`
+    )) return;
     setSubmitting(true);
+    setError('');
     try {
-      await api.post(`/os/${os_no}/${os_year}/quash`, { reason });
-      setSuccess('O.S. Case Quashed Successfully.');
-      setTimeout(() => navigate('/adjudication/quashed'), 500);
+      await api.post(`/os/${os_no}/${os_year}/quash`);
+      setSuccess('O.S. Case permanently deleted.');
+      setTimeout(() => navigate('/adjudication/adjudicated'), 800);
     } catch (err: any) {
-      let detail = err.response?.data?.detail || 'Failed to quash case.';
+      let detail = err.response?.data?.detail || 'Failed to delete case.';
       if (Array.isArray(detail)) detail = detail.map((e: any) => `${e.loc?.join('.')} - ${e.msg}`).join(', ');
       else if (typeof detail === 'object') detail = JSON.stringify(detail);
       setError(detail);
@@ -598,8 +612,9 @@ export default function AdjudicationForm() {
   // IMPORTANT: Must match backend _pending_filters() in offence.py.
   // A case is adjudicated if EITHER field is set — locks the form to VIEW ONLY.
   const isAlreadyAdjudicated = !!(osCase.adjudication_date || osCase.adj_offr_name);
-  const canQuash = osCase.adjudication_time
-    ? (new Date().getTime() - new Date(osCase.adjudication_time).getTime() < 3600000)
+  // 24-hour modification window: starts from adjudication_time, lasts exactly 24 hours
+  const canModify = osCase.adjudication_time
+    ? (new Date().getTime() - new Date(osCase.adjudication_time).getTime() < 86400000)
     : true;
 
   return (
@@ -619,7 +634,8 @@ export default function AdjudicationForm() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {!isAlreadyAdjudicated && (
+          {/* Edit SDO details: available before adjudication OR within the 24h window (not in re-adjudication mode) */}
+          {(!isAlreadyAdjudicated || (isAlreadyAdjudicated && canModify && !isReAdjudicating)) && (
             <button
               onClick={() => navigate(`/adjudication/edit-sdo/${osCase.os_no}/${osCase.os_year}`)}
               className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white text-xs px-3 py-1.5 rounded-lg transition-colors border border-white/20"
@@ -633,17 +649,33 @@ export default function AdjudicationForm() {
               <span className="bg-green-500/20 border border-green-400/40 text-green-100 text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5">
                 <CheckCircle size={13} /> Adjudicated
               </span>
-              <div 
-                title={!canQuash ? 'Quash adjudication option is available only for 1 hour from the time of adjudication.' : 'Permanently revoke adjudication'}
-              >
-                <button
-                  onClick={handleQuashOS}
-                  disabled={submitting || !canQuash}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors font-bold shadow-md ${!canQuash ? 'bg-slate-300 text-slate-500 border border-slate-300 cursor-not-allowed shadow-none' : 'bg-red-700 hover:bg-red-600 border border-red-500 text-white'}`}
-                >
-                  <AlertCircle size={12} /> Quash OS
-                </button>
-              </div>
+              {canModify && !isReAdjudicating && (
+                <>
+                  <button
+                    onClick={() => { setIsReAdjudicating(true); setConfirmSave(false); setError(''); }}
+                    className="flex items-center gap-1.5 bg-amber-500/20 hover:bg-amber-500/40 text-amber-100 text-xs px-3 py-1.5 rounded-lg transition-colors border border-amber-400/40 font-bold"
+                    title="Modify adjudication order (within 24-hour window)"
+                  >
+                    <Edit size={12} /> Edit Adjudication
+                  </button>
+                  <button
+                    onClick={handleDeleteOS}
+                    disabled={submitting}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-colors font-bold bg-red-700 hover:bg-red-600 border border-red-500 text-white disabled:opacity-50"
+                    title="Permanently delete this O.S. case (within 24-hour window)"
+                  >
+                    <Trash2 size={12} /> Delete OS
+                  </button>
+                </>
+              )}
+              {isReAdjudicating && (
+                <span className="bg-amber-400/20 border border-amber-300/40 text-amber-100 text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                  <Clock size={12} /> Re-Adjudication Mode
+                </span>
+              )}
+              {!canModify && (
+                <span className="text-white/40 text-xs font-medium">24h window closed</span>
+              )}
             </div>
           )}
         </div>
@@ -662,9 +694,9 @@ export default function AdjudicationForm() {
             <CheckCircle size={18} className="shrink-0 mt-0.5" />
             <div className="text-sm font-medium">
               <p>{success}</p>
-              {success.includes('Case adjudicated successfully') && (
+              {success.includes('adjudicated successfully') && (
                 <p className="mt-1 text-xs text-green-800 font-bold">
-                  Note: You have exactly 1 hour from the time of adjudication to Quash this order if needed.
+                  Note: You have 24 hours from adjudication to edit the case details, modify the adjudication order, or delete it entirely.
                 </p>
               )}
             </div>
@@ -687,14 +719,19 @@ export default function AdjudicationForm() {
         <div className="bg-amber-700 px-5 py-3.5 flex items-center gap-2">
           <Gavel size={16} className="text-amber-200" />
           <h2 className="font-bold text-white text-sm uppercase tracking-wider">Adjudication Order Details</h2>
-          {isAlreadyAdjudicated && (
+          {isAlreadyAdjudicated && !isReAdjudicating && (
             <span className="ml-auto text-xs bg-red-500/20 text-red-200 border border-red-400/30 px-2 py-0.5 rounded-full font-bold">
               VIEW ONLY — Previously Adjudicated
             </span>
           )}
+          {isReAdjudicating && (
+            <span className="ml-auto text-xs bg-amber-400/20 text-amber-200 border border-amber-300/30 px-2 py-0.5 rounded-full font-bold">
+              EDITING — Re-Adjudication (24h window)
+            </span>
+          )}
         </div>
 
-        <fieldset disabled={isAlreadyAdjudicated} className="p-6 space-y-6">
+        <fieldset disabled={isAlreadyAdjudicated && !isReAdjudicating} className="p-6 space-y-6">
           {/* Officer + Date */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
@@ -870,8 +907,8 @@ export default function AdjudicationForm() {
             </div>
           </div>
 
-          {/* Close Case */}
-          {!isAlreadyAdjudicated && (
+          {/* Close Case — shown when creating new adjudication or in re-adjudication mode */}
+          {(!isAlreadyAdjudicated || isReAdjudicating) && (
             <div className="flex items-center gap-3 border-t border-amber-100 pt-4">
               <input type="checkbox" id="chk-close-case"
                 className="w-4 h-4 accent-amber-600 rounded"
@@ -883,7 +920,7 @@ export default function AdjudicationForm() {
             </div>
           )}
 
-          {!isAlreadyAdjudicated && (
+          {(!isAlreadyAdjudicated || isReAdjudicating) && (
             <div className="border-t border-amber-100 pt-4">
               <label className="flex items-center gap-2.5 cursor-pointer select-none">
                 <input
@@ -894,7 +931,9 @@ export default function AdjudicationForm() {
                   onChange={e => setConfirmSave(e.target.checked)}
                 />
                 <span className="text-sm font-medium text-slate-700">
-                  I confirm the above details are correct and wish to save the adjudication order.
+                  {isReAdjudicating
+                    ? 'I confirm the above modifications are correct and wish to save the updated adjudication order.'
+                    : 'I confirm the above details are correct and wish to save the adjudication order.'}
                 </span>
               </label>
             </div>
@@ -904,6 +943,7 @@ export default function AdjudicationForm() {
         <div className="p-6 pt-0">
           {/* Action Buttons */}
           <div className="flex items-center gap-3 border-t border-amber-100 pt-4">
+            {/* First-time adjudication */}
             {!isAlreadyAdjudicated && (
               <>
                 <button
@@ -924,8 +964,29 @@ export default function AdjudicationForm() {
                 </button>
               </>
             )}
-            {/* Print button — only visible after adjudication is complete */}
-            {isAlreadyAdjudicated && (
+            {/* Re-adjudication mode (within 24h window) */}
+            {isAlreadyAdjudicated && isReAdjudicating && (
+              <>
+                <button
+                  id="btn-save-readjn"
+                  onClick={handleSave}
+                  disabled={submitting || remarksLen > REMARKS_MAX || !confirmSave}
+                  className="flex items-center gap-2 bg-amber-700 hover:bg-amber-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Save size={17} />
+                  {submitting ? 'Saving...' : 'Save Updated Adjudication'}
+                </button>
+                <button
+                  onClick={() => { setIsReAdjudicating(false); setConfirmSave(false); setError(''); }}
+                  disabled={submitting}
+                  className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-50"
+                >
+                  <XCircle size={17} /> Cancel Edit
+                </button>
+              </>
+            )}
+            {/* View mode after adjudication — print only */}
+            {isAlreadyAdjudicated && !isReAdjudicating && (
               <button
                 onClick={handlePrint}
                 disabled={submitting}

@@ -749,7 +749,9 @@ def admin_restore_backup(
                 return "float"
             if isinstance(t, sqlalchemy.Integer):
                 return "int"
-            if isinstance(t, (sqlalchemy.Date, sqlalchemy.DateTime)):
+            if isinstance(t, sqlalchemy.DateTime):
+                return "datetime"
+            if isinstance(t, sqlalchemy.Date):
                 return "date"
         except Exception:
             pass
@@ -769,6 +771,13 @@ def admin_restore_backup(
                 return int(float(v))
             except ValueError:
                 return None
+        if kind == "datetime":
+            for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+                try:
+                    return datetime.strptime(v, fmt)
+                except ValueError:
+                    continue
+            return None
         if kind == "date":
             for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
                 try:

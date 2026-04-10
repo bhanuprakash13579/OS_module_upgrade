@@ -51,6 +51,15 @@ pub fn run() {
       std::fs::create_dir_all(&app_data_dir)
         .expect("could not create app data dir");
 
+      // Create a persistent PyInstaller extraction cache directory.
+      // By pointing TEMP/TMP/TMPDIR here we give PyInstaller's bootloader a
+      // stable, absolute, writable path.  After the first launch the _MEI<hash>
+      // folder already exists at this path and PyInstaller skips extraction
+      // entirely — making every subsequent launch significantly faster.
+      let runtime_cache = app_data_dir.join("runtime_cache");
+      std::fs::create_dir_all(&runtime_cache).ok();
+      let runtime_cache_str = runtime_cache.to_string_lossy().into_owned();
+
       let db_path = app_data_dir.join("cops_br_database.db");
 
       // On first install: copy the bundled seed DB into app-data dir
@@ -77,6 +86,7 @@ pub fn run() {
 
       let app_handle = app.handle().clone();
       let db_path_owned = db_path_str;
+      let runtime_cache_owned = runtime_cache_str;
 
       // Sidecar supervisor loop — spawns the Python server and auto-restarts it
       // if it crashes unexpectedly. Stops cleanly when the app window is closed.
@@ -101,7 +111,14 @@ pub fn run() {
           let sidecar_cmd = match app_handle
             .shell()
             .sidecar("python-server")
-            .map(|c| c.env("COPS_DB_PATH", &db_path_owned))
+            .map(|c| c
+              .env("COPS_DB_PATH", &db_path_owned)
+              // Point PyInstaller's bootloader to our persistent cache dir.
+              // Same binary → same _MEI<hash> → no re-extraction after first run.
+              .env("TEMP",   &runtime_cache_owned)   // Windows primary
+              .env("TMP",    &runtime_cache_owned)   // Windows fallback
+              .env("TMPDIR", &runtime_cache_owned)   // Linux / macOS
+            )
           {
             Ok(c) => c,
             Err(e) => {

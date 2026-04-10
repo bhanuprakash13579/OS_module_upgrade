@@ -51,6 +51,18 @@ def _pending_filters():
     ]
 
 
+# ── 24-Hour Modification Window ───────────────────────────────────────────────
+def _within_edit_window(os_obj) -> bool:
+    """
+    Returns True if the 24-hour post-adjudication modification window is open.
+    The window starts from adjudication_time and lasts exactly 24 hours.
+    If adjudication_time is not set the case is not yet adjudicated (always editable by SDO).
+    """
+    if not os_obj.adjudication_time:
+        return True
+    return datetime.now() - os_obj.adjudication_time <= timedelta(hours=24)
+
+
 # ── Free-allowance helper ─────────────────────────────────────────────────────
 def _eff_fa(item_value: float, item) -> float:
     """
@@ -689,6 +701,39 @@ def get_offline_pending_count(
     return {"count": count or 0}
 
 
+# ── Adjudication: Combined sidebar counts (one round-trip instead of two) ────
+@router.get("/sidebar-counts")
+def get_sidebar_counts(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_adjn_user)
+):
+    """
+    Returns both pending and offline-pending counts in a single DB transaction.
+    Replaces the two separate /pending/count and /offline-pending/count calls
+    made by AdjudicationLayout on every mount.
+    """
+    pending_items_subq = exists().where(
+        and_(
+            CopsItems.os_no == CopsMaster.os_no,
+            CopsItems.os_year == CopsMaster.os_year,
+            CopsItems.items_release_category.in_(['Under OS', 'Under Duty'])
+        )
+    )
+    pending_count = db.query(func.count(CopsMaster.id)).filter(
+        CopsMaster.entry_deleted == "N",
+        *_pending_filters(),
+        pending_items_subq,
+    ).scalar() or 0
+
+    offline_count = db.query(func.count(CopsMaster.id)).filter(
+        CopsMaster.entry_deleted == "N",
+        CopsMaster.is_offline_adjudication == 'Y',
+        CopsMaster.adj_offr_name.is_(None),
+    ).scalar() or 0
+
+    return {"pending": pending_count, "offline_pending": offline_count}
+
+
 # ── Adjudication: Pending Offline Adjudication List ──────────────────────────
 @router.get("/offline-pending", response_model=List[schemas.CopsMasterOut])
 def get_offline_pending(
@@ -784,7 +829,13 @@ def update_os(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_sdo_user)   # SDO module only
 ):
-    """SDO Module: Modify an existing O/S case (only if not yet adjudicated)."""
+    """SDO Module: Modify an existing O/S case.
+
+    - Before adjudication: always allowed (unless print lock is active).
+    - After adjudication, within 24 hours of adjudication_time: allowed.
+      Resets all adjudication fields so the case goes back to pending.
+    - After adjudication, beyond 24 hours: blocked.
+    """
     os_obj = db.query(CopsMaster).filter(
         CopsMaster.os_no == os_no,
         CopsMaster.os_year == os_year,
@@ -794,16 +845,34 @@ def update_os(
     if not os_obj:
         raise HTTPException(status_code=404, detail="O.S. record not found.")
 
-    if os_obj.os_printed == 'Y':
+    if os_obj.adjudication_date:
+        # Case is adjudicated — only allowed within the 24-hour window
+        if not _within_edit_window(os_obj):
+            raise HTTPException(
+                status_code=400,
+                detail="Modification window has expired. O/S cases can only be modified within 24 hours of adjudication."
+            )
+        # Reset all adjudication fields — case returns to pending for re-adjudication
+        os_obj.online_adjn = "N"
+        os_obj.adjudication_date = None
+        os_obj.adjudication_time = None
+        os_obj.adj_offr_name = None
+        os_obj.adj_offr_designation = None
+        os_obj.adjn_offr_remarks = None
+        os_obj.os_printed = 'N'
+        os_obj.confiscated_value = 0.0
+        os_obj.redeemed_value = 0.0
+        os_obj.re_export_value = 0.0
+        os_obj.rf_amount = 0.0
+        os_obj.pp_amount = 0.0
+        os_obj.ref_amount = 0.0
+        os_obj.total_payable = 0.0
+        os_obj.closure_ind = None
+    elif os_obj.os_printed == 'Y':
+        # Not adjudicated but already printed — block modification
         raise HTTPException(
             status_code=400,
             detail="Print Out Has Already Been Taken for The Entered O.S.No. Cannot Modify its details !"
-        )
-
-    if os_obj.adjudication_date:
-        raise HTTPException(
-            status_code=400,
-            detail="Modification Not Allowed: This O/S No. has already been adjudicated. Contact System Administrator !"
         )
 
     # Update master fields (do not allow changing O.S. No / Year via payload)
@@ -1442,7 +1511,7 @@ def print_os_pdf(
 
 
 # ── Adjudication Module: Adjudicate O/S Case ─────────────────────────────────
-@router.post("/{os_no}/{os_year}/adjudicate")
+@router.post("/{os_no}/{os_year}/adjudicate", response_model=schemas.CopsMasterOut)
 def online_adjudicate(
     os_no: str,
     os_year: int,
@@ -1462,16 +1531,25 @@ def online_adjudicate(
         raise HTTPException(status_code=404, detail="O.S. record not found.")
 
     if os_obj.adjudication_date:
-        raise HTTPException(
-            status_code=400,
-            detail="This O/S case has already been adjudicated. Cancel adjudication first to re-adjudicate."
-        )
+        # Already adjudicated — only allow re-adjudication within the 24-hour window
+        if not _within_edit_window(os_obj):
+            raise HTTPException(
+                status_code=400,
+                detail="Re-adjudication not allowed. The 24-hour modification window has expired."
+            )
+        # Within window: allow re-adjudication (fall through to update fields below)
 
     rules.validate_remarks_length(payload.adjn_offr_remarks)
 
     # Update adjudication details
     os_obj.adjudication_date = payload.adjudication_date or date.today()
-    os_obj.adjudication_time = datetime.now()
+    # Stamp adjudication_time only on the FIRST adjudication.
+    # Re-adjudications (Edit Adjudication within 24h) must not reset the clock —
+    # the 24-hour window always runs from the original first adjudication time.
+    # Exception: if adjudication_time is None (e.g. after an SDO edit reset it to
+    # pending), it is a fresh adjudication event and gets a new timestamp.
+    if not os_obj.adjudication_time:
+        os_obj.adjudication_time = datetime.now()
     os_obj.adj_offr_name = payload.adj_offr_name
     os_obj.adj_offr_designation = current_user.user_desig or payload.adj_offr_designation
     os_obj.adjn_offr_remarks = payload.adjn_offr_remarks
@@ -1505,7 +1583,13 @@ def online_adjudicate(
     os_obj.closure_ind = "Y" if payload.close_case else None
 
     db.commit()
-    return {"message": "Adjudication Details Updated !", "os_no": os_no, "os_year": os_year}
+    db.refresh(os_obj)
+    # Attach items so the frontend can update its local state without a follow-up GET
+    os_obj.items = db.query(CopsItems).filter(
+        CopsItems.os_no == os_no,
+        CopsItems.os_year == os_year
+    ).all()
+    return os_obj
 
 
 # ── Adjudication Module: Cancel Adjudication ──────────────────────────────────
@@ -1597,8 +1681,9 @@ def delete_os(
         raise HTTPException(
             status_code=400,
             detail=(
-                "This O/S case has already been adjudicated and cannot be deleted. "
-                "Use the Quash workflow to remove an adjudicated case."
+                "This O/S case has already been adjudicated and cannot be deleted via this route. "
+                "To remove an adjudicated case, use the Delete option in the Adjudication module "
+                "within 24 hours of adjudication."
             ),
         )
 
@@ -1661,36 +1746,47 @@ def reject_os(
     db.commit()
     return {"message": "O/S case rejected."}
 
-# ── Adjudication: Quash Adjudicated O/S ──────────────────────────────────────
+# ── Adjudication: Delete Adjudicated O/S within 24-Hour Window ───────────────
 @router.post("/{os_no}/{os_year}/quash")
 def quash_os(
     os_no: str,
     os_year: int,
-    payload: schemas.OSActionReason,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_adjn_user)
 ):
+    """
+    Permanently delete an adjudicated O/S case within the 24-hour modification window.
+
+    Unlike a soft-delete or quash, this is a hard delete: all records are
+    removed from cops_master and cops_items as if the case never existed.
+    No reason or user attribution is captured — the 24-hour window is the
+    sole safeguard.
+
+    Window: 24 hours from adjudication_time.
+    """
     os_obj = db.query(CopsMaster).filter(
         CopsMaster.os_no == os_no,
         CopsMaster.os_year == os_year,
         CopsMaster.entry_deleted == "N",
         CopsMaster.is_draft == "N"
     ).first()
-    
+
     if not os_obj:
         raise HTTPException(status_code=404, detail="O.S. case not found.")
     if os_obj.adjudication_date is None:
-        raise HTTPException(status_code=400, detail="Cannot quash an un-adjudicated case.")
-        
-    if os_obj.adjudication_time and datetime.now() - os_obj.adjudication_time > timedelta(hours=1):
+        raise HTTPException(status_code=400, detail="Cannot delete an un-adjudicated case using this endpoint.")
+
+    if not _within_edit_window(os_obj):
         raise HTTPException(
-            status_code=400, 
-            detail="Quash period expired. Cases can only be quashed within 1 hour of adjudication."
+            status_code=400,
+            detail="Deletion window has expired. O/S cases can only be deleted within 24 hours of adjudication."
         )
-        
-    os_obj.quashed = "Y"
-    os_obj.quash_reason = payload.reason
-    os_obj.quashed_by = current_user.user_name
-    os_obj.quash_date = date.today()
+
+    # Hard delete: remove items first (FK constraint), then the master record
+    db.query(CopsItems).filter(
+        CopsItems.os_no == os_no,
+        CopsItems.os_year == os_year
+    ).delete(synchronize_session=False)
+    db.delete(os_obj)
     db.commit()
-    return {"message": "O/S case quashed."}
+    return {"message": "O/S case permanently deleted.", "os_no": os_no, "os_year": os_year}

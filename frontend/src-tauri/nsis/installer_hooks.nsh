@@ -31,4 +31,8 @@
   nsExec::ExecToStack `powershell.exe -NonInteractive -WindowStyle Hidden -Command "Remove-MpPreference -ExclusionPath '$INSTDIR' -ErrorAction SilentlyContinue"`
   Pop $0
   Pop $1
+  ; Remove the PyInstaller extraction cache created by the startup speed optimisation.
+  ; This is in AppData\Local\COPS\runtime_cache (separate from $INSTDIR).
+  DetailPrint "Removing COPS runtime cache..."
+  RMDir /r "$LOCALAPPDATA\COPS\runtime_cache"
 !macroend

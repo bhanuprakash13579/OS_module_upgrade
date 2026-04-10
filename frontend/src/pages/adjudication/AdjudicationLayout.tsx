@@ -23,12 +23,16 @@ export default function AdjudicationLayout() {
 
   useEffect(() => {
     if (!token) return;
-    api.get('/os/pending/count', { headers: { Authorization: `Bearer ${token}` } })
-      .then(res => setPendingCount(res.data.count))
-      .catch(() => setPendingCount(null));
-    api.get('/os/offline-pending/count', { headers: { Authorization: `Bearer ${token}` } })
-      .then(res => setOfflinePendingCount(res.data.count))
-      .catch(() => setOfflinePendingCount(null));
+    // Single combined request instead of two sequential HTTP calls
+    api.get('/os/sidebar-counts', { headers: { Authorization: `Bearer ${token}` } })
+      .then(res => {
+        setPendingCount(res.data.pending);
+        setOfflinePendingCount(res.data.offline_pending);
+      })
+      .catch(() => {
+        setPendingCount(null);
+        setOfflinePendingCount(null);
+      });
   }, [token]);
 
   const handleLogout = () => {

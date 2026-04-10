@@ -1,6 +1,12 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Filter, AlertCircle, RefreshCw, Trash2, X, FileText, CreditCard, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Search, Filter, AlertCircle, RefreshCw, Trash2, X, FileText, CreditCard, ChevronDown, ChevronUp, Clock, Edit } from 'lucide-react';
+
+/** Returns true if the 24-hour post-adjudication modification window is still open. */
+const isWithin24hWindow = (adjudicationTime: string | null | undefined): boolean => {
+  if (!adjudicationTime) return false;
+  return new Date().getTime() - new Date(adjudicationTime).getTime() < 86400000;
+};
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
 import DatePicker from '@/components/DatePicker';
@@ -23,6 +29,144 @@ function parseBrEntries(raw: string | null | undefined): BrEntry[] {
   try { return JSON.parse(raw); } catch { return []; }
 }
 
+// ── BR/DR inline edit panel — own local state so keystrokes don't re-render the list ──
+const BrDrPanel = memo(function BrDrPanel({
+  osNo, osYear, initialData, onClose, onSaved,
+}: {
+  osNo: string;
+  osYear: number;
+  initialData: BrDrData;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [data, setData] = useState<BrDrData>(initialData);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const addBrEntry = () => setData(d => ({ ...d, brEntries: [...d.brEntries, { no: '', date: '' }] }));
+  const removeBrEntry = (idx: number) => setData(d => ({ ...d, brEntries: d.brEntries.filter((_, i) => i !== idx) }));
+  const updateBrEntry = (idx: number, field: 'no' | 'date', val: string) =>
+    setData(d => ({ ...d, brEntries: d.brEntries.map((e, i) => i === idx ? { ...e, [field]: val } : e) }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      const payload = {
+        br_entries: data.brEntries
+          .filter(e => e.no.trim())
+          .map(e => ({ no: e.no.trim(), date: e.date?.trim() || null })),
+        dr_no: data.drNo.trim() || null,
+        dr_date: data.drDate?.trim() || null,
+      };
+      await api.patch(`/os/${osNo}/${osYear}/post-adj`, payload);
+      onSaved();
+    } catch (err: any) {
+      let errMsg = err.response?.data?.detail || err.message || 'Failed to save';
+      if (Array.isArray(errMsg)) errMsg = errMsg.map((e: any) => `${e.loc?.join('.')} - ${e.msg}`).join(', ');
+      else if (typeof errMsg === 'object') errMsg = JSON.stringify(errMsg);
+      setError(errMsg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="border border-amber-200 rounded-lg bg-white p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-bold text-amber-900 flex items-center gap-2">
+          <CreditCard size={15} />
+          Post-Adjudication Receipt Details — {osNo}/{osYear}
+        </h3>
+        <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600">
+          <X size={16} />
+        </button>
+      </div>
+
+      {/* Bank Receipt entries */}
+      <div>
+        <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2 block">
+          Bank Receipt(s) (BR)
+        </label>
+        <div className="space-y-2">
+          {data.brEntries.map((entry, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="BR No."
+                value={entry.no}
+                onChange={e => updateBrEntry(i, 'no', e.target.value)}
+                className="w-44 px-2.5 py-1.5 border border-slate-300 rounded-md text-sm bg-slate-50 focus:bg-white focus:ring-1 focus:ring-amber-400 focus:border-amber-400"
+              />
+              <div className="w-44">
+                <DatePicker
+                  value={entry.date}
+                  onChange={val => updateBrEntry(i, 'date', val)}
+                  placeholder="BR Date"
+                  inputClassName="w-full px-2.5 py-1.5 border border-slate-300 rounded-md text-sm bg-slate-50 focus:bg-white focus:ring-1 focus:ring-amber-400 focus:border-amber-400"
+                />
+              </div>
+              {data.brEntries.length > 1 && (
+                <button type="button" onClick={() => removeBrEntry(i)} className="text-red-400 hover:text-red-600 p-1">
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+        <button type="button" onClick={addBrEntry} className="mt-2 text-xs text-amber-700 hover:text-amber-900 font-medium flex items-center gap-1">
+          <Plus size={12} /> Add another BR
+        </button>
+      </div>
+
+      {/* DR entry */}
+      <div>
+        <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2 block">
+          Detention Receipt (DR)
+        </label>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            placeholder="DR No."
+            value={data.drNo}
+            onChange={e => setData(d => ({ ...d, drNo: e.target.value }))}
+            className="w-44 px-2.5 py-1.5 border border-slate-300 rounded-md text-sm bg-slate-50 focus:bg-white focus:ring-1 focus:ring-amber-400 focus:border-amber-400"
+          />
+          <div className="w-44">
+            <DatePicker
+              value={data.drDate}
+              onChange={val => setData(d => ({ ...d, drDate: val }))}
+              placeholder="DR Date"
+              inputClassName="w-full px-2.5 py-1.5 border border-slate-300 rounded-md text-sm bg-slate-50 focus:bg-white focus:ring-1 focus:ring-amber-400 focus:border-amber-400"
+            />
+          </div>
+        </div>
+      </div>
+
+      {error && <p className="text-xs text-red-600 font-medium">{error}</p>}
+
+      <div className="flex items-center gap-2 pt-1 border-t border-amber-100">
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="px-4 py-1.5 bg-amber-600 text-white text-xs font-bold rounded-md hover:bg-amber-700 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+        >
+          {saving ? <RefreshCw size={12} className="animate-spin" /> : null}
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-4 py-1.5 border border-slate-300 bg-white text-slate-600 text-xs font-medium rounded-md hover:bg-slate-50 transition-colors"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+});
+
 export default function OffenceList() {
   const navigate = useNavigate();
   const { token: _token } = useAuth();
@@ -38,11 +182,10 @@ export default function OffenceList() {
   const [filterStatus, setFilterStatus] = useState('');
   const [filterBrDrPending, setFilterBrDrPending] = useState(false);
 
-  // BR/DR inline edit state
+  // BR/DR inline edit state — only tracks which row is expanded + its initial data.
+  // Keystroke state lives inside BrDrPanel so typing doesn't re-render the whole list.
   const [expandedBrDr, setExpandedBrDr] = useState<string | null>(null);
-  const [brDrData, setBrDrData] = useState<BrDrData>({ brEntries: [{ no: '', date: '' }], drNo: '', drDate: '' });
-  const [brDrSaving, setBrDrSaving] = useState(false);
-  const [brDrError, setBrDrError] = useState('');
+  const [expandedBrDrData, setExpandedBrDrData] = useState<BrDrData>({ brEntries: [{ no: '', date: '' }], drNo: '', drDate: '' });
 
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(searchDebounce.current), []);
@@ -139,7 +282,8 @@ export default function OffenceList() {
     }
   };
 
-  // Open BR/DR edit panel for a row, pre-populating from existing data
+  // Open BR/DR edit panel for a row, pre-populating from existing data.
+  // Keystroke state now lives entirely inside BrDrPanel — no re-renders here.
   const openBrDr = (row: any) => {
     const key = `${row.os_no}-${row.os_year}`;
     if (expandedBrDr === key) {
@@ -147,45 +291,12 @@ export default function OffenceList() {
       return;
     }
     const stored = parseBrEntries(row.post_adj_br_entries);
-    setBrDrData({
+    setExpandedBrDrData({
       brEntries: stored.length ? stored : [{ no: '', date: '' }],
       drNo: row.post_adj_dr_no || '',
       drDate: row.post_adj_dr_date || '',
     });
-    setBrDrError('');
     setExpandedBrDr(key);
-  };
-
-  const addBrEntry = () => setBrDrData(d => ({ ...d, brEntries: [...d.brEntries, { no: '', date: '' }] }));
-  const removeBrEntry = (idx: number) => setBrDrData(d => ({ ...d, brEntries: d.brEntries.filter((_, i) => i !== idx) }));
-  const updateBrEntry = (idx: number, field: 'no' | 'date', val: string) =>
-    setBrDrData(d => ({ ...d, brEntries: d.brEntries.map((e, i) => i === idx ? { ...e, [field]: val } : e) }));
-
-  const saveBrDr = async (os_no: string, os_year: number) => {
-    setBrDrSaving(true);
-    setBrDrError('');
-    try {
-      const payload = {
-        br_entries: brDrData.brEntries
-          .filter(e => e.no.trim())
-          .map(e => ({ no: e.no.trim(), date: e.date?.trim() || null })),
-        dr_no: brDrData.drNo.trim() || null,
-        dr_date: brDrData.drDate?.trim() || null,
-      };
-      await api.patch(`/os/${os_no}/${os_year}/post-adj`, payload);
-      setExpandedBrDr(null);
-      fetchCases(currentPage, searchTerm);
-    } catch (err: any) {
-      let errMsg = err.response?.data?.detail || err.message || 'Failed to save';
-      if (Array.isArray(errMsg)) {
-        errMsg = errMsg.map((e: any) => `${e.loc?.join('.')} - ${e.msg}`).join(', ');
-      } else if (typeof errMsg === 'object') {
-        errMsg = JSON.stringify(errMsg);
-      }
-      setBrDrError(errMsg);
-    } finally {
-      setBrDrSaving(false);
-    }
   };
 
   const totalPages = Math.ceil(total / PER_PAGE) || 1;
@@ -359,6 +470,7 @@ export default function OffenceList() {
                   // IMPORTANT: Must match backend _pending_filters() in offence.py.
                   // A case is adjudicated if EITHER adjudication_date or adj_offr_name is set.
                   const isAdjudicated = !!(row.adjudication_date || row.adj_offr_name);
+                  const canEditAdjudicated = isAdjudicated && isWithin24hWindow(row.adjudication_time);
                   const totalValue = row.total_items_value || 0;
                   const rowKey = `${row.os_no}-${row.os_year}`;
                   const isExpanded = expandedBrDr === rowKey;
@@ -409,13 +521,24 @@ export default function OffenceList() {
                         <td className="px-5 py-3 align-middle text-center">
                           <div className="flex justify-center items-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
                             {isAdjudicated ? (
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1.5 flex-wrap justify-center">
                                 <button
                                   onClick={() => navigate(`/sdo/offence/${row.os_no}/${row.os_year}/view`)}
                                   className="px-3 py-1.5 text-xs font-bold text-white bg-slate-600 hover:bg-slate-700 rounded-md transition-colors"
                                 >
                                   View
                                 </button>
+                                {canEditAdjudicated && (
+                                  <button
+                                    onClick={e => { e.stopPropagation(); navigate(`/sdo/offence/${row.os_no}/${row.os_year}/edit`); }}
+                                    title="Modify SDO details (within 24-hour window — will re-open case for adjudication)"
+                                    className="px-2.5 py-1.5 text-xs font-bold rounded-md transition-colors flex items-center gap-1 text-amber-700 bg-amber-50 border border-amber-300 hover:bg-amber-100"
+                                  >
+                                    <Clock size={11} />
+                                    <Edit size={11} />
+                                    Edit
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => openBrDr(row)}
                                   title="Add / Edit BR & DR Receipt Details"
@@ -458,108 +581,17 @@ export default function OffenceList() {
                         </td>
                       </tr>
 
-                      {/* BR/DR inline edit sub-row */}
+                      {/* BR/DR inline edit sub-row — rendered by BrDrPanel (own state, no list re-renders) */}
                       {isExpanded && (
                         <tr key={`${rowKey}-brdr`} className="bg-amber-50/60">
                           <td colSpan={7} className="px-6 py-4">
-                            <div className="border border-amber-200 rounded-lg bg-white p-4 space-y-4">
-                              <div className="flex items-center justify-between">
-                                <h3 className="text-sm font-bold text-amber-900 flex items-center gap-2">
-                                  <CreditCard size={15} />
-                                  Post-Adjudication Receipt Details — {row.os_no}/{row.os_year}
-                                </h3>
-                                <button type="button" onClick={() => setExpandedBrDr(null)} className="text-slate-400 hover:text-slate-600">
-                                  <X size={16} />
-                                </button>
-                              </div>
-
-                              {/* Bank Receipt entries */}
-                              <div>
-                                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2 block">
-                                  Bank Receipt(s) (BR)
-                                </label>
-                                <div className="space-y-2">
-                                  {brDrData.brEntries.map((entry, i) => (
-                                    <div key={i} className="flex items-center gap-2">
-                                      <input
-                                        type="text"
-                                        placeholder="BR No."
-                                        value={entry.no}
-                                        onChange={e => updateBrEntry(i, 'no', e.target.value)}
-                                        className="w-44 px-2.5 py-1.5 border border-slate-300 rounded-md text-sm bg-slate-50 focus:bg-white focus:ring-1 focus:ring-amber-400 focus:border-amber-400"
-                                      />
-                                      <div className="w-44">
-                                        <DatePicker
-                                          value={entry.date}
-                                          onChange={val => updateBrEntry(i, 'date', val)}
-                                          placeholder="BR Date"
-                                          inputClassName="w-full px-2.5 py-1.5 border border-slate-300 rounded-md text-sm bg-slate-50 focus:bg-white focus:ring-1 focus:ring-amber-400 focus:border-amber-400"
-                                        />
-                                      </div>
-                                      {brDrData.brEntries.length > 1 && (
-                                        <button type="button" onClick={() => removeBrEntry(i)} className="text-red-400 hover:text-red-600 p-1">
-                                          <X size={14} />
-                                        </button>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={addBrEntry}
-                                  className="mt-2 text-xs text-amber-700 hover:text-amber-900 font-medium flex items-center gap-1"
-                                >
-                                  <Plus size={12} /> Add another BR
-                                </button>
-                              </div>
-
-                              {/* DR entry */}
-                              <div>
-                                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2 block">
-                                  Detention Receipt (DR)
-                                </label>
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="text"
-                                    placeholder="DR No."
-                                    value={brDrData.drNo}
-                                    onChange={e => setBrDrData(d => ({ ...d, drNo: e.target.value }))}
-                                    className="w-44 px-2.5 py-1.5 border border-slate-300 rounded-md text-sm bg-slate-50 focus:bg-white focus:ring-1 focus:ring-amber-400 focus:border-amber-400"
-                                  />
-                                  <div className="w-44">
-                                    <DatePicker
-                                      value={brDrData.drDate}
-                                      onChange={val => setBrDrData(d => ({ ...d, drDate: val }))}
-                                      placeholder="DR Date"
-                                      inputClassName="w-full px-2.5 py-1.5 border border-slate-300 rounded-md text-sm bg-slate-50 focus:bg-white focus:ring-1 focus:ring-amber-400 focus:border-amber-400"
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-
-                              {brDrError && (
-                                <p className="text-xs text-red-600 font-medium">{brDrError}</p>
-                              )}
-
-                              <div className="flex items-center gap-2 pt-1 border-t border-amber-100">
-                                <button
-                                  type="button"
-                                  onClick={() => saveBrDr(row.os_no, row.os_year)}
-                                  disabled={brDrSaving}
-                                  className="px-4 py-1.5 bg-amber-600 text-white text-xs font-bold rounded-md hover:bg-amber-700 disabled:opacity-50 transition-colors flex items-center gap-1.5"
-                                >
-                                  {brDrSaving ? <RefreshCw size={12} className="animate-spin" /> : null}
-                                  {brDrSaving ? 'Saving…' : 'Save'}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setExpandedBrDr(null)}
-                                  className="px-4 py-1.5 border border-slate-300 bg-white text-slate-600 text-xs font-medium rounded-md hover:bg-slate-50 transition-colors"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            </div>
+                            <BrDrPanel
+                              osNo={row.os_no}
+                              osYear={row.os_year}
+                              initialData={expandedBrDrData}
+                              onClose={() => setExpandedBrDr(null)}
+                              onSaved={() => { setExpandedBrDr(null); fetchCases(currentPage, searchTerm); }}
+                            />
                           </td>
                         </tr>
                       )}
