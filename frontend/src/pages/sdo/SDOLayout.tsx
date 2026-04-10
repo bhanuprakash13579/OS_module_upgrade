@@ -22,22 +22,23 @@ export default function SDOLayout() {
     <div className="flex min-h-screen w-full print:bg-white print:overflow-visible" style={{ background: '#f0f4f8' }}>
       {/* Sidebar */}
       <aside
-        className={`${isCollapsed ? 'w-16' : 'w-64'} flex flex-col shadow-xl transition-[width] duration-200 z-50 shrink-0 print:!hidden sticky top-0 h-screen overflow-y-auto`}
+        className={`${isCollapsed ? 'w-16' : 'w-64'} flex flex-col shadow-xl transition-[width] duration-300 ease-in-out z-50 shrink-0 print:!hidden sticky top-0 h-screen overflow-hidden`}
         style={{ background: 'linear-gradient(180deg, #1e3a5f 0%, #0f2340 100%)' }}
       >
         {/* Logo Area & Toggle */}
         <div className="p-3 border-b border-white/10 flex items-center justify-between min-h-[72px] shrink-0">
-            {!isCollapsed && (
-              <div className="flex items-center gap-3">
+            <div
+              className="flex items-center gap-3 transition-[opacity,transform] duration-300 ease-in-out"
+              style={{ opacity: isCollapsed ? 0 : 1, transform: isCollapsed ? 'translateX(-8px)' : 'translateX(0)', width: isCollapsed ? 0 : 'auto', overflow: 'hidden', pointerEvents: isCollapsed ? 'none' : 'auto' }}
+            >
                 <div className="bg-blue-500/20 border border-blue-400/30 p-2 rounded-lg shrink-0">
                   <ShieldAlert className="w-6 h-6 text-blue-300" />
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 whitespace-nowrap">
                   <h1 className="text-white font-bold text-base tracking-wide leading-tight">SDO MODULE</h1>
                   <p className="text-blue-300 text-xs">COPS</p>
                 </div>
-              </div>
-            )}
+            </div>
             
             <button
               type="button"
@@ -50,14 +51,12 @@ export default function SDOLayout() {
           </div>
 
         {/* Navigation */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain min-h-0">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain min-h-0" style={{ opacity: 1, transition: 'opacity 200ms ease' }}>
           <nav className="p-3 space-y-1 mt-2">
             
             {user?.user_status !== 'TEMP' && (
               <>
-                {!isCollapsed && (
-                  <p className="text-blue-400/70 text-xs uppercase tracking-widest font-semibold px-3 mb-3">Offence Cases</p>
-                )}
+                <p className="text-blue-400/70 text-xs uppercase tracking-widest font-semibold px-3 mb-3 whitespace-nowrap transition-opacity duration-300" style={{ opacity: isCollapsed ? 0 : 1, height: isCollapsed ? 0 : 'auto', overflow: 'hidden', margin: isCollapsed ? 0 : undefined }}>Offence Cases</p>
                 <NavItem to="/sdo/offence/new" icon={<Plus size={24}/>} label="Register New O/S Case" color="blue" id="nav-new-os" end={false} collapsed={isCollapsed} />
                 <NavItem to="/sdo/offline-adjudication" icon={<ClipboardList size={24}/>} label="Offline Adjudication" color="blue" id="nav-offline-adj" end={false} collapsed={isCollapsed} />
                 <NavItem to="/sdo/offence" icon={<FileText size={24}/>} label="View All O/S Cases" color="blue" id="nav-list-os" end collapsed={isCollapsed} />
@@ -66,9 +65,7 @@ export default function SDOLayout() {
 
             {user?.user_status !== 'TEMP' && (
               <>
-                {!isCollapsed && (
-                  <p className="text-blue-400/70 text-xs uppercase tracking-widest font-semibold px-3 mt-4 mb-3">Administration</p>
-                )}
+                <p className="text-blue-400/70 text-xs uppercase tracking-widest font-semibold px-3 mt-4 mb-3 whitespace-nowrap transition-opacity duration-300" style={{ opacity: isCollapsed ? 0 : 1, height: isCollapsed ? 0 : 'auto', overflow: 'hidden', margin: isCollapsed ? 0 : undefined }}>Administration</p>
                 <NavItem to="/sdo/users" icon={<Users size={24}/>} label="Manage Users" color="blue" id="nav-manage-users" end={false} collapsed={isCollapsed} />
               </>
             )}
@@ -76,9 +73,7 @@ export default function SDOLayout() {
           </nav>
 
           <div className="mt-6 px-3">
-            {!isCollapsed && (
-              <p className="text-blue-400/70 text-xs uppercase tracking-widest font-semibold px-3 mb-3">Account</p>
-            )}
+            <p className="text-blue-400/70 text-xs uppercase tracking-widest font-semibold px-3 mb-3 whitespace-nowrap transition-opacity duration-300" style={{ opacity: isCollapsed ? 0 : 1, height: isCollapsed ? 0 : 'auto', overflow: 'hidden', margin: isCollapsed ? 0 : undefined }}>Account</p>
             <NavItem to="/sdo/change-password" icon={<KeyRound size={24}/>} label="Change Password" color="blue" id="nav-change-pwd" end={false} collapsed={isCollapsed} />
           </div>
         </div>
@@ -86,16 +81,17 @@ export default function SDOLayout() {
         {/* Footer */}
         <div className={`border-t border-white/10 space-y-3 shrink-0 ${isCollapsed ? 'p-2' : 'p-4'}`}>
           {/* User Info */}
-          {!isCollapsed && (
-            <div className="bg-white/5 border border-white/10 rounded-lg p-3">
-              <div className="flex items-center gap-2 mb-1">
+          <div
+            className="bg-white/5 border border-white/10 rounded-lg transition-[opacity,max-height] duration-300 ease-in-out overflow-hidden"
+            style={{ opacity: isCollapsed ? 0 : 1, maxHeight: isCollapsed ? 0 : '120px', padding: isCollapsed ? 0 : '0.75rem', borderColor: isCollapsed ? 'transparent' : undefined }}
+          >
+              <div className="flex items-center gap-2 mb-1 whitespace-nowrap">
                 <User size={18} className="text-blue-300" />
                 <p className="text-blue-200 text-xs uppercase tracking-wider font-semibold">Active Officer</p>
               </div>
               <p className="text-white font-semibold text-sm truncate">{user?.user_name}</p>
-              <p className="text-blue-300 text-xs">{user?.user_desig || user?.user_role} · {currentDate}</p>
-            </div>
-          )}
+              <p className="text-blue-300 text-xs whitespace-nowrap">{user?.user_desig || user?.user_role} · {currentDate}</p>
+          </div>
 
 
           

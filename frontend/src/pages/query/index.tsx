@@ -52,19 +52,20 @@ export default function QueryModule() {
   return (
     <div className="flex min-h-screen w-full bg-slate-50 text-slate-800 print:h-auto print:min-h-0 print:overflow-visible print:block print-layout-root">
       {/* Sidebar - hidden when printing */}
-      <aside className={`${isCollapsed ? 'w-16' : 'w-64'} flex flex-col bg-slate-900 border-r border-slate-700 shadow-xl shadow-slate-900/20 transition-[width] duration-200 print:hidden shrink-0 z-50 sticky top-0 h-screen overflow-y-auto`}>
+      <aside className={`${isCollapsed ? 'w-16' : 'w-64'} flex flex-col bg-slate-900 border-r border-slate-700 shadow-xl shadow-slate-900/20 transition-[width] duration-300 ease-in-out print:hidden shrink-0 z-50 sticky top-0 h-screen overflow-hidden`}>
         <div className="p-3 border-b border-slate-700/50 flex items-center justify-between min-h-[72px] shrink-0">
-            {!isCollapsed && (
-              <div className="flex items-center gap-3">
+            <div
+              className="flex items-center gap-3 transition-[opacity,transform] duration-300 ease-in-out"
+              style={{ opacity: isCollapsed ? 0 : 1, transform: isCollapsed ? 'translateX(-8px)' : 'translateX(0)', width: isCollapsed ? 0 : 'auto', overflow: 'hidden', pointerEvents: isCollapsed ? 'none' : 'auto' }}
+            >
                 <div className="bg-gradient-to-br from-emerald-500 to-emerald-700 p-2 rounded-lg shrink-0">
                   <FileSearch className="text-white w-6 h-6" />
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 whitespace-nowrap">
                   <h1 className="text-white font-bold text-base tracking-wide leading-tight">Query Module</h1>
                   <p className="text-emerald-400 text-xs">COPS</p>
                 </div>
-              </div>
-            )}
+            </div>
             
             <button
               type="button"
@@ -78,7 +79,7 @@ export default function QueryModule() {
         
         <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain min-h-0">
           <nav className="p-3 space-y-1 mt-2">
-            {!isCollapsed && <p className="text-emerald-500/70 text-xs uppercase tracking-widest font-semibold px-3 mb-3">Search & Reports</p>}
+            {!isCollapsed && <p className="text-emerald-500/70 text-xs uppercase tracking-widest font-semibold px-3 mb-3 whitespace-nowrap transition-opacity duration-300" style={{ opacity: isCollapsed ? 0 : 1 }}>Search & Reports</p>}
             
             <button
               onClick={() => navigate('/query/os')}
@@ -137,16 +138,17 @@ export default function QueryModule() {
         </div>
         
         <div className={`border-t border-slate-700/50 space-y-3 shrink-0 ${isCollapsed ? 'p-2' : 'p-4'}`}>
-          {!isCollapsed && (
-            <div className="bg-slate-800 rounded-lg p-3 border border-slate-700/50">
-              <div className="flex items-center gap-2 mb-1">
+          <div
+            className="bg-slate-800 rounded-lg border border-slate-700/50 transition-[opacity,max-height] duration-300 ease-in-out overflow-hidden"
+            style={{ opacity: isCollapsed ? 0 : 1, maxHeight: isCollapsed ? 0 : '120px', padding: isCollapsed ? 0 : '0.75rem', borderColor: isCollapsed ? 'transparent' : undefined }}
+          >
+              <div className="flex items-center gap-2 mb-1 whitespace-nowrap">
                 <FileSearch size={18} className="text-emerald-400" />
                 <p className="text-emerald-300 text-xs uppercase tracking-wider font-semibold">Logged in as</p>
               </div>
               <p className="text-white font-semibold text-sm truncate">{user?.user_name}</p>
               <p className="text-emerald-400 text-xs">{user?.user_desig || user?.user_role}</p>
-            </div>
-          )}
+          </div>
           
           <button
             onClick={() => navigate('/modules')}

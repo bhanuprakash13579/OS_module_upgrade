@@ -120,6 +120,20 @@ def _get_pdf_template():
             _pdf_jinja_env = env.get_template("os_print.html")
     return _pdf_jinja_env
 
+# ── Font-size result cache (in-memory, keyed on template-data hash) ───────────
+# Any change to OS data, items, remarks, or admin print-template config produces
+# a different hash → automatic cache miss.  No manual invalidation needed.
+_font_cache: dict[str, tuple[str, str]] = {}
+_FONT_CACHE_MAX = 200          # evict oldest entry beyond this limit
+
+def _font_cache_key(template_vars: dict) -> str:
+    """Deterministic hash of all template data that affects page layout."""
+    import hashlib, json
+    # logo_path doesn't affect text layout; exclude to match sizing behaviour
+    filtered = {k: v for k, v in template_vars.items() if k != "logo_path"}
+    raw = json.dumps(filtered, sort_keys=True, default=str)
+    return hashlib.sha256(raw.encode()).hexdigest()
+
 @router.get("/item-descriptions")
 def get_item_descriptions(db: Session = Depends(get_db)):
     """
@@ -1473,31 +1487,46 @@ def print_os_pdf(
     )
 
     # ── Generate PDF ───────────────────────────────────────────────────────────
-    # Two independent binary searches (Page 1 font, Page 2 font) run in parallel
-    # using a 2-worker thread pool — cuts sizing time by ~50% since neither
-    # phase depends on the other. Logo is stripped during sizing to skip image I/O.
+    # Two independent top-down searches (Page 1 font, Page 2 font) run in
+    # parallel using a 2-worker thread pool.  Top-down starts from the largest
+    # font and stops at the first size that fits on one page — for routine
+    # 1-to-4 item bookings this resolves in a single render instead of the 3
+    # that a binary search needs.  Results are cached in-memory keyed on a
+    # SHA-256 hash of all template data, so repeat downloads of the same
+    # unchanged O/S are instant.
     _P2 = [11.0, 10.5, 10.0, 9.5, 9.0, 8.5, 8.0, 7.5, 7.0, 6.5, 6.0, 5.5]
     _P1 = [11.0, 10.5, 10.0, 9.5, 9.0, 8.5, 8.0]
 
-    test_vars = template_vars.copy()
-    test_vars["logo_path"] = ""  # Skip image fetch during sizing
+    cache_key = _font_cache_key(template_vars)
+    cached = _font_cache.get(cache_key)
 
-    def _fit_page(sizes, page_no):
-        """Binary search: return largest font size (pt string) that fits on one page."""
-        lo, hi = 0, len(sizes) - 1
-        best = f"{sizes[-1]}pt"
-        while lo <= hi:
-            mid = (lo + hi) // 2
-            html = tmpl.render(**test_vars, **{
-                f"p{page_no}_font_size": f"{sizes[mid]}pt",
-                "only_page": page_no,
-            })
-            if len(WeasyHTML(string=html).render().pages) <= 1:
-                best = f"{sizes[mid]}pt"
-                hi = mid - 1   # try a larger font
-            else:
-                lo = mid + 1   # need a smaller font
-        return best
+    if cached:
+        best_p1, best_p2 = cached
+    else:
+        test_vars = template_vars.copy()
+        test_vars["logo_path"] = ""          # skip image I/O during sizing
+
+        def _fit_page(sizes, page_no):
+            """Top-down search: return largest font size that fits on one page."""
+            for size in sizes:
+                html = tmpl.render(**test_vars, **{
+                    f"p{page_no}_font_size": f"{size}pt",
+                    "only_page": page_no,
+                })
+                if len(WeasyHTML(string=html).render().pages) <= 1:
+                    return f"{size}pt"
+            return f"{sizes[-1]}pt"          # fallback to smallest
+
+        with _ThreadPoolExecutor(max_workers=2) as _pool:
+            _f1 = _pool.submit(_fit_page, _P1, 1)
+            _f2 = _pool.submit(_fit_page, _P2, 2)
+            best_p1 = _f1.result()
+            best_p2 = _f2.result()
+
+        # Store in cache (evict oldest entry if over limit)
+        if len(_font_cache) >= _FONT_CACHE_MAX:
+            _font_cache.pop(next(iter(_font_cache)))
+        _font_cache[cache_key] = (best_p1, best_p2)
 
     def _step_down(size_str: str, sizes: list) -> str:
         """Return the next smaller size in the list, or the minimum if already there."""
@@ -1506,13 +1535,6 @@ def print_os_pdf(
             return f"{sizes[min(idx + 1, len(sizes) - 1)]}pt"
         except ValueError:
             return f"{sizes[-1]}pt"
-
-    # Run both phases in parallel — they are fully independent
-    with _ThreadPoolExecutor(max_workers=2) as _pool:
-        _f1 = _pool.submit(_fit_page, _P1, 1)
-        _f2 = _pool.submit(_fit_page, _P2, 2)
-        best_p1 = _f1.result()
-        best_p2 = _f2.result()
 
     # Final combined render with the real logo and optimal font sizes.
     # Post-render safety check: if content is extreme (very long remarks,
@@ -1528,6 +1550,10 @@ def print_os_pdf(
         best_p2 = _step_down(best_p2, _P2)
         rendered_doc = WeasyHTML(string=tmpl.render(**template_vars,
                                 p1_font_size=best_p1, p2_font_size=best_p2)).render()
+
+    # If safety-check stepped down from a cached value, update the cache
+    if cached and (best_p1, best_p2) != cached:
+        _font_cache[cache_key] = (best_p1, best_p2)
 
     pdf_bytes = rendered_doc.write_pdf()
 

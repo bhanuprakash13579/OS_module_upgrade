@@ -45,22 +45,23 @@ export default function AdjudicationLayout() {
     <div className="flex min-h-screen w-full print:bg-white print:overflow-visible" style={MAIN_STYLE}>
       {/* Sidebar */}
       <aside
-        className={`${isCollapsed ? 'w-16' : 'w-64'} flex flex-col shadow-xl transition-[width] duration-200 z-50 shrink-0 print:!hidden sticky top-0 h-screen overflow-y-auto`}
+        className={`${isCollapsed ? 'w-16' : 'w-64'} flex flex-col shadow-xl transition-[width] duration-300 ease-in-out z-50 shrink-0 print:!hidden sticky top-0 h-screen overflow-hidden`}
         style={SIDEBAR_STYLE}
       >
         {/* Logo */}
         <div className="p-3 border-b border-white/10 flex items-center justify-between min-h-[72px] shrink-0">
-            {!isCollapsed && (
-              <div className="flex items-center gap-3">
+            <div
+              className="flex items-center gap-3 transition-[opacity,transform] duration-300 ease-in-out"
+              style={{ opacity: isCollapsed ? 0 : 1, transform: isCollapsed ? 'translateX(-8px)' : 'translateX(0)', width: isCollapsed ? 0 : 'auto', overflow: 'hidden', pointerEvents: isCollapsed ? 'none' : 'auto' }}
+            >
                 <div className="bg-amber-500/20 border border-amber-400/30 p-2 rounded-lg shrink-0">
                   <Gavel className="w-6 h-6 text-amber-300" />
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 whitespace-nowrap">
                   <h1 className="text-white font-bold text-base tracking-wide leading-tight">ONLINE ADJN</h1>
                   <p className="text-amber-300 text-xs">Adjudication Module</p>
                 </div>
-              </div>
-            )}
+            </div>
             
             <button
               type="button"
@@ -78,7 +79,7 @@ export default function AdjudicationLayout() {
             
             {user?.user_status !== 'TEMP' && (
               <>
-                {!isCollapsed && <p className="text-amber-400/70 text-xs uppercase tracking-widest font-semibold px-3 mb-3">O/S Cases</p>}
+                {!isCollapsed && <p className="text-amber-400/70 text-xs uppercase tracking-widest font-semibold px-3 mb-3 whitespace-nowrap transition-opacity duration-300" style={{ opacity: isCollapsed ? 0 : 1 }}>O/S Cases</p>}
                 <AdjNavItem
                   to="/adjudication/pending"
                   icon={<FileText size={24} />}
@@ -114,7 +115,7 @@ export default function AdjudicationLayout() {
 
             {user?.user_status !== 'TEMP' && (
               <>
-                {!isCollapsed && <p className="text-amber-400/70 text-xs uppercase tracking-widest font-semibold px-3 mt-4 mb-3">Administration</p>}
+                {!isCollapsed && <p className="text-amber-400/70 text-xs uppercase tracking-widest font-semibold px-3 mt-4 mb-3 whitespace-nowrap transition-opacity duration-300" style={{ opacity: isCollapsed ? 0 : 1 }}>Administration</p>}
                 <AdjNavItem
                   to="/adjudication/users"
                   icon={<Users size={24} />}
@@ -128,23 +129,24 @@ export default function AdjudicationLayout() {
           </nav>
 
           <div className="mt-6 px-3">
-            {!isCollapsed && <p className="text-amber-400/70 text-xs uppercase tracking-widest font-semibold px-3 mb-3">Account</p>}
+            {!isCollapsed && <p className="text-amber-400/70 text-xs uppercase tracking-widest font-semibold px-3 mb-3 whitespace-nowrap transition-opacity duration-300" style={{ opacity: isCollapsed ? 0 : 1 }}>Account</p>}
             <AdjNavItem to="/adjudication/change-password" icon={<KeyRound size={24} />} label="Change Password" id="nav-adjn-pwd" collapsed={isCollapsed} />
           </div>
         </div>
 
         {/* Footer */}
         <div className={`border-t border-white/10 space-y-3 shrink-0 ${isCollapsed ? 'p-2' : 'p-4'}`}>
-          {!isCollapsed && (
-            <div className="bg-white/5 border border-white/10 rounded-lg p-3">
-              <div className="flex items-center gap-2 mb-1">
+          <div
+            className="bg-white/5 border border-white/10 rounded-lg transition-[opacity,max-height] duration-300 ease-in-out overflow-hidden"
+            style={{ opacity: isCollapsed ? 0 : 1, maxHeight: isCollapsed ? 0 : '120px', padding: isCollapsed ? 0 : '0.75rem', borderColor: isCollapsed ? 'transparent' : undefined }}
+          >
+              <div className="flex items-center gap-2 mb-1 whitespace-nowrap">
                 <User size={18} className="text-amber-300" />
                 <p className="text-amber-200 text-xs uppercase tracking-wider font-semibold">Adjudicating Officer</p>
               </div>
               <p className="text-white font-semibold text-sm truncate">{user?.user_name}</p>
-              <p className="text-amber-300 text-xs">{user?.user_desig || user?.user_role} · {currentDate}</p>
-            </div>
-          )}
+              <p className="text-amber-300 text-xs whitespace-nowrap">{user?.user_desig || user?.user_role} · {currentDate}</p>
+          </div>
 
 
           
