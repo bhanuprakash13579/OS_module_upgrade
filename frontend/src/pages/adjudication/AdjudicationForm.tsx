@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, memo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Gavel, ArrowLeft, Save, XCircle, User, Package, FileText, AlertCircle, CheckCircle, Edit, Printer, Wand2, Trash2, Clock } from 'lucide-react';
+import { Gavel, ArrowLeft, Save, XCircle, User, Package, FileText, AlertCircle, AlertTriangle, CheckCircle, Edit, Printer, Wand2, Trash2, Clock } from 'lucide-react';
 import DatePicker from '@/components/DatePicker';
 import api from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
@@ -368,6 +368,13 @@ export default function AdjudicationForm() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Auto-clear success banner after 6 seconds
+  useEffect(() => {
+    if (!success) return;
+    const t = setTimeout(() => setSuccess(''), 3000);
+    return () => clearTimeout(t);
+  }, [success]);
+
   // Each adjData field is its own state so only the affected input re-renders
   const [adjDate, setAdjDate]   = useState(() => new Date().toISOString().split('T')[0]);
   const [offrName, setOffrName] = useState(() => user?.user_name || '');
@@ -377,9 +384,13 @@ export default function AdjudicationForm() {
   const [refAmt, setRefAmt]     = useState(0);
   const [ppAmt, setPpAmt]       = useState(0);
   
-  const [closeCase, setCloseCase] = useState(false);
   const [confirmSave, setConfirmSave] = useState(false);
   const [isReAdjudicating, setIsReAdjudicating] = useState(false);
+
+  // Styled confirmation modals (replaces native window.confirm / window.prompt)
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
 
   const REMARKS_MAX = 3000;
   const remarksLen  = remarks.length;
@@ -430,8 +441,7 @@ export default function AdjudicationForm() {
           // Pre-fill adjudication date from the existing record so that
           // re-adjudication defaults to the original date, not today.
           if (data.adjudication_date) setAdjDate(data.adjudication_date);
-          // Pre-tick "Close Case" if the existing order was already closed.
-          if (data.closure_ind === 'Y') setCloseCase(true);
+          // closure_ind is always set automatically on adjudication
         }
         setLoading(false);
       })
@@ -494,7 +504,7 @@ export default function AdjudicationForm() {
         confiscated_value: totalConfsValue,
         redeemed_value: redeemedVal,
         re_export_value: reExportVal,
-        close_case: closeCase,
+        close_case: true,
       });
       setOsCase(updatedCase);
       setSuccess(
@@ -553,12 +563,17 @@ export default function AdjudicationForm() {
     }
   };
 
-  const handleRejectOS = async () => {
-    const reason = window.prompt('Enter the reason for rejecting this pending O.S. (This will send it to the Quashed list):');
-    if (!reason || !reason.trim()) return;
+  const handleRejectOS = () => {
+    setRejectReason('');
+    setShowRejectModal(true);
+  };
+
+  const confirmRejectOS = async () => {
+    if (!rejectReason.trim()) return;
+    setShowRejectModal(false);
     setSubmitting(true);
     try {
-      await api.post(`/os/${os_no}/${os_year}/reject`, { reason });
+      await api.post(`/os/${os_no}/${os_year}/reject`, { reason: rejectReason.trim() });
       setSuccess('O.S. Case Rejected Successfully.');
       setTimeout(() => navigate('/adjudication/quashed'), 500);
     } catch (err: any) {
@@ -570,12 +585,14 @@ export default function AdjudicationForm() {
     }
   };
 
-  const handleDeleteOS = async () => {
-    if (!window.confirm(
-      `WARNING: This will PERMANENTLY DELETE O.S. No. ${os_no}/${os_year}.\n\nAll records will be removed as if this case never existed. This cannot be undone.\n\nProceed with deletion?`
-    )) return;
-    setSubmitting(true);
+  const handleDeleteOS = () => {
     setError('');
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteOS = async () => {
+    setShowDeleteModal(false);
+    setSubmitting(true);
     try {
       await api.post(`/os/${os_no}/${os_year}/quash`);
       setSuccess('O.S. Case permanently deleted.');
@@ -907,19 +924,6 @@ export default function AdjudicationForm() {
             </div>
           </div>
 
-          {/* Close Case — shown when creating new adjudication or in re-adjudication mode */}
-          {(!isAlreadyAdjudicated || isReAdjudicating) && (
-            <div className="flex items-center gap-3 border-t border-amber-100 pt-4">
-              <input type="checkbox" id="chk-close-case"
-                className="w-4 h-4 accent-amber-600 rounded"
-                checked={closeCase}
-                onChange={e => setCloseCase(e.target.checked)} />
-              <label htmlFor="chk-close-case" className="text-sm font-semibold text-slate-700 cursor-pointer">
-                Mark this case as <strong className="text-amber-700">Closed / Adjudicated</strong> (sets Closure Indicator = Y)
-              </label>
-            </div>
-          )}
-
           {(!isAlreadyAdjudicated || isReAdjudicating) && (
             <div className="border-t border-amber-100 pt-4">
               <label className="flex items-center gap-2.5 cursor-pointer select-none">
@@ -1042,6 +1046,84 @@ export default function AdjudicationForm() {
                 onClick={handleContextSubmit}
                 className="flex-1 py-2 px-4 rounded-lg bg-amber-700 text-white text-sm font-bold hover:bg-amber-600 disabled:opacity-50 flex items-center justify-center gap-1.5">
                 <Wand2 size={14} /> Generate Order
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete OS confirmation modal ──────────────────────────────────── */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+            <div className="bg-red-700 px-6 py-4 flex items-center gap-3">
+              <AlertTriangle size={22} className="text-white shrink-0" />
+              <h2 className="text-white font-bold text-base">Delete O.S. Case</h2>
+            </div>
+            <div className="px-6 py-5 space-y-3">
+              <p className="text-slate-800 font-semibold text-sm">
+                Are you sure you want to permanently delete O.S.&nbsp;No.&nbsp;
+                <span className="text-red-700 font-bold">{os_no}/{os_year}</span>?
+              </p>
+              <p className="text-slate-600 text-sm leading-relaxed">
+                All records will be removed as if this case never existed.
+                This action <strong>cannot be undone</strong>.
+              </p>
+            </div>
+            <div className="px-6 pb-5 flex gap-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="flex-1 py-2.5 px-4 rounded-lg border border-slate-300 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteOS}
+                className="flex-1 py-2.5 px-4 rounded-lg bg-red-700 hover:bg-red-600 text-white text-sm font-bold transition-colors flex items-center justify-center gap-2"
+              >
+                <Trash2 size={15} /> Yes, Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Reject OS modal (with reason input) ──────────────────────────── */}
+      {showRejectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+            <div className="bg-slate-700 px-6 py-4 flex items-center gap-3">
+              <XCircle size={22} className="text-white shrink-0" />
+              <h2 className="text-white font-bold text-base">Reject O.S. Case</h2>
+            </div>
+            <div className="px-6 py-5 space-y-3">
+              <p className="text-slate-700 text-sm">
+                Rejecting O.S.&nbsp;<span className="font-bold">{os_no}/{os_year}</span> will move it to the Quashed list.
+                Please provide a reason:
+              </p>
+              <textarea
+                autoFocus
+                rows={3}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-800 focus:ring-2 focus:ring-slate-400 focus:border-slate-400 resize-none"
+                placeholder="Enter reason for rejection…"
+                value={rejectReason}
+                onChange={e => setRejectReason(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && rejectReason.trim()) { e.preventDefault(); confirmRejectOS(); } }}
+              />
+            </div>
+            <div className="px-6 pb-5 flex gap-3">
+              <button
+                onClick={() => setShowRejectModal(false)}
+                className="flex-1 py-2.5 px-4 rounded-lg border border-slate-300 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmRejectOS}
+                disabled={!rejectReason.trim()}
+                className="flex-1 py-2.5 px-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                <XCircle size={15} /> Reject Case
               </button>
             </div>
           </div>

@@ -21,9 +21,10 @@ export default function AdjudicationLayout() {
     weekday: 'short', day: '2-digit', month: 'short', year: 'numeric'
   }), []);
 
+  // Refresh badge counts on every route change so the numbers stay accurate
+  // after adjudication, rejection, or deletion without requiring a full page reload.
   useEffect(() => {
     if (!token) return;
-    // Single combined request instead of two sequential HTTP calls
     api.get('/os/sidebar-counts', { headers: { Authorization: `Bearer ${token}` } })
       .then(res => {
         setPendingCount(res.data.pending);
@@ -33,7 +34,7 @@ export default function AdjudicationLayout() {
         setPendingCount(null);
         setOfflinePendingCount(null);
       });
-  }, [token]);
+  }, [token, location.pathname]);
 
   const handleLogout = () => {
     logout();
