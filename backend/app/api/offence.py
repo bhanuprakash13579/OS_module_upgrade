@@ -1,9 +1,12 @@
+import logging
 from datetime import date, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from typing import List
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_, and_, cast, Integer as SAInteger, exists, not_, text
 from collections import defaultdict
+
+logger = logging.getLogger(__name__)
 
 from app.database import get_db
 from app.models.auth import User
@@ -156,7 +159,11 @@ def get_item_descriptions(db: Session = Depends(get_db)):
                 CopsItems.items_desc,
                 func.count(CopsItems.items_desc).label("cnt")
             )
-            .filter(CopsItems.items_desc.isnot(None), CopsItems.items_desc != '')
+            .filter(
+                CopsItems.items_desc.isnot(None),
+                CopsItems.items_desc != '',
+                CopsItems.entry_deleted == "N",
+            )
             .group_by(func.upper(CopsItems.items_desc))
             .order_by(func.count(CopsItems.items_desc).desc())
             .limit(300)
@@ -1710,6 +1717,8 @@ def delete_os(
 
     # Archive a full snapshot to cops_master_deleted BEFORE marking deleted.
     # This preserves the complete record state for audit/recovery.
+    # If the snapshot fails, the entire operation is aborted — deletion without
+    # an audit trail violates compliance requirements.
     try:
         skip_cols = {"id", "adjn_offr_remarks1", "deleted_by", "deleted_reason", "deleted_on"}
         snapshot = CopsMasterDeleted(
@@ -1720,15 +1729,27 @@ def delete_os(
             }
         )
         db.add(snapshot)
-    except Exception as _e:
-        import logging as _log
-        _log.getLogger(__name__).warning("Audit archive failed on soft-delete: %s", _e)
+        db.flush()  # Surface any constraint/schema errors before we touch the master row
+    except Exception as exc:
+        db.rollback()
+        logger.error("Audit archive failed — deletion aborted for OS %s/%s: %s", os_no, os_year, exc)
+        raise HTTPException(
+            status_code=500,
+            detail="Deletion could not be completed: audit trail write failed. Please try again or contact support.",
+        )
 
-    # Soft-delete with full audit trail
+    # Soft-delete the master row and mark all child items deleted too.
+    # Items must be marked so that autocomplete and direct item queries
+    # don't surface descriptions from deleted cases.
     os_obj.entry_deleted = "Y"
     os_obj.deleted_by = current_user.user_id
     os_obj.deleted_reason = reason.strip()
     os_obj.deleted_on = date.today()
+
+    db.query(CopsItems).filter(
+        CopsItems.os_no == os_no,
+        CopsItems.os_year == os_year,
+    ).update({"entry_deleted": "Y"}, synchronize_session=False)
 
     db.commit()
     return {
