@@ -389,8 +389,6 @@ export default function AdjudicationForm() {
 
   // Styled confirmation modals (replaces native window.confirm / window.prompt)
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showRejectModal, setShowRejectModal] = useState(false);
-  const [rejectReason, setRejectReason] = useState('');
 
   const REMARKS_MAX = 3000;
   const remarksLen  = remarks.length;
@@ -559,28 +557,6 @@ export default function AdjudicationForm() {
       else if (typeof detail === 'object') detail = JSON.stringify(detail);
       setError(detail);
     } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleRejectOS = () => {
-    setRejectReason('');
-    setShowRejectModal(true);
-  };
-
-  const confirmRejectOS = async () => {
-    if (!rejectReason.trim()) return;
-    setShowRejectModal(false);
-    setSubmitting(true);
-    try {
-      await api.post(`/os/${os_no}/${os_year}/reject`, { reason: rejectReason.trim() });
-      setSuccess('O.S. Case Rejected Successfully.');
-      setTimeout(() => navigate('/adjudication/quashed'), 500);
-    } catch (err: any) {
-      let detail = err.response?.data?.detail || 'Failed to reject case.';
-      if (Array.isArray(detail)) detail = detail.map((e: any) => `${e.loc?.join('.')} - ${e.msg}`).join(', ');
-      else if (typeof detail === 'object') detail = JSON.stringify(detail);
-      setError(detail);
       setSubmitting(false);
     }
   };
@@ -949,24 +925,15 @@ export default function AdjudicationForm() {
           <div className="flex items-center gap-3 border-t border-amber-100 pt-4">
             {/* First-time adjudication */}
             {!isAlreadyAdjudicated && (
-              <>
-                <button
-                  id="btn-save-adjn"
-                  onClick={handleSave}
-                  disabled={submitting || remarksLen > REMARKS_MAX || !confirmSave}
-                  className="flex items-center gap-2 bg-amber-700 hover:bg-amber-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Save size={17} />
-                  {submitting ? 'Saving...' : 'Complete Adjudication'}
-                </button>
-                <button
-                  onClick={handleRejectOS}
-                  disabled={submitting}
-                  className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <XCircle size={17} /> Reject OS
-                </button>
-              </>
+              <button
+                id="btn-save-adjn"
+                onClick={handleSave}
+                disabled={submitting || remarksLen > REMARKS_MAX || !confirmSave}
+                className="flex items-center gap-2 bg-amber-700 hover:bg-amber-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Save size={17} />
+                {submitting ? 'Saving...' : 'Complete Adjudication'}
+              </button>
             )}
             {/* Re-adjudication mode (within 24h window) */}
             {isAlreadyAdjudicated && isReAdjudicating && (
@@ -1088,47 +1055,6 @@ export default function AdjudicationForm() {
         </div>
       )}
 
-      {/* ── Reject OS modal (with reason input) ──────────────────────────── */}
-      {showRejectModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
-            <div className="bg-slate-700 px-6 py-4 flex items-center gap-3">
-              <XCircle size={22} className="text-white shrink-0" />
-              <h2 className="text-white font-bold text-base">Reject O.S. Case</h2>
-            </div>
-            <div className="px-6 py-5 space-y-3">
-              <p className="text-slate-700 text-sm">
-                Rejecting O.S.&nbsp;<span className="font-bold">{os_no}/{os_year}</span> will move it to the Quashed list.
-                Please provide a reason:
-              </p>
-              <textarea
-                autoFocus
-                rows={3}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-800 focus:ring-2 focus:ring-slate-400 focus:border-slate-400 resize-none"
-                placeholder="Enter reason for rejection…"
-                value={rejectReason}
-                onChange={e => setRejectReason(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && rejectReason.trim()) { e.preventDefault(); confirmRejectOS(); } }}
-              />
-            </div>
-            <div className="px-6 pb-5 flex gap-3">
-              <button
-                onClick={() => setShowRejectModal(false)}
-                className="flex-1 py-2.5 px-4 rounded-lg border border-slate-300 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmRejectOS}
-                disabled={!rejectReason.trim()}
-                className="flex-1 py-2.5 px-4 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                <XCircle size={15} /> Reject Case
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -338,6 +338,11 @@ def create_os(
         db.add(db_item)
 
     db.commit()
+    db.refresh(os_obj)
+    os_obj.items = db.query(CopsItems).filter(
+        CopsItems.os_no == os_no,
+        CopsItems.os_year == os_year
+    ).all()
     return os_obj
 
 
@@ -681,6 +686,11 @@ def create_offline_adjudication(
         db.add(db_item)
 
     db.commit()
+    db.refresh(os_obj)
+    os_obj.items = db.query(CopsItems).filter(
+        CopsItems.os_no == os_no,
+        CopsItems.os_year == os_year
+    ).all()
     return os_obj
 
 
@@ -814,6 +824,9 @@ def complete_offline_adjudication(
     case.adj_offr_name = data.adj_offr_name.strip()
     case.adj_offr_designation = data.adj_offr_designation.strip()
     case.adjudication_date = data.adjudication_date or _date.today()
+    # Stamp adjudication_time so the 24-hour modification window works correctly.
+    # Without this, _within_edit_window() sees None and returns True forever.
+    case.adjudication_time = datetime.now()
     case.rf_amount = data.rf_amount
     case.pp_amount = data.pp_amount
     case.ref_amount = data.ref_amount
@@ -853,21 +866,22 @@ def get_os(
     return os_obj
 
 
-# ── SDO: Modify O/S Case ──────────────────────────────────────────────────────
+# ── SDO / Adjudication: Modify O/S Case ──────────────────────────────────────
 @router.put("/{os_no}/{os_year}", response_model=schemas.CopsMasterOut)
 def update_os(
     os_no: str,
     os_year: int,
     data: schemas.CopsMasterCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_sdo_user)   # SDO module only
+    current_user: User = Depends(get_current_active_user)
 ):
-    """SDO Module: Modify an existing O/S case.
+    """Modify an existing O/S case.
 
-    - Before adjudication: always allowed (unless print lock is active).
-    - After adjudication, within 24 hours of adjudication_time: allowed.
-      Resets all adjudication fields so the case goes back to pending.
-    - After adjudication, beyond 24 hours: blocked.
+    - SDO users: always allowed (unless print lock is active).
+      After adjudication, within 24 hours: allowed — resets adjudication fields.
+      After adjudication, beyond 24 hours: blocked.
+    - DC/AC users: only allowed on adjudicated cases within the 24-hour window.
+      Resets adjudication fields so the case returns to pending for re-adjudication.
     """
     os_obj = db.query(CopsMaster).filter(
         CopsMaster.os_no == os_no,
@@ -877,6 +891,21 @@ def update_os(
 
     if not os_obj:
         raise HTTPException(status_code=404, detail="O.S. record not found.")
+
+    # Role-based access:
+    # - DC/AC users: can edit any pending case freely; after adjudication, only within 24h window.
+    # - SDO users: existing behaviour (print lock + 24h adjudication window).
+    if current_user.user_role in ("DC", "AC"):
+        if os_obj.adjudication_date and not _within_edit_window(os_obj):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Modification window has expired. O/S cases can only be modified within 24 hours of adjudication."
+            )
+    elif current_user.user_role != "SDO":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to modify this case."
+        )
 
     if os_obj.adjudication_date:
         # Case is adjudicated — only allowed within the 24-hour window
@@ -1665,7 +1694,8 @@ def cancel_adjudicate(
     """Adjudication Module: Cancel an adjudication and re-open the case."""
     os_obj = db.query(CopsMaster).filter(
         CopsMaster.os_no == os_no,
-        CopsMaster.os_year == os_year
+        CopsMaster.os_year == os_year,
+        CopsMaster.entry_deleted == "N"
     ).first()
     if not os_obj:
         raise HTTPException(status_code=404, detail="O.S. not found")
@@ -1780,33 +1810,6 @@ def delete_os(
         "deleted_on": date.today().isoformat(),
         "note": f"OS No. {os_no}/{os_year} can now be reused for a new entry.",
     }
-
-# ── Adjudication: Reject Pending O/S ─────────────────────────────────────────
-@router.post("/{os_no}/{os_year}/reject")
-def reject_os(
-    os_no: str,
-    os_year: int,
-    payload: schemas.OSActionReason,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_adjn_user)
-):
-    os_obj = db.query(CopsMaster).filter(
-        CopsMaster.os_no == os_no,
-        CopsMaster.os_year == os_year,
-        CopsMaster.entry_deleted == "N",
-        CopsMaster.is_draft == "N",
-        CopsMaster.quashed != "Y"
-    ).first()
-    
-    if not os_obj:
-        raise HTTPException(status_code=404, detail="O.S. case not found.")
-    if os_obj.adjudication_date is not None:
-        raise HTTPException(status_code=400, detail="Cannot reject an already adjudicated case.")
-        
-    os_obj.rejected = "Y"
-    os_obj.reject_reason = payload.reason
-    db.commit()
-    return {"message": "O/S case rejected."}
 
 # ── Adjudication: Delete Adjudicated O/S within 24-Hour Window ───────────────
 @router.post("/{os_no}/{os_year}/quash")
