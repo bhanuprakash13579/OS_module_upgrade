@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Gavel, Search, Filter, AlertCircle, RefreshCw, X, CheckCircle, ShieldAlert, FileDown, Loader2 } from 'lucide-react';
+import { Gavel, Search, Filter, AlertCircle, RefreshCw, X, CheckCircle, FileDown, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
 import { startDownload, progressDownload, completeDownload, failDownload } from '@/components/DownloadToast';
 
@@ -212,7 +212,6 @@ export default function AdjudicationList() {
                 >
                   <option value="pending">Pending Adjudication</option>
                   <option value="adjudicated">Adjudicated</option>
-                  <option value="quashed">Quashed / Rejected</option>
                   <option value="">All Cases</option>
                 </select>
               </div>
@@ -287,7 +286,6 @@ export default function AdjudicationList() {
                   // fields is set from the "pending" list. If you change this condition,
                   // update _pending_filters() too, or cases will appear in wrong lists.
                   const isAdjudicated = !!(row.adjudication_date || row.adj_offr_name);
-                  const isQuashed = row.quashed === 'Y' || row.rejected === 'Y';
                   return (
                     <tr key={`${row.os_no}-${row.os_year}-${idx}`} className="hover:bg-amber-50 group">
                       <td className="px-5 py-3 align-middle">
@@ -315,11 +313,7 @@ export default function AdjudicationList() {
                         <div className="text-xs text-slate-400 mt-0.5">{row.total_items || 0} item(s)</div>
                       </td>
                       <td className="px-5 py-3 align-middle text-center">
-                        {isQuashed ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-md border text-slate-600 bg-slate-100 border-slate-300">
-                            <ShieldAlert size={11} /> QUASHED
-                          </span>
-                        ) : isAdjudicated ? (
+                        {isAdjudicated ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold rounded-md border text-green-700 bg-green-50 border-green-200">
                             <CheckCircle size={11} /> ADJUDICATED
                           </span>
@@ -330,7 +324,7 @@ export default function AdjudicationList() {
                         )}
                       </td>
                       <td className="px-5 py-3 align-middle text-center">
-                        {!isAdjudicated && !isQuashed ? (
+                        {!isAdjudicated ? (
                           <button
                             onClick={() => navigate(`/adjudication/case/${row.os_no}/${row.os_year}`)}
                             className="inline-flex items-center gap-1.5 bg-amber-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-amber-600 transition-colors opacity-80 group-hover:opacity-100"
@@ -347,7 +341,7 @@ export default function AdjudicationList() {
                         )}
                       </td>
                       <td className="px-5 py-3 align-middle text-center">
-                        {(isAdjudicated || isQuashed) && (() => {
+                        {isAdjudicated && (() => {
                           const dlKey = `${row.os_no}-${row.os_year}`;
                           const isLoading = downloadingKeys.has(dlKey);
                           return (

@@ -3,7 +3,6 @@ import { Routes, Route } from 'react-router-dom';
 import AdjudicationLayout from './AdjudicationLayout';
 import AdjudicationList from './AdjudicationList';
 import AdjudicatedList from './AdjudicatedList';
-import QuashedList from './QuashedList';
 import UserManagement from '../users/UserManagement';
 import ChangePassword from '../auth/ChangePassword';
 
@@ -28,8 +27,6 @@ export default function AdjudicationModule() {
         <Route path="pending" element={<AdjudicationList />} />
         {/* Already adjudicated cases */}
         <Route path="adjudicated" element={<AdjudicatedList />} />
-        {/* Quashed or Rejected cases */}
-        <Route path="quashed" element={<QuashedList />} />
         {/* Adjudication form for a specific case */}
         <Route path="case/:os_no/:os_year" element={<Suspense fallback={<RouteSpinner />}><AdjudicationForm /></Suspense>} />
         {/* Route for adjudicator to securely edit SDO fields */}

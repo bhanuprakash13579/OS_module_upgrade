@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { Gavel, FileText, CheckCircle, LogOut, Menu, User, KeyRound, Users, ShieldAlert, ClipboardCheck } from 'lucide-react';
+import { Gavel, FileText, CheckCircle, LogOut, Menu, User, KeyRound, Users, ClipboardCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useState, useEffect, useMemo } from 'react';
 
@@ -93,13 +93,6 @@ export default function AdjudicationLayout() {
                   icon={<CheckCircle size={24} />}
                   label="Adjudicated Cases"
                   id="nav-adjudicated"
-                  collapsed={isCollapsed}
-                />
-                <AdjNavItem
-                  to="/adjudication/quashed"
-                  icon={<ShieldAlert size={24} />}
-                  label="Quashed O.S. Cases"
-                  id="nav-quashed"
                   collapsed={isCollapsed}
                 />
                 <AdjNavItem
