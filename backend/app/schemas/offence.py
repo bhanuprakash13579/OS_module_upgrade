@@ -135,13 +135,6 @@ class CopsMasterOut(CopsMasterBase):
     post_adj_dr_no:      Optional[str] = None
     post_adj_dr_date:    Optional[date] = None
     
-    quashed: str = 'N'
-    quashed_by: Optional[str] = None
-    quash_reason: Optional[str] = None
-    quash_date: Optional[date] = None
-    rejected: str = 'N'
-    reject_reason: Optional[str] = None
-    
     items: List[CopsItemOut] = []
     model_config = ConfigDict(from_attributes=True)
 

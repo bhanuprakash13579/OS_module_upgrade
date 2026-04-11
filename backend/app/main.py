@@ -728,7 +728,7 @@ def get_mode():
 
 from app.api import auth, masters, baggage, offence, detention
 from app.api import admin_api
-from app.api import warehouse, mhb, fuel, appeal, revenue, sync, queries, reports, dashboard, os_query, backup
+from app.api import os_query, backup
 from app.api import apis
 
 app.include_router(admin_api.router, prefix="/api/admin", tags=["System Admin"])
@@ -739,15 +739,6 @@ app.include_router(masters.router, prefix="/api/masters", tags=["Masters"])
 app.include_router(baggage.router, prefix="/api/br", tags=["Baggage Receipts"])
 app.include_router(offence.router, prefix="/api/os", tags=["Offence Cases"])
 app.include_router(detention.router, prefix="/api/dr", tags=["Detention Receipts"])
-app.include_router(warehouse.router, prefix="/api/warehouse", tags=["Warehouse"])
-app.include_router(mhb.router, prefix="/api/mhb", tags=["MHB"])
-app.include_router(fuel.router, prefix="/api/fuel", tags=["Fuel"])
-app.include_router(appeal.router, prefix="/api/appeal", tags=["Appeal"])
-app.include_router(revenue.router, prefix="/api/revenue", tags=["Revenue & Challans"])
-app.include_router(sync.router, prefix="/api/sync", tags=["Synchronization"])
-app.include_router(queries.router, prefix="/api/queries", tags=["Universal Query"])
-app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
-app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard Analytics"])
 app.include_router(os_query.router)
 app.include_router(backup.router, prefix="/api/backup", tags=["Backup & Restore"])
 app.include_router(apis.router, prefix="/api/apis", tags=["APIS Matching"])

@@ -438,8 +438,6 @@ def get_all_os(
         elif sl == 'pending':
             # Uses the centralized _pending_filters() — see top of file
             q = q.filter(*_pending_filters())
-        elif sl == 'quashed':
-            q = q.filter(or_(CopsMaster.quashed == 'Y', CopsMaster.rejected == 'Y'))
     # BR/DR pending: adjudicated cases where no post-adj receipt data has been entered yet
     if br_dr_pending:
         q = q.filter(
@@ -711,23 +709,6 @@ def get_adjudicated_cases(
     for r in records:
         r.items = []
     return records
-
-# ── Adjudication Module: Quashed/Rejected Cases ──────────────────────────────
-@router.get("/quashed", response_model=List[schemas.CopsMasterOut])
-def get_quashed_cases(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_adjn_user)
-):
-    """Adjudication Module: Cases that were Quashed or Rejected."""
-    records = db.query(CopsMaster).filter(
-        CopsMaster.entry_deleted == "N",
-        (CopsMaster.quashed == "Y") | (CopsMaster.rejected == "Y")
-    ).order_by(CopsMaster.os_date.desc()).limit(200).all()
-    for r in records:
-        r.items = []
-    return records
-
-
 
 # ── Adjudication: Pending Offline Adjudication Count ─────────────────────────
 @router.get("/offline-pending/count")
@@ -1681,58 +1662,6 @@ def online_adjudicate(
         CopsItems.os_year == os_year
     ).all()
     return os_obj
-
-
-# ── Adjudication Module: Cancel Adjudication ──────────────────────────────────
-@router.post("/{os_no}/{os_year}/cancel-adjudication")
-def cancel_adjudicate(
-    os_no: str,
-    os_year: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_adjn_user)  # Adjudication module only
-):
-    """Adjudication Module: Cancel an adjudication and re-open the case."""
-    os_obj = db.query(CopsMaster).filter(
-        CopsMaster.os_no == os_no,
-        CopsMaster.os_year == os_year,
-        CopsMaster.entry_deleted == "N"
-    ).first()
-    if not os_obj:
-        raise HTTPException(status_code=404, detail="O.S. not found")
-
-    if os_obj.online_adjn != "Y":
-        raise HTTPException(status_code=400, detail="O.S. is not currently adjudicated online.")
-
-    # Archive the state
-    try:
-        del_obj = CopsMasterDeleted(
-            **{c.name: getattr(os_obj, c.name) for c in CopsMaster.__table__.columns if c.name not in ['id', 'adjn_offr_remarks1']}
-        )
-        del_obj.adjn_offr_remarks1 = "ADJN. CANCELLED"
-        db.add(del_obj)
-    except Exception as _e:
-        import logging as _log
-        _log.getLogger(__name__).warning("Audit archive failed on adjudication cancel: %s", _e)
-
-    # Reset adjudication fields
-    os_obj.online_adjn = "N"
-    os_obj.adjudication_date = None
-    os_obj.adjudication_time = None
-    os_obj.adj_offr_name = None
-    os_obj.adj_offr_designation = None
-    os_obj.adjn_offr_remarks = None
-    os_obj.os_printed = 'N'  # allow SDO to re-edit after cancellation
-    os_obj.confiscated_value = 0.0
-    os_obj.redeemed_value = 0.0
-    os_obj.re_export_value = 0.0
-    os_obj.rf_amount = 0.0
-    os_obj.pp_amount = 0.0
-    os_obj.ref_amount = 0.0
-    os_obj.total_payable = 0.0
-    os_obj.closure_ind = None
-
-    db.commit()
-    return {"message": "Adjudication Particulars Not Updated in D/R Data ! Adjudication Cancelled Successfully."}
 
 
 # ── Adjudication: Delete O/S Case (soft-delete, DC/AC only) ──────────────────
