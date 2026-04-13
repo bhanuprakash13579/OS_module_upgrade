@@ -81,6 +81,12 @@ export function detectContextualQuestions(items: any[]): ContextualQuestion[] {
   const hasCigarettes = items.some(i => {
     const desc = (i.items_desc || '').toLowerCase();
     const dtype = (i.items_duty_type || '').toLowerCase();
+    // E-cigarettes / vapes are prohibited under PECA 2019, not COTPA 2003 —
+    // exclude them so the COTPA pictorial-warning question is never asked for e-cigs.
+    const isECig = desc.includes('e-cig') || desc.includes('ecig') || desc.includes('e cig') ||
+                   desc.includes('vape') || desc.includes('vaping') || desc.includes('iqos') ||
+                   desc.includes('juul') || desc.includes('e-liquid') || desc.includes('electronic cigarette');
+    if (isECig) return false;
     return desc.includes('cigarette') || desc.includes('cigar') || desc.includes('bidi') ||
            desc.includes('beedi') || dtype.includes('cigarette');
   });
@@ -171,6 +177,18 @@ const KEYWORD_ALIASES: [string, string][] = [
 ];
 KEYWORD_ALIASES.sort((a, b) => b[0].length - a[0].length);
 
+/**
+ * Word-boundary-aware substring check.
+ * Single-word terms (e.g. "gin", "rum") require non-alpha boundaries so they
+ * don't fire on "original", "engine", "drum", "instruments", etc.
+ * Multi-word phrases are already specific enough — plain substring is fine.
+ */
+function includesWholeWord(text: string, term: string): boolean {
+  if (term.includes(' ')) return text.includes(term);
+  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?<![a-z])${escaped}(?![a-z])`).test(text);
+}
+
 /** Match an item description against statute keywords + aliases */
 function matchStatute(item: any, statutes: Statute[]): Statute | null {
   if (!Array.isArray(statutes)) return null;
@@ -179,7 +197,7 @@ function matchStatute(item: any, statutes: Statute[]): Statute | null {
   const desc = raw.replace(/-/g, ' ').replace(/\s+/g, ' ').trim();
 
   for (const [alias, canonicalKeyword] of KEYWORD_ALIASES) {
-    if (desc.includes(alias)) {
+    if (includesWholeWord(desc, alias)) {
       const statute = statutes.find(s => s.keyword === canonicalKeyword);
       if (statute) return statute;
     }
@@ -189,7 +207,7 @@ function matchStatute(item: any, statutes: Statute[]): Statute | null {
     .filter(s => s && s.keyword && s.keyword !== 'generic_commercial')
     .sort((a, b) => (b.keyword?.length || 0) - (a.keyword?.length || 0));
   for (const s of sorted) {
-    if (desc.includes(s.keyword)) return s;
+    if (includesWholeWord(desc, s.keyword)) return s;
   }
   return null;
 }

@@ -42,14 +42,17 @@ try:
         ppid = os.getppid()
         def _watch():
             import subprocess
+            # CREATE_NO_WINDOW must be used without shell=True.
+            # shell=True spawns an intermediate cmd.exe which Windows Terminal
+            # briefly attaches to before CREATE_NO_WINDOW suppresses it —
+            # causing a visible CMD flash every 5 seconds on Windows 11.
+            flags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
             while True:
                 try:
-                    # Use tasklist to bypass strict OpenProcess privilege blocks on Windows 11
-                    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
                     output = subprocess.check_output(
-                        f'tasklist /FI "PID eq {ppid}" /NH',
-                        shell=True,
-                        creationflags=flags
+                        ['tasklist', '/FI', f'PID eq {ppid}', '/NH'],
+                        creationflags=flags,
+                        stdin=subprocess.DEVNULL,
                     ).decode('utf-8', errors='ignore')
                     if str(ppid) not in output:
                         raise Exception("Parent dead")
@@ -83,14 +86,17 @@ try:
         try:
             import subprocess
             if sys.platform == "win32":
+                _no_win = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
                 result = subprocess.run(
-                    ["netstat", "-ano"], capture_output=True, text=True
+                    ["netstat", "-ano"], capture_output=True, text=True,
+                    creationflags=_no_win, stdin=subprocess.DEVNULL,
                 )
                 for line in result.stdout.splitlines():
                     if f":{port}" in line and "LISTENING" in line:
                         pid = line.strip().split()[-1]
                         subprocess.run(
-                            ["taskkill", "/PID", pid, "/F"], capture_output=True
+                            ["taskkill", "/PID", pid, "/F"], capture_output=True,
+                            creationflags=_no_win, stdin=subprocess.DEVNULL,
                         )
                         break
             else:

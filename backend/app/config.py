@@ -25,7 +25,7 @@ def _resolve_db_url() -> str:
 class Settings(BaseSettings):
     # ── Application ──────────────────────────────────────────────
     APP_NAME: str = "COPS Customs Application"
-    APP_VERSION: str = "3.0.5"
+    APP_VERSION: str = "3.0.6"
     # Set COPS_ENV=production in the environment (or .env file) to enable prod mode.
     # Anything else (including the default) is treated as development.
     COPS_ENV: str = "production"

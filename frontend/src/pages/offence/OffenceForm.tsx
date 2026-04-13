@@ -56,15 +56,80 @@ const DUTY_TYPE_OPTIONS = DUTY_TYPES.map(type => (
 ));
 
 // Module-level constants — defined once, never reallocated per render
+
+// Maps MRZ ISO 3-letter country codes → display nationality names.
+// When a passport is scanned, the MRZ nationality field (e.g. "ESP") is looked up here.
+// If not found, the raw code is left as-is so the user can see and correct it manually.
 const NATIONALITY_MAP: Record<string, string> = {
-  'IND': 'INDIAN', 'USA': 'AMERICAN', 'GBR': 'BRITISH', 'CAN': 'CANADIAN', 'AUS': 'AUSTRALIAN',
-  'FRA': 'FRENCH', 'DEU': 'GERMAN', 'ITA': 'ITALIAN', 'JPN': 'JAPANESE', 'KOR': 'KOREAN',
-  'CHN': 'CHINESE', 'RUS': 'RUSSIAN', 'ZAF': 'SOUTH AFRICAN', 'NGA': 'NIGERIAN', 'KEN': 'KENYAN',
-  'ARE': 'UAE', 'SAU': 'SAUDI ARABIAN', 'IRN': 'IRANIAN', 'IRQ': 'IRAQI', 'TUR': 'TURKISH',
-  'PAK': 'PAKISTANI', 'BGD': 'BANGLADESHI', 'LKA': 'SRI LANKAN', 'NPL': 'NEPALESE', 'AFG': 'AFGHAN',
-  'SGP': 'SINGAPOREAN', 'MYS': 'MALAYSIAN', 'VNM': 'VIETNAMESE', 'THA': 'THAI', 'CHE': 'SWISS',
-  'NZL': 'NEW ZEALANDER'
+  // South Asia
+  'IND': 'INDIAN', 'PAK': 'PAKISTANI', 'BGD': 'BANGLADESHI', 'LKA': 'SRI LANKAN',
+  'NPL': 'NEPALESE', 'AFG': 'AFGHAN', 'BTN': 'BHUTANESE', 'MDV': 'MALDIVIAN',
+  // East Asia
+  'CHN': 'CHINESE', 'JPN': 'JAPANESE', 'KOR': 'KOREAN', 'PRK': 'NORTH KOREAN',
+  'MNG': 'MONGOLIAN', 'TWN': 'TAIWANESE',
+  // Southeast Asia
+  'SGP': 'SINGAPOREAN', 'MYS': 'MALAYSIAN', 'VNM': 'VIETNAMESE', 'THA': 'THAI',
+  'PHL': 'FILIPINO', 'IDN': 'INDONESIAN', 'MMR': 'MYANMARESE', 'KHM': 'CAMBODIAN',
+  'LAO': 'LAOTIAN', 'BRN': 'BRUNEIAN',
+  // Middle East
+  'ARE': 'UAE', 'SAU': 'SAUDI ARABIAN', 'IRN': 'IRANIAN', 'IRQ': 'IRAQI',
+  'JOR': 'JORDANIAN', 'KWT': 'KUWAITI', 'QAT': 'QATARI', 'BHR': 'BAHRAINI',
+  'OMN': 'OMANI', 'YEM': 'YEMENI', 'SYR': 'SYRIAN', 'LBN': 'LEBANESE',
+  'ISR': 'ISRAELI', 'PSE': 'PALESTINIAN',
+  // Anglosphere
+  'USA': 'AMERICAN', 'GBR': 'BRITISH', 'CAN': 'CANADIAN', 'AUS': 'AUSTRALIAN',
+  'NZL': 'NEW ZEALANDER', 'IRL': 'IRISH',
+  // Western Europe
+  'FRA': 'FRENCH', 'DEU': 'GERMAN', 'ITA': 'ITALIAN', 'ESP': 'SPANISH',
+  'PRT': 'PORTUGUESE', 'NLD': 'DUTCH', 'BEL': 'BELGIAN', 'CHE': 'SWISS',
+  'AUT': 'AUSTRIAN', 'SWE': 'SWEDISH', 'NOR': 'NORWEGIAN', 'DNK': 'DANISH',
+  'FIN': 'FINNISH', 'GRC': 'GREEK', 'LUX': 'LUXEMBOURGER',
+  // Eastern Europe
+  'RUS': 'RUSSIAN', 'UKR': 'UKRAINIAN', 'POL': 'POLISH', 'CZE': 'CZECH',
+  'SVK': 'SLOVAK', 'HUN': 'HUNGARIAN', 'ROU': 'ROMANIAN', 'BGR': 'BULGARIAN',
+  'SRB': 'SERBIAN', 'HRV': 'CROATIAN', 'SVN': 'SLOVENIAN', 'BLR': 'BELARUSIAN',
+  // Central Asia & Caucasus
+  'TUR': 'TURKISH', 'KAZ': 'KAZAKHSTANI', 'UZB': 'UZBEK', 'TJK': 'TAJIK',
+  'TKM': 'TURKMEN', 'KGZ': 'KYRGYZ', 'AZE': 'AZERBAIJANI', 'ARM': 'ARMENIAN', 'GEO': 'GEORGIAN',
+  // Africa
+  'ZAF': 'SOUTH AFRICAN', 'NGA': 'NIGERIAN', 'KEN': 'KENYAN', 'ETH': 'ETHIOPIAN',
+  'EGY': 'EGYPTIAN', 'GHA': 'GHANAIAN', 'TZA': 'TANZANIAN', 'UGA': 'UGANDAN',
+  'ZWE': 'ZIMBABWEAN', 'ZMB': 'ZAMBIAN', 'SDN': 'SUDANESE', 'SOM': 'SOMALI',
+  'DZA': 'ALGERIAN', 'MAR': 'MOROCCAN', 'TUN': 'TUNISIAN', 'LBY': 'LIBYAN',
+  // Americas
+  'MEX': 'MEXICAN', 'BRA': 'BRAZILIAN', 'ARG': 'ARGENTINIAN', 'COL': 'COLOMBIAN',
+  'CHL': 'CHILEAN', 'PER': 'PERUVIAN', 'VEN': 'VENEZUELAN', 'ECU': 'ECUADORIAN',
+  'BOL': 'BOLIVIAN', 'URY': 'URUGUAYAN',
 };
+
+// Sorted list used for the nationality datalist (autocomplete suggestions).
+// Users can also type any value not in this list — the field is free-text with suggestions.
+const NATIONALITY_LIST = [
+  'AFGHAN', 'ALGERIAN', 'AMERICAN', 'ARGENTINIAN', 'ARMENIAN', 'AUSTRALIAN', 'AUSTRIAN', 'AZERBAIJANI',
+  'BAHRAINI', 'BANGLADESHI', 'BELARUSIAN', 'BELGIAN', 'BHUTANESE', 'BOLIVIAN', 'BRAZILIAN', 'BRITISH', 'BRUNEIAN', 'BULGARIAN',
+  'CAMBODIAN', 'CANADIAN', 'CHILEAN', 'CHINESE', 'COLOMBIAN', 'CROATIAN', 'CZECH',
+  'DANISH', 'DUTCH',
+  'ECUADORIAN', 'EGYPTIAN', 'ETHIOPIAN',
+  'FILIPINO', 'FINNISH', 'FRENCH',
+  'GEORGIAN', 'GERMAN', 'GHANAIAN', 'GREEK',
+  'HUNGARIAN',
+  'INDIAN', 'INDONESIAN', 'IRANIAN', 'IRAQI', 'IRISH', 'ISRAELI', 'ITALIAN',
+  'JAPANESE', 'JORDANIAN',
+  'KAZAKHSTANI', 'KENYAN', 'KOREAN', 'KUWAITI', 'KYRGYZ',
+  'LAOTIAN', 'LEBANESE', 'LIBYAN', 'LUXEMBOURGER',
+  'MALAYSIAN', 'MALDIVIAN', 'MEXICAN', 'MONGOLIAN', 'MOROCCAN', 'MYANMARESE',
+  'NEPALESE', 'NEW ZEALANDER', 'NIGERIAN', 'NORTH KOREAN', 'NORWEGIAN',
+  'OMANI',
+  'PAKISTANI', 'PALESTINIAN', 'PERUVIAN', 'POLISH', 'PORTUGUESE',
+  'QATARI',
+  'ROMANIAN', 'RUSSIAN',
+  'SAUDI ARABIAN', 'SINGAPOREAN', 'SLOVAK', 'SLOVENIAN', 'SOMALI', 'SOUTH AFRICAN', 'SPANISH', 'SRI LANKAN', 'SUDANESE', 'SWEDISH', 'SWISS', 'SYRIAN',
+  'TAJIK', 'TAIWANESE', 'TANZANIAN', 'THAI', 'TUNISIAN', 'TURKISH', 'TURKMEN',
+  'UAE', 'UGANDAN', 'UKRAINIAN', 'URUGUAYAN', 'UZBEK',
+  'VENEZUELAN', 'VIETNAMESE',
+  'YEMENI',
+  'ZAMBIAN', 'ZIMBABWEAN',
+];
 
 const PORT_MAP: Record<string, string> = {
   // India
@@ -571,8 +636,15 @@ export default function OffenceForm() {
                 (safeData as Record<string, unknown>)[key] = data[key];
             }
         });
-        // Handle mapped fields specifically if needed
-        if (data.country_of_departure) safeData.arrived_from = data.country_of_departure;
+        // Map country_of_departure → arrived_from. The non-export select only has four valid
+        // options; anything else (e.g. a destination stored when the case was an Export Case)
+        // is normalised to 'Others' so the select never renders blank.
+        if (data.country_of_departure) {
+          const validArrivedFrom = ['Nepal', 'Bhutan', 'Myanmar', 'Others'];
+          safeData.arrived_from = validArrivedFrom.includes(data.country_of_departure)
+            ? data.country_of_departure
+            : 'Others';
+        }
         
         setFormData(safeData);
         setSupdtsRemarks(data.supdts_remarks || '');
@@ -1261,39 +1333,19 @@ export default function OffenceForm() {
                         <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
                             Nationality
                         </label>
-                        <select id="field-pax_nationality" className={`w-full px-3 py-1.5 border ${fieldErrors.pax_nationality ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-300 focus:ring-blue-500'} rounded text-sm focus:ring-2 uppercase font-medium`} value={formData.pax_nationality} onChange={e => setFormData({...formData, pax_nationality: e.target.value.toUpperCase()})}>
-                            <option value="INDIAN">INDIAN</option>
-                            <option value="AMERICAN">AMERICAN</option>
-                            <option value="AFGHAN">AFGHAN</option>
-                            <option value="AUSTRALIAN">AUSTRALIAN</option>
-                            <option value="BANGLADESHI">BANGLADESHI</option>
-                            <option value="BRITISH">BRITISH</option>
-                            <option value="CANADIAN">CANADIAN</option>
-                            <option value="CHINESE">CHINESE</option>
-                            <option value="FRENCH">FRENCH</option>
-                            <option value="GERMAN">GERMAN</option>
-                            <option value="IRANIAN">IRANIAN</option>
-                            <option value="IRAQI">IRAQI</option>
-                            <option value="ITALIAN">ITALIAN</option>
-                            <option value="JAPANESE">JAPANESE</option>
-                            <option value="KENYAN">KENYAN</option>
-                            <option value="KOREAN">KOREAN</option>
-                            <option value="MALAYSIAN">MALAYSIAN</option>
-                            <option value="NEPALESE">NEPALESE</option>
-                            <option value="NEW ZEALANDER">NEW ZEALANDER</option>
-                            <option value="NIGERIAN">NIGERIAN</option>
-                            <option value="PAKISTANI">PAKISTANI</option>
-                            <option value="RUSSIAN">RUSSIAN</option>
-                            <option value="SAUDI ARABIAN">SAUDI ARABIAN</option>
-                            <option value="SINGAPOREAN">SINGAPOREAN</option>
-                            <option value="SOUTH AFRICAN">SOUTH AFRICAN</option>
-                            <option value="SRI LANKAN">SRI LANKAN</option>
-                            <option value="SWISS">SWISS</option>
-                            <option value="THAI">THAI</option>
-                            <option value="TURKISH">TURKISH</option>
-                            <option value="UAE">UAE</option>
-                            <option value="VIETNAMESE">VIETNAMESE</option>
-                        </select>
+                        <input
+                            id="field-pax_nationality"
+                            type="text"
+                            list="nationality-list-opts"
+                            className={`w-full px-3 py-1.5 border ${fieldErrors.pax_nationality ? 'border-red-500 ring-1 ring-red-500' : 'border-slate-300 focus:ring-blue-500'} rounded text-sm focus:ring-2 uppercase font-medium`}
+                            value={formData.pax_nationality}
+                            onChange={e => setFormData({...formData, pax_nationality: e.target.value.toUpperCase()})}
+                            placeholder="Type or select nationality"
+                            autoComplete="off"
+                        />
+                        <datalist id="nationality-list-opts">
+                            {NATIONALITY_LIST.map(n => <option key={n} value={n} />)}
+                        </datalist>
                     </div>
                     <div className="col-span-1">
                         <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Normal Residence At</label>

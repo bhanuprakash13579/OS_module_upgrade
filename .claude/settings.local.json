@@ -74,7 +74,9 @@
       "Bash(git tag:*)",
       "Bash(python -m py_compile backend/server_entry.py)",
       "Bash(sudo apt:*)",
-      "Bash(/tmp/backend_routes.txt:*)"
+      "Bash(/tmp/backend_routes.txt:*)",
+      "Bash(sqlite3 /home/bhanu/Downloads/cops_fulldb_2026-04-01.db \" SELECT sql || ';' FROM sqlite_master WHERE type='index' AND tbl_name IN \\( 'users','cops_master','cops_items','cops_master_deleted', 'batch_master','os_master','item_trans','audit_events' \\) AND sql IS NOT NULL ORDER BY tbl_name; \")",
+      "Bash(/home/bhanu/Desktop/cops2/node_modules/.bin/tsc --noEmit -p /home/bhanu/Desktop/cops2/tsconfig.json)"
     ]
   }
 }

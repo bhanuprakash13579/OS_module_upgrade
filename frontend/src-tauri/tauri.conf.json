@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "COPS",
-  "version": "3.0.5",
+  "version": "3.0.6",
   "identifier": "gov.in.customs.cops",
   "build": {
     "frontendDist": "../dist",
@@ -21,6 +21,7 @@
         "fullscreen": false,
         "maximized": true,
         "center": true,
+        "visible": false,
         "backgroundColor": "#f8fafc"
       }
     ],
