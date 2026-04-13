@@ -123,17 +123,16 @@ try:
     except Exception as _e:
         _slog(f"Warning: could not redirect stdout/stderr: {_e}")
 
-    # Redirect stdin to a never-closing pipe so uvicorn on Windows
+    # Redirect stdin to a never-closing pipe so uvicorn
     # cannot exit due to EOF polling, while keeping fileno() functional.
-    if sys.platform == "win32":
-        import io
-        try:
-            _r_fd, _w_fd = os.pipe()
-            # Keep the write end open forever (never GC'd, never closed)
-            _stdin_write_keeper = os.fdopen(_w_fd, "wb", buffering=0)
-            sys.stdin = io.FileIO(_r_fd, "rb", closefd=True)
-        except Exception as _pipe_err:
-            _slog(f"Warning: could not create stdin pipe: {_pipe_err}")
+    import io
+    try:
+        _r_fd, _w_fd = os.pipe()
+        # Keep the write end open forever (never GC'd, never closed)
+        _stdin_write_keeper = os.fdopen(_w_fd, "wb", buffering=0)
+        sys.stdin = io.FileIO(_r_fd, "rb", closefd=True)
+    except Exception as _pipe_err:
+        _slog(f"Warning: could not create stdin pipe: {_pipe_err}")
 
     import logging
     # Pre-startup logging (sqlalchemy, asyncio, app imports)
