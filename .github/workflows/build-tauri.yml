@@ -9,8 +9,6 @@ name: CI Build (verify code compiles)
 #   git tag v2.1.0 && git push origin v2.1.0
 # ─────────────────────────────────────────────────────────────────────────────
 on:
-  push:
-    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
