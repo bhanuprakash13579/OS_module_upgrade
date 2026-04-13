@@ -34,6 +34,15 @@ logger = logging.getLogger(__name__)
 _cipher_module = None   # sqlcipher3 module if available
 _DB_KEY: str | None = None  # 64-char hex key
 
+def _is_plain_sqlite(path: str) -> bool:
+    """Return True if the file exists and starts with the SQLite magic header."""
+    try:
+        with open(path, "rb") as _f:
+            return _f.read(16) == b"SQLite format 3\x00"
+    except Exception:
+        return False
+
+
 if settings.DATABASE_URL.startswith("sqlite"):
     try:
         import sqlcipher3 as _cipher_module      # type: ignore[import]
@@ -182,6 +191,24 @@ if settings.DATABASE_URL.startswith("sqlite"):
 
     else:
         # ── Plaintext fallback ───────────────────────────────────────────────
+        # SAFETY CHECK: if the DB file already exists but is NOT a plain SQLite
+        # file, it was encrypted by a previous build that had sqlcipher3.
+        # Opening it as plain SQLite would fail with "file is not a database",
+        # causing a confusing crash loop.  Raise a clear error now instead.
+        if os.path.exists(_db_path) and not _is_plain_sqlite(_db_path):
+            _msg = (
+                "STARTUP FAILURE: The database file appears to be encrypted "
+                f"({_db_path}) but the sqlcipher3 encryption module is not "
+                "available in this build.  "
+                "Fix options:\n"
+                "  1. Reinstall COPS — a fresh install will create a new database.\n"
+                "  2. Copy a plain-SQLite backup into the above path.\n"
+                "  3. Build with sqlcipher3 support (pip install sqlcipher3).\n"
+                "The application cannot start until this is resolved."
+            )
+            logger.critical(_msg)
+            raise RuntimeError(_msg)
+
         engine = create_engine(
             settings.DATABASE_URL,
             connect_args={"check_same_thread": False},

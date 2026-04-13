@@ -42,14 +42,24 @@ pub fn run() {
       // Resolve the user's app-data directory for this machine
       // e.g. C:\Users\<user>\AppData\Local\COPS  (Windows)
       //      ~/.local/share/COPS                 (Linux)
-      let app_data_dir = app
-        .path()
-        .app_local_data_dir()
-        .expect("could not resolve app data dir");
+      let app_data_dir = match app.path().app_local_data_dir() {
+        Ok(d) => d,
+        Err(e) => {
+          eprintln!("[cops] FATAL: cannot resolve app data dir: {e}");
+          // Emit so the frontend can show an error rather than spinning forever
+          let _ = app.handle().emit("sidecar-startup-failed",
+            format!("Cannot determine app data directory: {e}. Try reinstalling COPS."));
+          return Ok(());
+        }
+      };
 
       // Make sure the directory exists
-      std::fs::create_dir_all(&app_data_dir)
-        .expect("could not create app data dir");
+      if let Err(e) = std::fs::create_dir_all(&app_data_dir) {
+        eprintln!("[cops] FATAL: cannot create app data dir {:?}: {e}", app_data_dir);
+        let _ = app.handle().emit("sidecar-startup-failed",
+          format!("Cannot create app data directory: {e}. Check folder permissions."));
+        return Ok(());
+      }
 
       // Create a persistent PyInstaller extraction cache directory.
       // By pointing TEMP/TMP/TMPDIR here we give PyInstaller's bootloader a
@@ -64,14 +74,14 @@ pub fn run() {
 
       // On first install: copy the bundled seed DB into app-data dir
       if !db_path.exists() {
-        let bundled = app
-          .path()
-          .resource_dir()
-          .expect("could not resolve resource dir")
-          .join("cops_br_database.db");
-        if bundled.exists() {
-          std::fs::copy(&bundled, &db_path)
-            .expect("could not copy seed database");
+        if let Ok(resource_dir) = app.path().resource_dir() {
+          let bundled = resource_dir.join("cops_br_database.db");
+          if bundled.exists() {
+            if let Err(e) = std::fs::copy(&bundled, &db_path) {
+              eprintln!("[cops] Warning: could not copy seed database: {e}");
+              // Non-fatal — backend will create a fresh DB on first run
+            }
+          }
         }
       }
 
