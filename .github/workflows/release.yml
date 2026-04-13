@@ -96,7 +96,8 @@ jobs:
             libgdk-pixbuf2.0-dev \
             libcairo2-dev \
             libpango1.0-dev \
-            libfontconfig1-dev
+            libfontconfig1-dev \
+            libsqlcipher-dev
 
       # ── Python / PyInstaller ─────────────────────────────────────────────────
       - name: Setup Python 3.12
@@ -115,6 +116,23 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
           python -m pip install pyinstaller
+
+      - name: Install sqlcipher3-binary (Windows — DB encryption)
+        if: matrix.os == 'windows-latest'
+        working-directory: backend
+        shell: bash
+        run: |
+          python -m pip install --prefer-binary sqlcipher3-binary \
+            || python -m pip install --prefer-binary "sqlcipher3-binary==0.5.0.post1"
+          python -c "import sqlcipher3; print('✓ sqlcipher3 loaded — DB encryption enabled')"
+
+      - name: Install sqlcipher3 (Linux — DB encryption, links to system libsqlcipher)
+        if: matrix.os == 'ubuntu-22.04'
+        working-directory: backend
+        run: |
+          python -m pip install --prefer-binary sqlcipher3-binary \
+            || python -m pip install sqlcipher3
+          python -c "import sqlcipher3; print('✓ sqlcipher3 loaded — DB encryption enabled')"
 
       - name: Bake admin password hash into source
         working-directory: backend

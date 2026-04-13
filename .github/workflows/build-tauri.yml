@@ -97,17 +97,15 @@ jobs:
         working-directory: ./backend
         shell: bash
         run: |
-          python -m pip install --prefer-binary sqlcipher3-binary \
-            || python -m pip install --prefer-binary "sqlcipher3-binary==0.5.0.post1" \
-            || echo "sqlcipher3-binary not available — DB encryption disabled for this build"
+          python -m pip install --prefer-binary sqlcipher3-binary             || python -m pip install --prefer-binary "sqlcipher3-binary==0.5.0.post1"
+          python -c "import sqlcipher3; print('✓ sqlcipher3 loaded — DB encryption enabled')"
 
-      - name: Install sqlcipher3-binary (Linux — DB encryption, self-contained)
+      - name: Install sqlcipher3 (Linux — DB encryption, links to system libsqlcipher)
         if: matrix.os == 'ubuntu-22.04'
         working-directory: ./backend
         run: |
-          python -m pip install --prefer-binary sqlcipher3-binary \
-            || python -m pip install sqlcipher3 \
-            || echo "sqlcipher3 not available — DB encryption disabled for this build"
+          python -m pip install --prefer-binary sqlcipher3-binary             || python -m pip install sqlcipher3
+          python -c "import sqlcipher3; print('✓ sqlcipher3 loaded — DB encryption enabled')"
 
       - name: Bake admin password hash into source
         working-directory: ./backend
