@@ -16,5 +16,5 @@ weasyprint==68.1
 openpyxl==3.1.5
 pyodbc==5.2.0
 pyzipper==0.3.6
-# sqlcipher3-binary is optional (AES-256 encryption) — not available on all platforms.
-# Install manually if needed: pip install sqlcipher3-binary
+# sqlcipher3 is optional (AES-256 encryption) — not available on all platforms.
+# Install manually if needed: pip install sqlcipher3

@@ -92,17 +92,14 @@ jobs:
           python -m pip install --prefer-binary -r requirements.txt
           python -m pip install pyinstaller
 
-      - name: Install sqlcipher3-binary (Windows — DB encryption, best-effort)
+      - name: Install sqlcipher3 (Windows — DB encryption)
         if: matrix.os == 'windows-latest'
         working-directory: ./backend
         shell: bash
-        continue-on-error: true
         run: |
-          python -m pip install --prefer-binary sqlcipher3-binary \
-            || python -m pip install --prefer-binary "sqlcipher3-binary==0.5.0.post1" \
-            || echo "⚠ sqlcipher3-binary not available for this Python version on Windows"
+          python -m pip install sqlcipher3
           python -c "import sqlcipher3; print('✓ sqlcipher3 loaded — DB encryption enabled')" 2>/dev/null \
-            || echo "⚠ DB encryption disabled on Windows — no sqlcipher3 wheel available"
+            || echo "⚠ DB encryption disabled on Windows"
 
       - name: Install sqlcipher3 (Linux — DB encryption, links to system libsqlcipher)
         if: matrix.os == 'ubuntu-22.04'

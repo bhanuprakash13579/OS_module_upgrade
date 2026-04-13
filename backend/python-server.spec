@@ -5,7 +5,7 @@ import glob, os, subprocess, sys
 # target machine without libsqlcipher installed system-wide.
 #
 # Two cases:
-#  1. sqlcipher3-binary  — ships its own OpenSSL in sqlcipher3_binary.libs/
+#  1. sqlcipher3 (wheels) — ships its own OpenSSL in sqlcipher3.libs/
 #  2. sqlcipher3 (system-linked) — libsqlcipher.so.0 must be found via ldd
 #     and bundled explicitly; PyInstaller excludes it as an "unknown" lib.
 _sqlcipher_bins = []
@@ -15,12 +15,12 @@ try:
         os.path.join(os.path.dirname(_sc.__file__), '_sqlite3*.so')
     )
 
-    # Case 1: sqlcipher3-binary bundled libs
+    # Case 1: sqlcipher3 bundled libs (e.g. sqlcipher3.libs or similar)
     _libs_dir = os.path.normpath(
-        os.path.join(os.path.dirname(_sc.__file__), '..', 'sqlcipher3_binary.libs')
+        os.path.join(os.path.dirname(_sc.__file__), '..', 'sqlcipher3.libs')
     )
-    for _lib in glob.glob(os.path.join(_libs_dir, '*.so*')):
-        _sqlcipher_bins.append((_lib, 'sqlcipher3_binary.libs'))
+    for _lib in glob.glob(os.path.join(_libs_dir, '*.so*')) + glob.glob(os.path.join(_libs_dir, '*.dll*')):
+        _sqlcipher_bins.append((_lib, 'sqlcipher3.libs'))
 
     # Case 2: system-linked — walk ldd output to find libsqlcipher.so
     if not _sqlcipher_bins and _sc_ext:

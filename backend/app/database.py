@@ -46,7 +46,7 @@ if settings.DATABASE_URL.startswith("sqlite"):
         _DB_KEY = None
         logger.warning(
             "sqlcipher3 package not found — database will NOT be encrypted. "
-            "Install 'sqlcipher3-binary' to enable AES-256 at-rest encryption. "
+            "Install 'sqlcipher3' to enable AES-256 at-rest encryption. "
             "Import error detail: %s", _ie
         )
         logger.debug("sqlcipher3 import traceback:\n%s", _tb.format_exc())
