@@ -96,7 +96,7 @@ jobs:
         shell: bash
         run: |
           python -m pip install sqlcipher3
-          python -c "import sqlcipher3; print('✓ sqlcipher3 loaded — DB encryption enabled')"
+          python -c "import sqlcipher3; print('OK sqlcipher3 loaded - DB encryption enabled')"
 
       - name: Install sqlcipher3 (Linux — DB encryption, links to system libsqlcipher)
         if: matrix.os == 'ubuntu-22.04'
