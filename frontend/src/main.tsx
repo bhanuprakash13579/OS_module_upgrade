@@ -8,7 +8,7 @@ import './index.css'
 // split-second where Windows DWM sees the native host frame and the WebView2
 // compositor surface as two separate surfaces — the "double screen" flicker
 // visible in the taskbar thumbnail on Windows 11.
-if (typeof window !== 'undefined' && (window as any).__TAURI__) {
+if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
   import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
     requestAnimationFrame(() => getCurrentWindow().show());
   });
