@@ -89,6 +89,7 @@ class CopsMaster(Base):
     adj_offr_designation = Column(String(200))
     adjn_offr_remarks = Column(Text)                # Max 700 characters enforced in API
     adjn_offr_remarks1 = Column(Text)               # Legacy: extra adjudication remarks
+    adjn_section_ref = Column(String(200), nullable=True)  # Full section ref saved at adjudication, e.g. "Section 111(d), (l) & (m) of the Customs Act, 1962"
     online_adjn = Column(String(5))                 # Y/N
 
     # ── Administrative ──

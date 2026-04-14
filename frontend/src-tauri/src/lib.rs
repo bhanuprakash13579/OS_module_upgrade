@@ -16,6 +16,7 @@ mod win32 {
     use std::ffi::c_void;
 
     pub type HWND   = *mut c_void;
+    pub type WPARAM = usize;
     pub type LPARAM = isize;
     pub type BOOL   = i32;
     pub type DWORD  = u32;
@@ -26,6 +27,10 @@ mod win32 {
     /// Shows without activating — the foreground app keeps focus.
     pub const SW_SHOWNOACTIVATE: i32 = 4;
     pub const TRUE: BOOL = 1;
+    /// WM_SYSCOMMAND message — used to maximize without activating the window.
+    pub const WM_SYSCOMMAND: u32 = 0x0112;
+    /// SC_MAXIMIZE system command — maximizes the window.
+    pub const SC_MAXIMIZE: WPARAM = 0xF030;
 
     #[link(name = "user32")]
     extern "system" {
@@ -38,6 +43,8 @@ mod win32 {
             lp_enum_func: Option<unsafe extern "system" fn(HWND, LPARAM) -> BOOL>,
             l_param:      LPARAM,
         ) -> BOOL;
+        /// Post a message to the window's message queue (non-blocking, no activation).
+        pub fn PostMessageW(hwnd: HWND, msg: u32, w_param: WPARAM, l_param: LPARAM) -> BOOL;
     }
 }
 
@@ -57,6 +64,10 @@ fn show_main_window(app: tauri::AppHandle) {
                 // windows::HWND is a newtype: HWND(pub *mut c_void).
                 // Unwrap .0 to get the raw pointer our FFI expects.
                 win32::ShowWindow(hwnd.0, win32::SW_SHOWNOACTIVATE);
+                // Maximize without stealing focus: post WM_SYSCOMMAND + SC_MAXIMIZE.
+                // PostMessageW is asynchronous — it queues the message and returns
+                // immediately, so the window shows first and then maximizes cleanly.
+                win32::PostMessageW(hwnd.0, win32::WM_SYSCOMMAND, win32::SC_MAXIMIZE, 0);
             }
         }
     }
@@ -64,6 +75,9 @@ fn show_main_window(app: tauri::AppHandle) {
     #[cfg(not(target_os = "windows"))]
     {
         let _ = window.show();
+        // Explicitly maximize after show — GTK/WebKit2GTK may not honour the
+        // maximized:true config flag for a window that was initially hidden.
+        let _ = window.maximize();
     }
 }
 

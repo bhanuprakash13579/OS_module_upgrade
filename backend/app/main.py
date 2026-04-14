@@ -76,6 +76,7 @@ def apply_sqlite_migrations():
         ("is_legacy", "TEXT DEFAULT 'N'"),
         ("is_offline_adjudication", "TEXT DEFAULT 'N'"),
         ("file_spot", "TEXT DEFAULT 'Spot'"),
+        ("adjn_section_ref", "TEXT"),
     ]
 
     TABLES_TO_MIGRATE = ["cops_master", "cops_master_deleted", "cops_master_temp"]

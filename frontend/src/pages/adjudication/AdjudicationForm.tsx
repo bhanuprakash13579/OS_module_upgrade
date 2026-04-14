@@ -65,6 +65,7 @@ interface OSCase {
   adj_offr_name?: string;
   adj_offr_designation?: string;
   adjn_offr_remarks?: string;
+  adjn_section_ref?: string;
   adjudication_time?: string;
   online_adjn?: string;
   closure_ind?: string;
@@ -428,8 +429,16 @@ export default function AdjudicationForm() {
 
   const [selectedOptionals, setSelectedOptionals] = useState<string[]>([]);
 
-  // Reset optional chips when a different case is loaded
-  useEffect(() => { setSelectedOptionals([]); }, [osCase?.id]);
+  // Pre-fill optional chips from saved adjn_section_ref when a case loads/changes.
+  // Extracts (x) subsection letters and restores the ones that are still in optionalSubs.
+  useEffect(() => {
+    if (!osCase?.adjn_section_ref) { setSelectedOptionals([]); return; }
+    const saved = (osCase.adjn_section_ref.match(/\(([a-z])\)/g) || [])
+      .map((m: string) => m.slice(1, -1));
+    // Store all parsed subs — safeOptionals filters to valid ones once sectionCfg loads.
+    // Filtering here would silently drop selections if optionalSubs hasn't populated yet (race).
+    setSelectedOptionals(saved);
+  }, [osCase?.id, osCase?.adjn_section_ref]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isExportCase = osCase?.case_type === 'Export Case';
   const sectionNo    = isExportCase ? sectionCfg.exportSection  : sectionCfg.importSection;
@@ -447,7 +456,7 @@ export default function AdjudicationForm() {
     if (parts.length === 1) return parts[0];
     return parts.slice(0, -1).join(', ') + ' & ' + parts[parts.length - 1];
   };
-  const sectionText = `Section ${sectionNo} ${formatSubs(allSubs)} of the Customs Act, 1962`;
+  const sectionText = `Section ${sectionNo}${formatSubs(allSubs)} of the Customs Act, 1962`;
 
   // Styled confirmation modals (replaces native window.confirm / window.prompt)
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -558,6 +567,7 @@ export default function AdjudicationForm() {
         adj_offr_designation: offrDesig,
         adjudication_date: adjDate,
         adjn_offr_remarks: remarks,
+        adjn_section_ref: sectionText,
         rf_amount: rfAmt,
         ref_amount: refAmt,
         pp_amount: ppAmt,

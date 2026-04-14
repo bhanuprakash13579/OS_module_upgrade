@@ -539,6 +539,7 @@ class OSQueryResponse(BaseModel):
     pp_amount: float = 0.0
     supdts_remarks: Optional[str] = None
     adjn_offr_remarks: Optional[str] = None
+    adjn_section_ref: Optional[str] = None
     adj_offr_name: Optional[str] = None
     adj_offr_designation: Optional[str] = None
 
@@ -751,6 +752,7 @@ def search_os_cases(
             "supdts_remarks": (" ".join(filter(bool, [case.supdts_remarks, case.supdt_remarks2]))).strip() or None,
             "adjn_offr_remarks": (" ".join(filter(bool, [case.adjn_offr_remarks, case.adjn_offr_remarks1]))).strip() or None,
             "adj_offr_name": case.adj_offr_name,
+            "adjn_section_ref": case.adjn_section_ref,
             "adj_offr_designation": case.adj_offr_designation,
             "post_adj_br_entries": case.post_adj_br_entries,
             "post_adj_dr_no": case.post_adj_dr_no,

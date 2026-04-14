@@ -121,6 +121,7 @@ class CopsMasterOut(CopsMasterBase):
     adj_offr_name: Optional[str] = None
     adj_offr_designation: Optional[str] = None
     adjn_offr_remarks: Optional[str] = None
+    adjn_section_ref: Optional[str] = None
     adjudication_time: Optional[datetime] = None
     online_adjn: Optional[str] = None
     
@@ -173,6 +174,9 @@ class AdjudicationCreate(BaseModel):
 
     # Whether to close the case (set closure_ind = 'Y')
     close_case: bool = False
+
+    # Full section reference saved at adjudication time, e.g. "Section 111(d), (l) & (m) of the Customs Act, 1962"
+    adjn_section_ref: Optional[str] = None
 
     @field_validator('adjn_offr_remarks')
     @classmethod

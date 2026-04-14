@@ -365,7 +365,7 @@ _MASTER_COLS = [
     "is_draft", "is_legacy", "is_offline_adjudication", "file_spot", "os_printed", "os_category", "online_os",
     "adjudication_date", "adjudication_time",
     "adj_offr_name", "adj_offr_designation",
-    "adjn_offr_remarks", "adjn_offr_remarks1", "online_adjn",
+    "adjn_offr_remarks", "adjn_offr_remarks1", "adjn_section_ref", "online_adjn",
     # Supdt remarks
     "supdts_remarks", "supdt_remarks2",
     # Admin
@@ -677,6 +677,7 @@ _REPORT_MASTER_COLS: Set[str] = {
     "br_amount", "wh_amount", "other_amount", "total_payable",
     "br_no_num", "br_date_str", "br_amount_str", "br_no_str",
     "adjudication_date", "adj_offr_name", "adj_offr_designation", "adjn_offr_remarks",
+    "adjn_section_ref",
     "online_adjn", "dr_no", "dr_year", "seizure_date", "supdts_remarks",
     "post_adj_br_entries", "post_adj_dr_no", "post_adj_dr_date",
 }

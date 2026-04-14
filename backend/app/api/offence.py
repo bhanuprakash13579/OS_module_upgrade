@@ -909,6 +909,7 @@ def update_os(
         os_obj.adj_offr_name = None
         os_obj.adj_offr_designation = None
         os_obj.adjn_offr_remarks = None
+        os_obj.adjn_section_ref = None
         os_obj.os_printed = 'N'
         os_obj.confiscated_value = 0.0
         os_obj.redeemed_value = 0.0
@@ -1632,6 +1633,7 @@ def online_adjudicate(
     os_obj.adj_offr_name = payload.adj_offr_name
     os_obj.adj_offr_designation = current_user.user_desig or payload.adj_offr_designation
     os_obj.adjn_offr_remarks = payload.adjn_offr_remarks
+    os_obj.adjn_section_ref = payload.adjn_section_ref
 
     # Save per-item release categories
     if payload.item_categories:
