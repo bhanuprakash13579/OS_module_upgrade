@@ -54,8 +54,9 @@ fn show_main_window(app: tauri::AppHandle) {
     {
         if let Ok(hwnd) = window.hwnd() {
             unsafe {
-                // Tauri returns HWND as isize; cast via usize to *mut c_void for FFI.
-                win32::ShowWindow(hwnd as usize as win32::HWND, win32::SW_SHOWNOACTIVATE);
+                // windows::HWND is a newtype: HWND(pub *mut c_void).
+                // Unwrap .0 to get the raw pointer our FFI expects.
+                win32::ShowWindow(hwnd.0, win32::SW_SHOWNOACTIVATE);
             }
         }
     }
@@ -192,13 +193,17 @@ pub fn run() {
       {
         if let Some(main_win) = app.get_webview_window("main") {
           if let Ok(main_hwnd) = main_win.hwnd() {
+            // *mut c_void is not Send — convert to usize before crossing thread
+            // boundary, then cast back inside the async block (safe: the HWND
+            // remains valid for the lifetime of the Tauri window).
+            let hwnd_raw = main_hwnd.0 as usize;
             tauri::async_runtime::spawn(async move {
               // Give WebView2 time to create its child windows (~200 ms in practice;
               // 800 ms is a conservative buffer for slow machines / cold starts).
               tokio::time::sleep(std::time::Duration::from_millis(800)).await;
               unsafe {
                 win32::EnumChildWindows(
-                  main_hwnd as usize as win32::HWND,
+                  hwnd_raw as win32::HWND,
                   Some(hide_webview2_thumbnail),
                   0,
                 );
