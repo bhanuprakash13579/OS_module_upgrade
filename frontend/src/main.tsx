@@ -7,6 +7,11 @@ import './index.css'
 // The window starts hidden (visible: false in tauri.conf.json) to prevent the
 // split-second "double screen" flicker on Windows 11 / DWM.
 //
+// We call our custom Rust command `show_main_window` instead of window.show()
+// directly. On Windows the command uses SW_SHOWNOACTIVATE so COPS appears in
+// the taskbar without stealing focus from whatever the user was doing (e.g.
+// Chrome). On Linux/macOS it falls back to the normal show() call.
+//
 // IMPORTANT: We use a retry loop rather than a one-shot check because on
 // Linux/WebKit2GTK, Tauri injects __TAURI_INTERNALS__ asynchronously — it may
 // not be present when this module first executes.  The loop retries every 100 ms
@@ -16,8 +21,8 @@ import './index.css'
 if (typeof window !== 'undefined') {
   const _tryShowWindow = (attempt: number) => {
     if ('__TAURI_INTERNALS__' in window) {
-      import('@tauri-apps/api/window')
-        .then(({ getCurrentWindow }) => getCurrentWindow().show())
+      import('@tauri-apps/api/core')
+        .then(({ invoke }) => invoke('show_main_window'))
         .catch(() => {/* ignore — window may already be visible */});
     } else if (attempt < 30) {
       // __TAURI_INTERNALS__ not ready yet (WebKit2GTK async init) — retry

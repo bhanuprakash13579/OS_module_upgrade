@@ -7,6 +7,94 @@ use tauri_plugin_shell::process::CommandChild;
 #[cfg(not(debug_assertions))]
 use tauri_plugin_shell::process::CommandEvent;
 
+// ── Windows-only: raw Win32 FFI for focus-safe window show + taskbar fix ─────
+// We declare only the handful of API functions we actually need so there is no
+// extra crate dependency. All functions live in user32.dll / kernel32.dll which
+// are always present on Windows.
+#[cfg(target_os = "windows")]
+mod win32 {
+    use std::ffi::c_void;
+
+    pub type HWND   = *mut c_void;
+    pub type LPARAM = isize;
+    pub type BOOL   = i32;
+    pub type DWORD  = u32;
+
+    pub const GWL_EXSTYLE:      i32 = -20;
+    pub const WS_EX_TOOLWINDOW: i32 = 0x0000_0080_u32 as i32;
+    pub const WS_EX_APPWINDOW:  i32 = 0x0004_0000_u32 as i32;
+    /// Shows without activating — the foreground app keeps focus.
+    pub const SW_SHOWNOACTIVATE: i32 = 4;
+    pub const TRUE: BOOL = 1;
+
+    #[link(name = "user32")]
+    extern "system" {
+        pub fn ShowWindow(hwnd: HWND, n_cmd_show: i32) -> BOOL;
+        pub fn GetWindowLongW(hwnd: HWND, n_index: i32) -> i32;
+        pub fn SetWindowLongW(hwnd: HWND, n_index: i32, dw_new_long: i32) -> i32;
+        pub fn GetClassNameW(hwnd: HWND, lp_class_name: *mut u16, n_max_count: i32) -> i32;
+        pub fn EnumChildWindows(
+            hwnd_parent:  HWND,
+            lp_enum_func: Option<unsafe extern "system" fn(HWND, LPARAM) -> BOOL>,
+            l_param:      LPARAM,
+        ) -> BOOL;
+    }
+}
+
+// ── Tauri command: show the main window without stealing focus on Windows ─────
+// Called by main.tsx instead of window.show() directly. On Windows this uses
+// SW_SHOWNOACTIVATE so COPS appears in the taskbar without yanking focus away
+// from whatever the user was doing (e.g. Chrome). On other platforms it falls
+// back to the normal Tauri show() call.
+#[tauri::command]
+fn show_main_window(app: tauri::AppHandle) {
+    let Some(window) = app.get_webview_window("main") else { return };
+
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(hwnd) = window.hwnd() {
+            unsafe {
+                // Tauri returns HWND as isize; cast via usize to *mut c_void for FFI.
+                win32::ShowWindow(hwnd as usize as win32::HWND, win32::SW_SHOWNOACTIVATE);
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = window.show();
+    }
+}
+
+// ── Windows helper: hide WebView2's internal window from the taskbar ──────────
+// WebView2 creates a child window with class "Chrome_WidgetWin_1" under the
+// Tauri HWND. Windows 11's DWM picks it up as a second thumbnail, causing the
+// "double-tab" effect when hovering over the taskbar icon. Setting
+// WS_EX_TOOLWINDOW on that child removes it from the taskbar group while
+// keeping it fully functional for rendering.
+#[cfg(target_os = "windows")]
+unsafe extern "system" fn hide_webview2_thumbnail(
+    hwnd:   win32::HWND,
+    _param: win32::LPARAM,
+) -> win32::BOOL {
+    let mut buf = [0u16; 256];
+    let len = win32::GetClassNameW(hwnd, buf.as_mut_ptr(), buf.len() as i32);
+    if len > 0 {
+        let class = String::from_utf16_lossy(&buf[..len as usize]);
+        if class.starts_with("Chrome_WidgetWin") {
+            let ex = win32::GetWindowLongW(hwnd, win32::GWL_EXSTYLE);
+            // Add WS_EX_TOOLWINDOW (omit from taskbar grouping)
+            // Remove WS_EX_APPWINDOW (forces inclusion — counter-productive here)
+            win32::SetWindowLongW(
+                hwnd,
+                win32::GWL_EXSTYLE,
+                (ex | win32::WS_EX_TOOLWINDOW) & !win32::WS_EX_APPWINDOW,
+            );
+        }
+    }
+    win32::TRUE
+}
+
 /// Holds the python-server child process (updated on every restart).
 struct PythonSidecar(Mutex<Option<CommandChild>>);
 
@@ -93,6 +181,32 @@ pub fn run() {
       app.manage(PythonSidecar(Mutex::new(None)));
       app.manage(SidecarRestartEnabled(AtomicBool::new(true)));
       app.manage(FastCrashCount(AtomicU32::new(0)));
+
+      // ── Windows: fix WebView2 double-taskbar thumbnail ────────────────────
+      // WebView2 creates a "Chrome_WidgetWin_1" child window that Windows 11
+      // DWM treats as a second app window, causing two thumbnails when hovering
+      // the taskbar icon. We enumerate child windows after a short delay (to let
+      // WebView2 finish creating them) and set WS_EX_TOOLWINDOW on any match so
+      // they are hidden from the taskbar while still rendering normally.
+      #[cfg(target_os = "windows")]
+      {
+        if let Some(main_win) = app.get_webview_window("main") {
+          if let Ok(main_hwnd) = main_win.hwnd() {
+            tauri::async_runtime::spawn(async move {
+              // Give WebView2 time to create its child windows (~200 ms in practice;
+              // 800 ms is a conservative buffer for slow machines / cold starts).
+              tokio::time::sleep(std::time::Duration::from_millis(800)).await;
+              unsafe {
+                win32::EnumChildWindows(
+                  main_hwnd as usize as win32::HWND,
+                  Some(hide_webview2_thumbnail),
+                  0,
+                );
+              }
+            });
+          }
+        }
+      }
 
       let app_handle = app.handle().clone();
       let db_path_owned = db_path_str;
@@ -262,6 +376,7 @@ pub fn run() {
         }
       }
     })
+    .invoke_handler(tauri::generate_handler![show_main_window])
     .plugin(tauri_plugin_shell::init())
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_fs::init())
