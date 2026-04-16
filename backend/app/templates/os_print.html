@@ -57,6 +57,21 @@
   /* ── Page 1 — base font auto-scaled by backend to fill the page ──── */
   .p1 { font-size: {{ p1_font_size | default('9pt') }}; }
 
+  /* ── Page 1 — halved border widths ─────────────────────────────── */
+  .p1 .header-box { border-width: 2px; }
+  .p1 .tbl-outer { border-width: 2px; }
+  .p1 .tbl-outer td, .p1 .tbl-outer th { border-width: 0.5px; }
+  .p1 .td-bb4 { border-bottom-width: 2px !important; }
+  .p1 .td-br4 { border-right-width: 2px !important; }
+  .p1 .td-bt4 { border-top-width: 2px !important; }
+  .p1 .inv-tbl { border-width: 2px; }
+  .p1 .inv-tbl td, .p1 .inv-tbl th { border-width: 1px; }
+  .p1 .inv-tbl tfoot td { border-top-width: 2px !important; }
+  .p1 .sum-tbl { border-width: 2px; }
+  .p1 .sum-tbl td { border-width: 1px; }
+  .p1 .adj-tbl { border-width: 2px; }
+  .p1 .adj-tbl td { border-width: 1px; }
+
   /* ── Page 2 — font size auto-reduced by backend to fit one page ──── */
   .p2 { font-size: {{ p2_font_size | default('8pt') }}; line-height: 1.5; }
   .p2 td, .p2 th { padding: 1px 3px; vertical-align: top; }
