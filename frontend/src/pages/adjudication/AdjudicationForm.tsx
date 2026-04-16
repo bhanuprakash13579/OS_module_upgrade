@@ -7,6 +7,22 @@ import { useAuth } from '@/contexts/AuthContext';
 import { showDownloadToast } from '@/components/DownloadToast';
 import { useRemarksGenerator, detectContextualQuestions, ContextualAnswers, ContextualQuestion } from '@/hooks/useRemarksGenerator';
 
+// ── PIT config cache ──────────────────────────────────────────────────────────
+// The /admin/config/pit endpoint returns static configuration (legal section refs,
+// baggage rules) that does not change mid-session.  Caching it here avoids a
+// redundant network round-trip on every AdjudicationForm mount.
+// Cache is keyed by today's date so a day rollover gets fresh data automatically.
+let _pitCache: { date: string; data: Record<string, { field_value: string }> } | null = null;
+
+async function fetchPitConfig(): Promise<Record<string, { field_value: string }>> {
+  const today = new Date().toISOString().split('T')[0];
+  if (_pitCache && _pitCache.date === today) return _pitCache.data;
+  const res = await api.get('/admin/config/pit', { params: { ref_date: today } });
+  const data: Record<string, { field_value: string }> = res.data?.print_template ?? {};
+  _pitCache = { date: today, data };
+  return data;
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface CopsItem {
@@ -407,13 +423,11 @@ export default function AdjudicationForm() {
     importOptional: ['i', 'o'], exportOptional: ['e'],
   });
 
-  // Fetch once on mount — always use today so we get the CURRENT legal reference
-  // (not the case's os_date; sections apply at adjudication time, not detection time)
+  // Fetch once on mount — uses module-level cache so repeated form opens within the
+  // same session skip the network call entirely (see _pitCache / fetchPitConfig above).
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0];
-    api.get('/admin/config/pit', { params: { ref_date: today } })
-      .then(res => {
-        const ptc: Record<string, { field_value: string }> = res.data?.print_template ?? {};
+    fetchPitConfig()
+      .then(ptc => {
         const get = (key: string, fb: string) => ptc[key]?.field_value?.trim() || fb;
         setSectionCfg({
           importSection:  get('confiscation_section_import',        '111'),

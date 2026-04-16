@@ -180,6 +180,8 @@ if settings.DATABASE_URL.startswith("sqlite"):
             conn.execute("PRAGMA foreign_keys=ON")
             conn.execute("PRAGMA synchronous=NORMAL")
             conn.execute("PRAGMA cache_size=-32000")
+            conn.execute("PRAGMA temp_store=MEMORY")        # ORDER BY/GROUP BY temp tables in RAM
+            conn.execute("PRAGMA mmap_size=268435456")      # 256 MB memory-mapped I/O for read scans
             return conn
 
         engine = create_engine(
@@ -223,6 +225,8 @@ if settings.DATABASE_URL.startswith("sqlite"):
             cursor.execute("PRAGMA foreign_keys=ON")
             cursor.execute("PRAGMA synchronous=NORMAL")
             cursor.execute("PRAGMA cache_size=-32000")
+            cursor.execute("PRAGMA temp_store=MEMORY")      # ORDER BY/GROUP BY temp tables in RAM
+            cursor.execute("PRAGMA mmap_size=268435456")    # 256 MB memory-mapped I/O for read scans
             cursor.close()
 
 else:

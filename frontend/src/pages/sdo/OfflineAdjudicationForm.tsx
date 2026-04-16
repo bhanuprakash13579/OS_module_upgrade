@@ -1399,7 +1399,7 @@ export default function OfflineAdjudicationForm() {
                 </div>
                 <button
                   type="button"
-                  disabled={importLoading}
+                  disabled={importLoading || parsedRows.length === 0 || parsedRows.some(r => r.rfRefType === 'ambiguous' && !rowRfRefOverrides[r.sno])}
                   onClick={handleExcelImport}
                   className="flex items-center gap-2 px-6 py-2.5 bg-green-700 text-white font-semibold rounded-lg hover:bg-green-600 transition-colors text-sm disabled:opacity-60"
                 >
