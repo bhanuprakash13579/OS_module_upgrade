@@ -4,7 +4,7 @@ import {
   ArrowLeft, ShieldCheck, ShieldAlert, Lock, LogIn,
   UserPlus, Users, Pencil, X, KeyRound, Download,
   Upload, FileUp, Eye, EyeOff, RefreshCw, Database, ToggleLeft, ToggleRight, ScanLine,
-  Wifi, Plus, AlertTriangle, Monitor, Settings, Scale, Trash2
+  Wifi, Plus, AlertTriangle, Monitor, Settings, Scale, Trash2, Clock, CheckCircle
 } from 'lucide-react';
 import api from '@/lib/api';
 import { showDownloadToast } from '@/components/DownloadToast';
@@ -98,6 +98,11 @@ export default function RestoreBackup() {
   const [flagsLoading, setFlagsLoading] = useState(false);
   const [flagsMsg, setFlagsMsg] = useState('');
 
+  // Trial counter
+  const [trialStatus, setTrialStatus] = useState<{ trial_disabled: boolean; days_remaining: number | null; expired: boolean } | null>(null);
+  const [trialLoading, setTrialLoading] = useState(false);
+  const [trialMsg, setTrialMsg] = useState('');
+
   // App mode
   const [prodMode, setProdMode] = useState(false);
 
@@ -180,6 +185,14 @@ export default function RestoreBackup() {
       .then(r => { setProdMode(!!r.data.prod_mode); })
       .catch(() => {});
     loadDevices();
+    // Load trial status via public endpoint (no admin token needed)
+    api.get('/trial-status')
+      .then(r => setTrialStatus({
+        trial_disabled: !!r.data.trial_disabled,
+        days_remaining: r.data.days_remaining ?? null,
+        expired: !!r.data.expired,
+      }))
+      .catch(() => {});
   }, [adminToken]);
 
   // ── Allowed Devices ───────────────────────────────────────────────────────
@@ -245,6 +258,29 @@ export default function RestoreBackup() {
     } finally {
       setFlagsLoading(false);
     }
+  };
+
+  const handleTrialReset = async () => {
+    setTrialLoading(true); setTrialMsg('');
+    try {
+      await api.post('/admin/trial/reset', {}, { headers: adminHeaders(adminToken) });
+      const r = await api.get('/trial-status');
+      setTrialStatus({ trial_disabled: !!r.data.trial_disabled, days_remaining: r.data.days_remaining ?? null, expired: !!r.data.expired });
+      setTrialMsg('Trial reset — 30-day window starts today.');
+    } catch (err: any) {
+      setTrialMsg(err.response?.data?.detail || 'Failed to reset trial.');
+    } finally { setTrialLoading(false); }
+  };
+
+  const handleTrialDisable = async () => {
+    setTrialLoading(true); setTrialMsg('');
+    try {
+      await api.post('/admin/trial/disable', {}, { headers: adminHeaders(adminToken) });
+      setTrialStatus({ trial_disabled: true, days_remaining: null, expired: false });
+      setTrialMsg('Trial disabled — installation is now permanent.');
+    } catch (err: any) {
+      setTrialMsg(err.response?.data?.detail || 'Failed to disable trial.');
+    } finally { setTrialLoading(false); }
   };
 
   function loadUsers() {
@@ -1118,6 +1154,65 @@ export default function RestoreBackup() {
               </button>
             </div>
             {flagsMsg && <p className={`text-xs ${flagsMsg.includes('Failed') ? 'text-red-600' : 'text-emerald-700'}`}>{flagsMsg}</p>}
+          </section>
+
+          {/* Trial / License */}
+          <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 space-y-4">
+            <div className="flex items-center gap-2">
+              <Clock size={18} className="text-blue-600" />
+              <div>
+                <h2 className="text-sm font-semibold text-slate-700">Trial / License</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Manage the 30-day trial counter for this installation.</p>
+              </div>
+            </div>
+
+            {trialStatus ? (
+              trialStatus.trial_disabled ? (
+                <div className="flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-200 rounded-lg">
+                  <CheckCircle size={16} className="text-green-600 shrink-0" />
+                  <p className="text-sm font-medium text-green-800">Permanent Installation — trial counter is disabled.</p>
+                </div>
+              ) : (
+                <div className={`flex items-center gap-3 px-4 py-3 rounded-lg border ${
+                  trialStatus.expired ? 'bg-red-50 border-red-300' :
+                  (trialStatus.days_remaining ?? 30) <= 7 ? 'bg-orange-50 border-orange-300' :
+                  'bg-blue-50 border-blue-200'
+                }`}>
+                  <Clock size={16} className={trialStatus.expired ? 'text-red-600' : 'text-blue-600'} />
+                  <p className={`text-sm font-semibold ${trialStatus.expired ? 'text-red-800' : 'text-blue-800'}`}>
+                    {trialStatus.expired
+                      ? 'Trial EXPIRED — application is blocked for regular users'
+                      : `${trialStatus.days_remaining} day${trialStatus.days_remaining === 1 ? '' : 's'} remaining in trial`}
+                  </p>
+                </div>
+              )
+            ) : (
+              <p className="text-xs text-slate-400 italic">Loading trial status…</p>
+            )}
+
+            <div className="flex gap-3 flex-wrap">
+              <button
+                type="button"
+                disabled={trialLoading}
+                onClick={handleTrialReset}
+                className="flex items-center gap-2 px-4 py-2 text-xs rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60 font-semibold"
+              >
+                <RefreshCw size={13} /> Reset Trial (restart 30-day window)
+              </button>
+              <button
+                type="button"
+                disabled={trialLoading || !!trialStatus?.trial_disabled}
+                onClick={handleTrialDisable}
+                className="flex items-center gap-2 px-4 py-2 text-xs rounded-lg bg-green-700 text-white hover:bg-green-800 disabled:opacity-60 font-semibold"
+              >
+                <CheckCircle size={13} /> Activate Permanent License
+              </button>
+            </div>
+            {trialMsg && (
+              <p className={`text-xs font-medium ${trialMsg.includes('Failed') ? 'text-red-600' : 'text-emerald-700'}`}>
+                {trialMsg}
+              </p>
+            )}
           </section>
         </div>
       )}

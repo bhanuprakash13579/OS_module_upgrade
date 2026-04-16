@@ -114,6 +114,14 @@ def apply_sqlite_migrations():
                 conn.execute(text("ALTER TABLE feature_flags ADD COLUMN prod_mode BOOLEAN DEFAULT 0"))
             if "session_timeout_minutes" not in ff_cols:
                 conn.execute(text("ALTER TABLE feature_flags ADD COLUMN session_timeout_minutes INTEGER DEFAULT 480"))
+            if "trial_start_date" not in ff_cols:
+                conn.execute(text("ALTER TABLE feature_flags ADD COLUMN trial_start_date TEXT"))
+            if "trial_disabled" not in ff_cols:
+                conn.execute(text("ALTER TABLE feature_flags ADD COLUMN trial_disabled INTEGER DEFAULT 0"))
+            # Auto-init trial_start_date for existing rows (idempotent)
+            conn.execute(text(
+                "UPDATE feature_flags SET trial_start_date = date('now') WHERE trial_start_date IS NULL"
+            ))
 
             # ── Backfill is_legacy for all pre-March-18-2026 records ─────────
             # Cases before the new module went live are historical data from the
@@ -602,7 +610,7 @@ app = FastAPI(
 
 # ── Security Middleware ───────────────────────────────────────────
 # Endpoints always allowed from any LAN IP (no device-registration required)
-_OPEN_PATHS = {"/health", "/", "/api/features", "/api/mode"}
+_OPEN_PATHS = {"/health", "/", "/api/features", "/api/mode", "/api/trial-status"}
 # Auth endpoints always open (LAN clients need to log in)
 _OPEN_PREFIXES = ("/api/auth/",)
 # Admin panel — master terminal (localhost) only
@@ -725,6 +733,44 @@ def get_mode():
     Returns the current app mode so the frontend can show/hide the DEV MODE banner.
     """
     return {"prod_mode": state.prod_mode}
+
+
+@app.get("/api/trial-status")
+def get_trial_status():
+    """
+    Public endpoint — no auth required.
+    Returns trial period status for the frontend countdown banner.
+    Auto-initialises trial_start_date on first access if it was never set.
+    """
+    from app.models.config import FeatureFlags
+    from datetime import date as _date
+    db = SessionLocal()
+    try:
+        flags = db.query(FeatureFlags).filter(FeatureFlags.id == 1).first()
+        if not flags:
+            flags = FeatureFlags(id=1, apis_enabled=False,
+                                 trial_start_date=str(_date.today()), trial_disabled=0)
+            db.add(flags)
+            db.commit()
+        elif not flags.trial_start_date:
+            flags.trial_start_date = str(_date.today())
+            db.commit()
+
+        if flags.trial_disabled:
+            return {"trial_disabled": True, "days_remaining": None, "expired": False}
+
+        start = _date.fromisoformat(flags.trial_start_date)
+        days_elapsed = (_date.today() - start).days
+        days_remaining = max(0, 30 - days_elapsed)
+        return {
+            "trial_disabled": False,
+            "trial_start_date": str(start),
+            "days_elapsed": days_elapsed,
+            "days_remaining": days_remaining,
+            "expired": days_remaining == 0,
+        }
+    finally:
+        db.close()
 
 
 from app.api import auth, masters, baggage, offence, detention

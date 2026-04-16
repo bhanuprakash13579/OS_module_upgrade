@@ -452,7 +452,10 @@ def get_all_os(
             CopsMaster.post_adj_br_entries.is_(None),
             CopsMaster.post_adj_dr_no.is_(None),
         )
-    total = q.count()
+    # Use with_entities(count) instead of q.count() — avoids SQLAlchemy wrapping
+    # the full 65-column SELECT in a subquery just to count rows.
+    # Generates: SELECT count(id) FROM cops_master WHERE ... (lean, index-only scan)
+    total = q.with_entities(func.count(CopsMaster.id)).scalar() or 0
     records = q.order_by(
         CopsMaster.os_year.desc(),
         cast(CopsMaster.os_no, SAInteger).desc()
@@ -697,6 +700,99 @@ def create_offline_adjudication(
         CopsItems.os_year == os_year
     ).all()
     return os_obj
+
+
+# ── SDO Module: Bulk Import Offline Adjudication Cases ───────────────────────
+@router.post("/offline/bulk-import")
+def bulk_import_offline_adjudication(
+    rows: List[schemas.CopsMasterCreate],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_sdo_user)
+):
+    """
+    SDO Module: Bulk-import offline adjudication cases parsed from an Excel file.
+
+    Duplicate (os_no, os_year) pairs are silently skipped — same behaviour as
+    the ZIP restore in the backup panel.  Returns imported / skipped / failed counts.
+    """
+    # Pre-load all existing (os_no, os_year) pairs into a set for O(1) lookup
+    existing_pairs: set = set(
+        db.query(CopsMaster.os_no, CopsMaster.os_year)
+          .filter(CopsMaster.entry_deleted == "N")
+          .all()
+    )
+
+    imported = 0
+    skipped = 0
+    failed = []
+
+    for data in rows:
+        from app.services.rules_engine import BusinessRulesEngine
+        rules = BusinessRulesEngine(db)
+        if data.passport_no:
+            data.passport_no = rules.normalize_passport(data.passport_no)
+
+        os_date = data.os_date
+        if not os_date:
+            from datetime import date as _date
+            os_date = _date.today()
+
+        os_no = str(data.os_no or '').strip()
+        if not os_no:
+            failed.append({"os_no": None, "os_year": None, "error": "Missing OS No."})
+            continue
+
+        os_year = os_date.year
+
+        # Skip duplicates (ZIP restore pattern)
+        if (os_no, os_year) in existing_pairs:
+            skipped += 1
+            continue
+
+        try:
+            total_val = sum(float(i.items_value or 0) for i in data.items)
+
+            os_obj = CopsMaster(
+                os_no=os_no,
+                os_date=os_date,
+                os_year=os_year,
+                total_items=len(data.items),
+                total_items_value=total_val,
+                total_duty_amount=float(data.total_duty_amount or 0),
+                total_payable=float(data.total_payable or 0),
+                is_offline_adjudication='Y',
+                **data.model_dump(exclude={
+                    "items", "os_no", "os_year", "os_date",
+                    "is_offline_adjudication", "total_items",
+                    "total_items_value", "total_duty_amount", "total_payable"
+                })
+            )
+            db.add(os_obj)
+            db.flush()  # get id without committing
+
+            for idx, c_item in enumerate(data.items):
+                db_item = CopsItems(
+                    os_no=os_no,
+                    os_date=os_obj.os_date,
+                    os_year=os_year,
+                    items_sno=idx + 1,
+                    items_desc=c_item.items_desc,
+                    items_qty=c_item.items_qty,
+                    items_uqc=c_item.items_uqc,
+                    items_value=float(c_item.items_value or 0),
+                    items_duty_type=c_item.items_duty_type,
+                    items_duty=0.0,
+                )
+                db.add(db_item)
+
+            db.commit()
+            existing_pairs.add((os_no, os_year))
+            imported += 1
+        except Exception as e:
+            db.rollback()
+            failed.append({"os_no": os_no, "os_year": os_year, "error": str(e)})
+
+    return {"imported": imported, "skipped": skipped, "failed": failed, "total": len(rows)}
 
 
 # ── Adjudication Module: Adjudicated Cases ────────────────────────────────────

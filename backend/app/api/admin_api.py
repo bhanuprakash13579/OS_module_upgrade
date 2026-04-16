@@ -314,6 +314,35 @@ def get_app_mode():
     return {"prod_mode": state.prod_mode}
 
 
+# ── Trial Counter Management ──────────────────────────────────────────────────
+
+@router.post("/trial/reset", dependencies=[Depends(require_admin)])
+def reset_trial(db: Session = Depends(get_db)):
+    """Reset trial start date to today, re-opening a fresh 30-day window."""
+    flags = db.query(FeatureFlags).filter(FeatureFlags.id == 1).first()
+    if not flags:
+        flags = FeatureFlags(id=1, apis_enabled=False)
+        db.add(flags)
+    flags.trial_start_date = str(date.today())
+    flags.trial_disabled = False
+    db.commit()
+    return {"trial_start_date": flags.trial_start_date, "trial_disabled": False,
+            "message": "Trial reset — 30-day window starts today"}
+
+
+@router.post("/trial/disable", dependencies=[Depends(require_admin)])
+def disable_trial(db: Session = Depends(get_db)):
+    """Disable trial mode (convert to permanent installation — banner disappears)."""
+    flags = db.query(FeatureFlags).filter(FeatureFlags.id == 1).first()
+    if not flags:
+        flags = FeatureFlags(id=1, apis_enabled=False)
+        db.add(flags)
+    flags.trial_disabled = True
+    db.commit()
+    return {"trial_disabled": True,
+            "message": "Trial disabled — installation is now permanent"}
+
+
 # ── Network Access Control (IP/MAC Whitelist) ─────────────────────────────────
 
 @router.get("/devices", dependencies=[Depends(require_admin)])
