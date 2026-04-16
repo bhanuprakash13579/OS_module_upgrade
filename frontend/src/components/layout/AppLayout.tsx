@@ -4,6 +4,7 @@ import { Plane, Gavel, FileText, Database, ShieldAlert, LogOut, Search, Settings
 import { clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { useAuth } from '@/contexts/AuthContext';
+import TrialBanner from '@/components/TrialBanner';
 
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
@@ -47,6 +48,7 @@ export default function AppLayout() {
 
   return (
     <div className="flex min-h-screen w-full bg-slate-50 text-slate-800 print:bg-white print:overflow-visible">
+      <TrialBanner />
       
       {/* Sidebar Navigation */}
       <aside className="w-64 glass-header flex flex-col justify-between hidden md:flex print:!hidden sticky top-0 h-screen overflow-y-auto">

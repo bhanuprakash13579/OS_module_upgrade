@@ -481,6 +481,9 @@ class OSQueryRequest(BaseModel):
     page: int = 1
     limit: int = 100
 
+    # Export mode — lifts per-page cap so download-all works in one request
+    export: bool = False
+
 class OSQueryItemResponse(BaseModel):
     items_sno: int
     items_desc: Optional[str]
@@ -668,15 +671,18 @@ def search_os_cases(
     }
     sort_col = _SORTABLE.get(query.sort_by, CopsMaster.os_year)
     sort_fn = desc if query.sort_dir.lower() == "desc" else asc
+
+    # Count BEFORE applying order_by — SQLite must not sort all rows just to count them.
+    # with_entities(count) also avoids the ORM wrapping a full 65-column SELECT in a
+    # subquery (the behaviour of q.count()), generating a lean index-only count instead.
+    total_count = q.with_entities(func.count(CopsMaster.id)).scalar() or 0
+
     # Tie-break: always newest first (desc year, desc no) regardless of primary sort direction
     if query.sort_by in ("os_no", "os_year"):
         q = q.order_by(sort_fn(CopsMaster.os_year), sort_fn(_os_no_int))
     else:
         q = q.order_by(sort_fn(sort_col), desc(CopsMaster.os_year), desc(_os_no_int))
-    
-    # Pagination calculations
-    total_count = q.count()
-    limit = max(1, min(query.limit, 500))  # Cap page size at 500
+    limit = max(1, min(query.limit, 5000 if query.export else 500))
     page = max(1, query.page)
     total_pages = (total_count + limit - 1) // limit
     
