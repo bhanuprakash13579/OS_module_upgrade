@@ -759,7 +759,7 @@ def bulk_import_offline_adjudication(
                 total_items=len(data.items),
                 total_items_value=total_val,
                 total_duty_amount=float(data.total_duty_amount or 0),
-                total_payable=float(data.total_payable or 0),
+                total_payable=float(data.total_duty_amount or 0) + float(data.rf_amount or 0) + float(data.pp_amount or 0) + float(data.ref_amount or 0),
                 is_offline_adjudication='Y',
                 **data.model_dump(exclude={
                     "items", "os_no", "os_year", "os_date",
@@ -905,9 +905,12 @@ def complete_offline_adjudication(
                             detail="This offline case has already been completed.")
 
     from datetime import date as _date
+    _adj_date = data.adjudication_date or _date.today()
+    if _adj_date > _date.today():
+        raise HTTPException(status_code=400, detail="Adjudication date cannot be in the future.")
     case.adj_offr_name = data.adj_offr_name.strip()
     case.adj_offr_designation = data.adj_offr_designation.strip()
-    case.adjudication_date = data.adjudication_date or _date.today()
+    case.adjudication_date = _adj_date
     # Stamp adjudication_time so the 24-hour modification window works correctly.
     # Without this, _within_edit_window() sees None and returns True forever.
     case.adjudication_time = datetime.now()
@@ -953,9 +956,12 @@ def add_outcome(
         raise HTTPException(status_code=400, detail="Outcome already recorded for this case.")
 
     from datetime import date as _date
+    _adj_date = data.adjudication_date or _date.today()
+    if _adj_date > _date.today():
+        raise HTTPException(status_code=400, detail="Adjudication date cannot be in the future.")
     case.adj_offr_name = data.adj_offr_name.strip()
     case.adj_offr_designation = data.adj_offr_designation.strip()
-    case.adjudication_date = data.adjudication_date or _date.today()
+    case.adjudication_date = _adj_date
     case.adjudication_time = datetime.now()
     case.rf_amount = data.rf_amount
     case.pp_amount = data.pp_amount
@@ -1765,7 +1771,10 @@ def online_adjudicate(
     rules.validate_remarks_length(payload.adjn_offr_remarks)
 
     # Update adjudication details
-    os_obj.adjudication_date = payload.adjudication_date or date.today()
+    _eff_adj_date = payload.adjudication_date or date.today()
+    if _eff_adj_date > date.today():
+        raise HTTPException(status_code=400, detail="Adjudication date cannot be in the future.")
+    os_obj.adjudication_date = _eff_adj_date
     # Stamp adjudication_time only on the FIRST adjudication.
     # Re-adjudications (Edit Adjudication within 24h) must not reset the clock —
     # the 24-hour window always runs from the original first adjudication time.

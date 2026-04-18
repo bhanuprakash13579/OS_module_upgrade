@@ -750,7 +750,7 @@ def custom_report(
                                    CopsItems.os_year == CopsMaster.os_year)) \
              .filter(CopsItems.items_desc.ilike(f"%{body.item_desc}%")).distinct()
 
-    masters: List[CopsMaster] = q.order_by(CopsMaster.os_year, CopsMaster.os_no).all()
+    masters: List[CopsMaster] = q.order_by(CopsMaster.os_year, CopsMaster.os_no).limit(10000).all()
 
     include_items = bool(body.item_cols)
     all_cols = body.master_cols + body.item_cols
