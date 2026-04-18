@@ -921,6 +921,7 @@ def complete_offline_adjudication(
         case.adjn_offr_remarks = data.adjn_offr_remarks
     if data.close_case:
         case.closure_ind = 'Y'
+    case.total_payable = float(case.total_duty_amount or 0.0) + data.rf_amount + data.pp_amount + data.ref_amount
 
     db.commit()
     return {"status": "ok", "os_no": os_no, "os_year": os_year}
