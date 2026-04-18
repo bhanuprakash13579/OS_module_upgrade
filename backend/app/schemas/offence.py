@@ -229,3 +229,6 @@ class OfflineAdjudicationComplete(BaseModel):
                 f"Remarks exceeds {settings.ADJN_REMARKS_MAX_CHARS} characters."
             )
         return v
+
+
+OutcomeUpdate = OfflineAdjudicationComplete

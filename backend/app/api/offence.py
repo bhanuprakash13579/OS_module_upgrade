@@ -926,6 +926,50 @@ def complete_offline_adjudication(
     return {"status": "ok", "os_no": os_no, "os_year": os_year}
 
 
+# ── Adjudication: Add Outcome to Pending Offline Case ────────────────────────
+@router.patch("/{os_no}/{os_year}/outcome")
+def add_outcome(
+    os_no: str,
+    os_year: int,
+    data: schemas.OutcomeUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Any authenticated user: add adjudication outcome to a pending offline case
+    that has not yet been completed (adj_offr_name IS NULL).
+    """
+    case = db.query(CopsMaster).filter(
+        CopsMaster.os_no == os_no,
+        CopsMaster.os_year == os_year,
+        CopsMaster.entry_deleted == "N",
+        CopsMaster.is_offline_adjudication == 'Y',
+    ).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Offline adjudication case not found.")
+    if case.adj_offr_name:
+        raise HTTPException(status_code=400, detail="Outcome already recorded for this case.")
+
+    from datetime import date as _date
+    case.adj_offr_name = data.adj_offr_name.strip()
+    case.adj_offr_designation = data.adj_offr_designation.strip()
+    case.adjudication_date = data.adjudication_date or _date.today()
+    case.adjudication_time = datetime.now()
+    case.rf_amount = data.rf_amount
+    case.pp_amount = data.pp_amount
+    case.ref_amount = data.ref_amount
+    case.confiscated_value = data.confiscated_value
+    case.redeemed_value = data.redeemed_value
+    case.re_export_value = data.re_export_value
+    if data.adjn_offr_remarks:
+        case.adjn_offr_remarks = data.adjn_offr_remarks
+    if data.close_case:
+        case.closure_ind = 'Y'
+
+    db.commit()
+    return {"status": "ok", "os_no": os_no, "os_year": os_year}
+
+
 # ── Get Single O/S Case ───────────────────────────────────────────────────────
 @router.get("/{os_no}/{os_year}", response_model=schemas.CopsMasterOut)
 def get_os(
