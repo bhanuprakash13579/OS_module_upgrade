@@ -694,7 +694,15 @@ class CustomReportRequest(BaseModel):
     item_cols: List[str] = []
     from_date: Optional[date] = None
     to_date: Optional[date] = None
-    case_type: Optional[str] = None  # "Export Case" | "Arrival Case" | None (all)
+    case_type: Optional[str] = None
+    # Row-level filters
+    os_no: Optional[str] = None
+    os_year: Optional[int] = None
+    adj_offr_name: Optional[str] = None
+    flight_no: Optional[str] = None
+    pax_name: Optional[str] = None
+    passport_no: Optional[str] = None
+    item_desc: Optional[str] = None
 
 
 @router.post("/custom-report")
@@ -724,17 +732,31 @@ def custom_report(
         if (body.case_type or "").strip().upper() == "EXPORT CASE":
             q = q.filter(func.upper(CopsMaster.case_type) == "EXPORT CASE")
         else:
-            q = q.filter(
-                or_(CopsMaster.case_type.is_(None), func.upper(CopsMaster.case_type) != "EXPORT CASE")
-            )
+            q = q.filter(or_(CopsMaster.case_type.is_(None), func.upper(CopsMaster.case_type) != "EXPORT CASE"))
+    if body.os_no:
+        q = q.filter(CopsMaster.os_no == body.os_no)
+    if body.os_year:
+        q = q.filter(CopsMaster.os_year == body.os_year)
+    if body.adj_offr_name:
+        q = q.filter(CopsMaster.adj_offr_name.ilike(f"%{body.adj_offr_name}%"))
+    if body.flight_no:
+        q = q.filter(CopsMaster.flight_no.ilike(f"%{body.flight_no}%"))
+    if body.pax_name:
+        q = q.filter(CopsMaster.pax_name.ilike(f"%{body.pax_name}%"))
+    if body.passport_no:
+        q = q.filter(CopsMaster.passport_no.ilike(f"%{body.passport_no}%"))
+    if body.item_desc:
+        q = q.join(CopsItems, and_(CopsItems.os_no == CopsMaster.os_no,
+                                   CopsItems.os_year == CopsMaster.os_year)) \
+             .filter(CopsItems.items_desc.ilike(f"%{body.item_desc}%")).distinct()
+
     masters: List[CopsMaster] = q.order_by(CopsMaster.os_year, CopsMaster.os_no).all()
 
     include_items = bool(body.item_cols)
     all_cols = body.master_cols + body.item_cols
     rows = []
 
-    # Bulk-load all items for the filtered masters in a single query (avoids N+1).
-    # Use JOIN on master IDs (chunked at 900) — safer than a raw OR chain.
+    # Bulk-load items (chunked at 900) for the filtered masters.
     items_map = defaultdict(list)
     if include_items and masters:
         _CHUNK = 900
@@ -751,21 +773,16 @@ def custom_report(
             ):
                 items_map[(it.os_no, it.os_year, it.location_code or "")].append(it)
 
+    # One row per OS — item columns are newline-joined across all items.
     for m in masters:
         master_data = {col: _val(getattr(m, col, None)) for col in body.master_cols}
         if include_items:
             m_items = items_map.get((m.os_no, m.os_year, m.location_code or ""), [])
-            if m_items:
-                for item in m_items:
-                    row = dict(master_data)
-                    for col in body.item_cols:
-                        row[col] = _val(getattr(item, col, None))
-                    rows.append(row)
-            else:
-                row = dict(master_data)
-                for col in body.item_cols:
-                    row[col] = ""
-                rows.append(row)
+            row = dict(master_data)
+            for col in body.item_cols:
+                vals = [_val(getattr(item, col, None)) for item in m_items]
+                row[col] = "\n".join(v for v in vals if v)
+            rows.append(row)
         else:
             rows.append(master_data)
 
