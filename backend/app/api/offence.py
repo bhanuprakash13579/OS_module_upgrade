@@ -944,6 +944,7 @@ def add_outcome(
         CopsMaster.os_year == os_year,
         CopsMaster.entry_deleted == "N",
         CopsMaster.is_offline_adjudication == 'Y',
+        CopsMaster.is_draft == 'N',
     ).first()
     if not case:
         raise HTTPException(status_code=404, detail="Offline adjudication case not found.")
@@ -965,6 +966,7 @@ def add_outcome(
         case.adjn_offr_remarks = data.adjn_offr_remarks
     if data.close_case:
         case.closure_ind = 'Y'
+    case.total_payable = float(case.total_duty_amount or 0.0) + data.rf_amount + data.pp_amount + data.ref_amount
 
     db.commit()
     return {"status": "ok", "os_no": os_no, "os_year": os_year}
