@@ -789,6 +789,211 @@ def custom_report(
     return {"columns": all_cols, "rows": rows, "total": len(rows)}
 
 
+# ── Custom Report: BR / DR ────────────────────────────────────────────────────
+
+# Safe allowlists — prevent column-name injection
+_REPORT_BR_MASTER_COLS: Set[str] = {
+    "br_no", "br_date", "br_type", "br_year", "br_shift",
+    "flight_no", "flight_date",
+    "pax_name", "pax_nationality", "passport_no", "passport_date",
+    "passport_issue_place", "pax_address1", "pax_address2", "pax_address3",
+    "pax_date_of_birth", "pax_status", "residence_at", "country_of_departure",
+    "departure_date",
+    "os_no", "os_date", "dr_no", "dr_date",
+    "total_items_value", "total_fa_value", "total_duty_amount",
+    "rf_amount", "pp_amount", "ref_amount", "wh_amount", "other_amount",
+    "br_amount", "total_payable", "total_fa_availed",
+    "challan_no", "bank_date", "bank_shift", "batch_date", "batch_shift",
+    "dc_code", "unique_no", "location_code", "login_id",
+    "entry_deleted", "bkup_taken", "br_printed", "ff_ind",
+    "image_filename", "table_name", "arrived_from",
+    "br_amount_str", "br_no_str", "abroad_stay", "actual_br_type",
+}
+
+_REPORT_BR_ITEM_COLS: Set[str] = {
+    "items_sno", "items_desc", "items_qty", "items_uqc", "items_value",
+    "items_fa", "items_bcd", "items_cvd", "items_cess", "items_hec",
+    "items_duty", "items_duty_type", "items_category",
+    "items_dr_no", "items_dr_year", "items_release_category",
+    "flight_no", "bank_date", "bank_shift", "batch_date", "batch_shift",
+    "unique_no", "location_code", "login_id", "entry_deleted",
+}
+
+_REPORT_DR_MASTER_COLS: Set[str] = {
+    "dr_no", "dr_date", "dr_year", "dr_type",
+    "pax_name", "passport_no", "passport_date",
+    "pax_address1", "pax_address2", "pax_address3",
+    "port_of_departure", "flight_no", "flight_date",
+    "total_items_value",
+    "closure_ind", "closure_remarks", "closure_date",
+    "closed_batch_date", "closed_batch_shift",
+    "warehouse_no",
+    "entry_deleted", "unique_no", "location_code", "login_id",
+    "detained_by", "detained_pkg_no", "detained_pkg_type", "seal_no",
+    "dr_printed", "detention_reasons",
+    "seizure_date", "os_no", "receipt_by_who",
+}
+
+_REPORT_DR_ITEM_COLS: Set[str] = {
+    "items_sno", "items_desc", "items_qty", "items_uqc", "items_value",
+    "items_fa", "items_release_category",
+    "receipt_by_who", "item_closure_remarks",
+    "detained_pkg_no", "detained_pkg_type",
+    "unique_no", "location_code",
+}
+
+
+class CustomReportBRDRRequest(BaseModel):
+    report_type: str   # 'BR' or 'DR'
+    master_cols: List[str]
+    item_cols: List[str] = []
+    from_date: Optional[date] = None
+    to_date: Optional[date] = None
+    # Row-level filters (shared)
+    doc_no: Optional[int] = None          # br_no / dr_no
+    doc_year: Optional[int] = None        # br_year / dr_year
+    doc_type: Optional[str] = None        # br_type / dr_type
+    flight_no: Optional[str] = None
+    pax_name: Optional[str] = None
+    passport_no: Optional[str] = None
+    item_desc: Optional[str] = None
+    os_no: Optional[str] = None
+
+
+@router.post("/custom-report-brdr")
+def custom_report_brdr(
+    body: CustomReportBRDRRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Build a custom report on br_master+br_items or dr_master+dr_items.
+    Mirrors /custom-report but for baggage/detention registers.
+
+    Performance notes:
+     - Raw SQL on only the user-requested columns (avoids ORM hydration of 50+ columns)
+     - EXISTS subquery for item_desc filter (avoids DISTINCT over full master row)
+     - Indexes ix_{br,dr}_items_join + ix_{br,dr}_master_entry_deleted_date (see main.py)
+     - Single JOIN on master.id PK to fetch items for the filtered masters only
+    """
+    rtype = (body.report_type or "").upper().strip()
+    if rtype not in ("BR", "DR"):
+        raise HTTPException(status_code=400, detail="report_type must be 'BR' or 'DR'.")
+
+    if rtype == "BR":
+        master_tbl, items_tbl = "br_master", "br_items"
+        master_allow, item_allow = _REPORT_BR_MASTER_COLS, _REPORT_BR_ITEM_COLS
+        date_col, no_col, year_col, type_col = "br_date", "br_no", "br_year", "br_type"
+        items_has_entry_deleted = True   # br_items has entry_deleted column
+    else:
+        master_tbl, items_tbl = "dr_master", "dr_items"
+        master_allow, item_allow = _REPORT_DR_MASTER_COLS, _REPORT_DR_ITEM_COLS
+        date_col, no_col, year_col, type_col = "dr_date", "dr_no", "dr_year", "dr_type"
+        items_has_entry_deleted = False  # dr_items does not
+
+    invalid = (set(body.master_cols) - master_allow) | (set(body.item_cols) - item_allow)
+    if invalid:
+        raise HTTPException(status_code=400, detail=f"Unknown columns: {sorted(invalid)}")
+    if not body.master_cols and not body.item_cols:
+        raise HTTPException(status_code=400, detail="Select at least one column.")
+
+    # ── Build master WHERE clause ────────────────────────────────────────────
+    conds: List[str] = ["m.entry_deleted = 'N'"]
+    params: dict = {}
+
+    if body.from_date and body.to_date:
+        conds.append(f"m.{date_col} BETWEEN :from_date AND :to_date")
+        params["from_date"] = body.from_date
+        params["to_date"]   = body.to_date
+    if body.doc_no is not None:
+        conds.append(f"m.{no_col} = :doc_no"); params["doc_no"] = body.doc_no
+    if body.doc_year is not None:
+        conds.append(f"m.{year_col} = :doc_year"); params["doc_year"] = body.doc_year
+    if body.doc_type:
+        conds.append(f"UPPER(m.{type_col}) = :doc_type")
+        params["doc_type"] = body.doc_type.strip().upper()
+    if body.flight_no:
+        conds.append("m.flight_no LIKE :flight_no"); params["flight_no"] = f"%{body.flight_no}%"
+    if body.pax_name:
+        conds.append("m.pax_name LIKE :pax_name"); params["pax_name"] = f"%{body.pax_name}%"
+    if body.passport_no:
+        conds.append("m.passport_no LIKE :passport_no"); params["passport_no"] = f"%{body.passport_no}%"
+    if body.os_no and "os_no" in master_allow:
+        conds.append("m.os_no LIKE :os_no"); params["os_no"] = f"%{body.os_no}%"
+    # EXISTS is faster than JOIN+DISTINCT for item_desc filter.
+    if body.item_desc:
+        conds.append(
+            f"EXISTS (SELECT 1 FROM {items_tbl} i "
+            f"WHERE i.{no_col}=m.{no_col} AND i.{date_col}=m.{date_col} "
+            f"AND i.{type_col}=m.{type_col} AND i.items_desc LIKE :item_desc)"
+        )
+        params["item_desc"] = f"%{body.item_desc}%"
+
+    where_sql = " AND ".join(conds)
+
+    # ── Select only requested master columns (+ id for joining items) ──
+    internal_master_cols = set(body.master_cols) | {"id"}
+    master_select_sql = ", ".join(f"m.{c}" for c in internal_master_cols)
+
+    master_sql = text(
+        f"SELECT {master_select_sql} FROM {master_tbl} m "
+        f"WHERE {where_sql} "
+        f"ORDER BY m.{year_col}, m.{no_col} "
+        f"LIMIT 10000"
+    )
+    master_rows = db.execute(master_sql, params).mappings().all()
+
+    # ── Bulk-load items for only the filtered masters ────────────────────────
+    # Group by master.id (stable PK). Grouping by (no,date,type) composite would be
+    # fragile on SQLite because raw text() bypasses ORM Date coercion — DATE columns
+    # come back as strings and formats can differ across legacy-imported vs ORM rows,
+    # causing silent dict-miss → empty item cells.
+    items_map: dict = defaultdict(list)
+    if body.item_cols and master_rows:
+        # Fetch only requested item columns (composite keys no longer needed for grouping)
+        internal_item_cols = set(body.item_cols)
+        item_select_sql = ", ".join(f"i.{c}" for c in internal_item_cols) if internal_item_cols else "NULL"
+        item_deleted_filter = " AND i.entry_deleted = 'N'" if items_has_entry_deleted else ""
+
+        _CHUNK = 900
+        ids = [r["id"] for r in master_rows]
+        for i in range(0, len(ids), _CHUNK):
+            chunk = ids[i:i + _CHUNK]
+            placeholders = ",".join(f":id{j}" for j in range(len(chunk)))
+            chunk_params = {f"id{j}": v for j, v in enumerate(chunk)}
+            item_sql = text(
+                f"SELECT m.id AS _master_id, {item_select_sql} FROM {items_tbl} i "
+                f"JOIN {master_tbl} m ON m.{no_col}=i.{no_col} "
+                f"AND m.{date_col}=i.{date_col} AND m.{type_col}=i.{type_col} "
+                f"WHERE m.id IN ({placeholders}){item_deleted_filter} "
+                f"ORDER BY m.id, i.items_sno, i.id"
+            )
+            for it in db.execute(item_sql, chunk_params).mappings().all():
+                items_map[it["_master_id"]].append(it)
+
+    # ── Build output rows (tight loop) ───────────────────────────────────────
+    master_cols = body.master_cols
+    item_cols = body.item_cols
+    rows: List[dict] = []
+
+    if item_cols:
+        for m in master_rows:
+            row = {col: _val(m[col]) for col in master_cols}
+            m_items = items_map.get(m["id"])
+            if m_items:
+                for col in item_cols:
+                    row[col] = "\n".join(s for s in (_val(it[col]) for it in m_items) if s)
+            else:
+                for col in item_cols:
+                    row[col] = ""
+            rows.append(row)
+    else:
+        for m in master_rows:
+            rows.append({col: _val(m[col]) for col in master_cols})
+
+    return {"columns": master_cols + item_cols, "rows": rows, "total": len(rows)}
+
+
 # ── Adjudication Officers Summary PDF ────────────────────────────────────────
 
 class AdjudicationSummaryRequest(BaseModel):

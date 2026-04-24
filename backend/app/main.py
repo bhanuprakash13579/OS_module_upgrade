@@ -198,6 +198,11 @@ def apply_sqlite_migrations():
                 "CREATE INDEX IF NOT EXISTS ix_cops_master_adjudication_time ON cops_master (adjudication_time)",
                 "CREATE INDEX IF NOT EXISTS ix_cops_master_closure_ind       ON cops_master (closure_ind)",
                 "CREATE INDEX IF NOT EXISTS ix_cops_master_pending_composite ON cops_master (entry_deleted, is_draft, adjudication_date, adj_offr_name)",
+                # BR/DR custom-report indexes: composite join keys on items tables
+                "CREATE INDEX IF NOT EXISTS ix_br_items_join  ON br_items  (br_no, br_date, br_type)",
+                "CREATE INDEX IF NOT EXISTS ix_dr_items_join  ON dr_items  (dr_no, dr_date, dr_type)",
+                "CREATE INDEX IF NOT EXISTS ix_br_master_entry_deleted_date ON br_master (entry_deleted, br_date)",
+                "CREATE INDEX IF NOT EXISTS ix_dr_master_entry_deleted_date ON dr_master (entry_deleted, dr_date)",
             ]:
                 conn.execute(text(idx_ddl))
 
