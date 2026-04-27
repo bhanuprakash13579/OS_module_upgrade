@@ -561,7 +561,7 @@ export default function OSPrintView() {
           </div>
 
           <div className="text-center font-bold underline uppercase mb-1">{p2WaiverHeading}</div>
-          <div className="mb-2 text-justify indent-8">
+          <div className="mb-2 text-justify indent-8" style={{ whiteSpace: 'pre-wrap' }}>
             {waiverText1}
           </div>
           <div className="flex justify-end mb-2">
@@ -571,7 +571,7 @@ export default function OSPrintView() {
             </div>
           </div>
 
-          <div className="mb-2 text-justify indent-8">
+          <div className="mb-2 text-justify indent-8" style={{ whiteSpace: 'pre-wrap' }}>
             {waiverText2}
           </div>
           <div className="flex justify-end mb-4">
@@ -589,14 +589,14 @@ export default function OSPrintView() {
           <div className="text-center font-bold underline uppercase mb-2">ORDER (ORIGINAL)</div>
         
           <div className="mb-2 space-y-1 text-justify">
-            <p>{nb1Text}</p>
-            <p>{nb2Text}</p>
+            <p style={{ whiteSpace: 'pre-wrap' }}>{nb1Text}</p>
+            <p style={{ whiteSpace: 'pre-wrap' }}>{nb2Text}</p>
           </div>
-          <p className="mb-2 indent-8"><span className="font-bold">{noteScnWaived}</span></p>
+          <p className="mb-2 indent-8" style={{ whiteSpace: 'pre-wrap' }}><span className="font-bold">{noteScnWaived}</span></p>
 
           <div className="mb-2 space-y-1 text-justify">
-            <p className="indent-8">{legalPara1}</p>
-            <p className="indent-8">{fillTpl(legalPara2, { confiscation_full_ref: confiscationRef })}</p>
+            <p className="indent-8" style={{ whiteSpace: 'pre-wrap' }}>{legalPara1}</p>
+            <p className="indent-8" style={{ whiteSpace: 'pre-wrap' }}>{fillTpl(legalPara2, { confiscation_full_ref: confiscationRef })}</p>
           </div>
 
           <div className="font-bold underline text-center uppercase mb-1">{recordHeading}</div>
@@ -609,7 +609,7 @@ export default function OSPrintView() {
           <div className="font-bold underline text-center uppercase mb-1">{orderHeading}</div>
           <div className="mb-2 text-justify">
             {confValue > 0 && (data.rf_amount || 0) > 0 && (
-              <p className="mb-1 indent-8">
+              <p className="mb-1 indent-8" style={{ whiteSpace: 'pre-wrap' }}>
                 {fillTpl(orderParaRfTpl, {
                   confiscation_full_ref: confiscationRef,
                   rf_slnos_text: slnosText(rfSlNos),
@@ -620,7 +620,7 @@ export default function OSPrintView() {
               </p>
             )}
             {reExpValue > 0 && (data.ref_amount || 0) > 0 && !isExportCase && (
-              <p className="mb-1 indent-8">
+              <p className="mb-1 indent-8" style={{ whiteSpace: 'pre-wrap' }}>
                 {fillTpl(orderParaRefTpl, {
                   ref_slnos_text: slnosText(refSlNos),
                   re_exp_value: reExpValue,
@@ -630,7 +630,7 @@ export default function OSPrintView() {
               </p>
             )}
             {absConfValue > 0 && (
-              <p className="mb-1 indent-8">
+              <p className="mb-1 indent-8" style={{ whiteSpace: 'pre-wrap' }}>
                 {fillTpl(orderParaAbsConfTpl, {
                   confiscation_full_ref: confiscationRef,
                   also_text: (confValue > 0 || reExpValue > 0) ? 'also ' : '',
@@ -640,7 +640,7 @@ export default function OSPrintView() {
               </p>
             )}
             {(data.pp_amount || 0) > 0 && (
-              <p className="indent-8">
+              <p className="indent-8" style={{ whiteSpace: 'pre-wrap' }}>
                 {fillTpl(orderParaPpTpl, {
                   pp_amount: data.pp_amount || 0,
                   pp_words: numberToWords(data.pp_amount || 0).trim().replace(/\b\w/g, (l: string) => l.toUpperCase()),
@@ -657,9 +657,9 @@ export default function OSPrintView() {
           </div>
 
           <div className="mb-3 text-justify">
-            <p>{bottomNb1}</p>
-            {bottomNb2 && <p>{bottomNb2}</p>}
-            <p>{bottomNb3}</p>
+            <p style={{ whiteSpace: 'pre-wrap' }}>{bottomNb1}</p>
+            {bottomNb2 && <p style={{ whiteSpace: 'pre-wrap' }}>{bottomNb2}</p>}
+            <p style={{ whiteSpace: 'pre-wrap' }}>{bottomNb3}</p>
           </div>
 
           <table className="w-full border-collapse border-4 border-solid border-black mb-4">

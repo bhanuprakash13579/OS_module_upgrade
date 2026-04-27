@@ -707,10 +707,13 @@ export default function OSTemplateEditor({ adminToken }: OSTemplateEditorProps) 
                 onChange={e => setEdit(prev => prev ? { ...prev, newValue: e.target.value } : null)}
               />
               {edit.isTemplate && (
-                <div className="mt-1 text-[10px]">
+                <div className="mt-1 text-[10px]" style={{ whiteSpace: 'pre-wrap' }}>
                   <TemplateText text={edit.newValue} />
                 </div>
               )}
+              <p className="mt-1 text-[9px] text-slate-400">
+                Tip: Press Enter to add a line break. A blank line creates a paragraph break in the printed PDF.
+              </p>
             </div>
 
             <div>

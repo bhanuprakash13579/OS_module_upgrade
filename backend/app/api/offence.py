@@ -1452,6 +1452,39 @@ def print_os_pdf(
     def _slnos_text(slnos: list) -> str:
         return f" at Sl.No(s). {', '.join(str(s) for s in slnos)}" if slnos else ""
 
+    # ── Confiscation full reference (mirrors frontend OSPrintView logic) ─────
+    # Used in legal_para_2 and ORDER paragraphs as {confiscation_full_ref}.
+    # Saved per-case at adjudication time; otherwise computed from PIT config.
+    def _fmt_subs(subs: list) -> str:
+        if not subs:
+            return ""
+        parts = [f"({s})" for s in subs]
+        if len(parts) == 1:
+            return parts[0]
+        return ", ".join(parts[:-1]) + " & " + parts[-1]
+
+    def _ptc_csv(key: str, fallback: str) -> list:
+        return [s.strip().lower() for s in _ptc(key, fallback).split(",") if s.strip()]
+
+    saved_section_ref = (os_obj.adjn_section_ref or "").strip()
+    if saved_section_ref:
+        confiscation_full_ref = saved_section_ref
+    else:
+        sec_no = _ptc(
+            "confiscation_section_export" if is_export else "confiscation_section_import",
+            "113" if is_export else "111",
+        )
+        fixed_subs = _ptc_csv(
+            "confiscation_fixed_subs_export" if is_export else "confiscation_fixed_subs_import",
+            "" if is_export else "d,l,m",
+        )
+        opt_subs = _ptc_csv(
+            "confiscation_optional_subs_export" if is_export else "confiscation_optional_subs_import",
+            "" if is_export else "i,o",
+        )
+        all_subs = sorted(set(fixed_subs) | set(opt_subs))
+        confiscation_full_ref = f"Section {sec_no}{_fmt_subs(all_subs)} of the Customs Act, 1962"
+
     # ── Prev. offence + other PP offences (mirrors updated frontend logic) ────
     all_other_records = db.query(CopsMaster).filter(
         func.lower(CopsMaster.pax_name) == func.lower(os_obj.pax_name or ""),
@@ -1585,11 +1618,14 @@ def print_os_pdf(
             "In terms of Foreign Trade Policy notified by the Government in pursuance to Section 3(1) & 3(2) of the Foreign Trade (Development & Regulation) Act, 1992, export of goods without proper Customs declaration or in violation of applicable export regulations / restrictions is prohibited. Passengers are required to declare all goods carried at the time of departure as mandated under Section 40 of the Customs Act, 1962."
             if is_export else
             "In terms of Foreign Trade Policy notified by the Government in pursuance to Section 3(1) & 3(2) of the Foreign Trade (Development & Regulation) Act, 1992 read with the Rules framed thereunder, also read with Section 11(2)(u) of Customs Act, 1962, import of 'goods in commercial quantity / goods in the nature of non-bonafide baggage' is not permitted without a valid import licence, though exemption exists under clause 3(h) of the Foreign Trade (Exemption from application of Rules in certain cases) order 1993 for import of goods by a passenger from abroad only to the extent admissible under the Baggage Rules framed under Section 79 of the Customs Act, 1962."),
-        legal_para_2=_ptc(
-            "export_legal_para_2" if is_export else "legal_para_2",
-            "Export of goods non-declared / misdeclared / concealed / in commercial quantity / contrary to any prohibition or export restriction is therefore liable for confiscation under Section 113 of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992."
-            if is_export else
-            "Import of goods non-declared / misdeclared / concealed / in trade and in commercial quantity / non-bonafide in excess of the baggage allowance is therefore liable for confiscation under Section 111(d), (i), (l), (m) & (o) of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992."),
+        legal_para_2=_render_para(
+            _ptc(
+                "export_legal_para_2" if is_export else "legal_para_2",
+                "Export of goods non-declared / misdeclared / concealed / in commercial quantity / contrary to any prohibition or export restriction is therefore liable for confiscation under {confiscation_full_ref} read with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992."
+                if is_export else
+                "Import of goods non-declared / misdeclared / concealed / in trade and in commercial quantity / non-bonafide in excess of the baggage allowance is therefore liable for confiscation under {confiscation_full_ref} read with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992."),
+            confiscation_full_ref=confiscation_full_ref,
+        ),
         record_heading=_ptc("record_heading",
             "RECORD OF PERSONAL HEARING & FINDINGS"),
         order_heading=_ptc("order_heading",
@@ -1599,13 +1635,14 @@ def print_os_pdf(
             _ptc(
                 "export_order_para_rf" if is_export else "order_para_rf",
                 # Export: Section 113, no "Duty extra" (export violations don't attract inbound duty)
-                "I Order confiscation of the goods{rf_slnos_text} valued at Rs.{conf_value}/- under Section 113 of the Customs Act, 1962, but allow the passenger an option to redeem the goods valued at Rs.{conf_value}/- on a fine of Rs.{rf_amount}/- (Rupees {rf_words} Only) in lieu of confiscation under Section 125 of the Customs Act 1962 within 7 days from the date of receipt of this Order."
+                "I Order confiscation of the goods{rf_slnos_text} valued at Rs.{conf_value}/- under {confiscation_full_ref}, but allow the passenger an option to redeem the goods valued at Rs.{conf_value}/- on a fine of Rs.{rf_amount}/- (Rupees {rf_words} Only) in lieu of confiscation under Section 125 of the Customs Act 1962 within 7 days from the date of receipt of this Order."
                 if is_export else
-                "I Order confiscation of the goods{rf_slnos_text} valued at Rs.{conf_value}/- under Section 111(d), (i), (l), (m) & (o) of the Customs Act, 1962 read with Section 3(3) of Foreign Trade (D&R) Act, 1992, but allow the passenger an option to redeem the goods valued at Rs.{conf_value}/- on a fine of Rs.{rf_amount}/- (Rupees {rf_words} Only) in lieu of confiscation under Section 125 of the Customs Act 1962 within 7 days from the date of receipt of this Order, Duty extra."),
+                "I Order confiscation of the goods{rf_slnos_text} valued at Rs.{conf_value}/- under {confiscation_full_ref} read with Section 3(3) of Foreign Trade (D&R) Act, 1992, but allow the passenger an option to redeem the goods valued at Rs.{conf_value}/- on a fine of Rs.{rf_amount}/- (Rupees {rf_words} Only) in lieu of confiscation under Section 125 of the Customs Act 1962 within 7 days from the date of receipt of this Order, Duty extra."),
             rf_slnos_text=_slnos_text(rf_slnos),
             conf_value=int(conf_value),
             rf_amount=int(rf_amount),
             rf_words=title_words(rf_amount),
+            confiscation_full_ref=confiscation_full_ref,
         ) if conf_value > 0 and int(rf_amount) > 0 else "",
         # Re-export option does not apply to export/departure cases —
         # goods seized on exit cannot be "reshipped abroad"
@@ -1621,12 +1658,13 @@ def print_os_pdf(
             _ptc(
                 "export_order_para_abs_conf" if is_export else "order_para_abs_conf",
                 # Export: Section 113
-                "I {also_text}order absolute confiscation of the goods{abs_conf_slnos_text} valued at Rs.{abs_conf_value}/- under Section 113 of the Customs Act, 1962."
+                "I {also_text}order absolute confiscation of the goods{abs_conf_slnos_text} valued at Rs.{abs_conf_value}/- under {confiscation_full_ref}."
                 if is_export else
-                "I {also_text}order absolute confiscation of the goods{abs_conf_slnos_text} valued at Rs.{abs_conf_value}/- under Section 111(d), (i), (l), (m) & (o) of the Customs Act, 1962 read with Section 3(3) of the Foreign Trade (D&R) Act, 1992."),
+                "I {also_text}order absolute confiscation of the goods{abs_conf_slnos_text} valued at Rs.{abs_conf_value}/- under {confiscation_full_ref} read with Section 3(3) of the Foreign Trade (D&R) Act, 1992."),
             also_text="also " if (conf_value > 0 or re_exp_value > 0) else "",
             abs_conf_slnos_text=_slnos_text(all_abs_conf_slnos),
             abs_conf_value=int(abs_conf_value),
+            confiscation_full_ref=confiscation_full_ref,
         ) if abs_conf_value > 0 else "",
         para_pp=_render_para(
             _ptc(

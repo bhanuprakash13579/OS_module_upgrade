@@ -300,14 +300,14 @@
   <div style="text-align:center;font-weight:bold;text-transform:uppercase;margin-bottom:1px"><span style="border-bottom:1px solid #000;padding-bottom:1px">{{ p2_waiver_heading }}</span></div>
 
   <!-- Waiver text — full width, right-aligned signature below -->
-  <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0">{{ waiver_text_1 }}</p>
+  <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0;white-space:pre-wrap">{{ waiver_text_1 }}</p>
   <div style="text-align:right;margin-bottom:3px">
     <div style="height:16px"></div>
     <i>Signature of Passenger</i>
   </div>
 
   <!-- "I was present" — full width, right-aligned signature below -->
-  <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0">{{ waiver_text_2 }}</p>
+  <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0;white-space:pre-wrap">{{ waiver_text_2 }}</p>
   <div style="text-align:right;margin-bottom:4px">
     <div style="height:16px"></div>
     <i>Signature of Passenger</i>
@@ -327,15 +327,15 @@
   <div style="text-align:center;font-weight:bold;margin-bottom:2px"><span style="border-bottom:1px solid #000;padding-bottom:1px">ORDER (ORIGINAL)</span></div>
 
   <!-- N.B. 1 & 2 -->
-  <p style="text-align:justify;margin:0 0 1px 0">{{ nb1_text }}</p>
-  <p style="text-align:justify;margin:0 0 2px 2em">{{ nb2_text }}</p>
+  <p style="text-align:justify;margin:0 0 1px 0;white-space:pre-wrap">{{ nb1_text }}</p>
+  <p style="text-align:justify;margin:0 0 2px 2em;white-space:pre-wrap">{{ nb2_text }}</p>
 
   <!-- Note: SCN waived -->
-  <p style="text-align:justify;margin:0 0 2px 0"><b>{{ note_scn_waived }}</b></p>
+  <p style="text-align:justify;margin:0 0 2px 0;white-space:pre-wrap"><b>{{ note_scn_waived }}</b></p>
 
   <!-- Legal paragraphs -->
-  <p style="text-align:justify;text-indent:2em;margin:0 0 1px 0">{{ legal_para_1 }}</p>
-  <p style="text-align:justify;text-indent:2em;margin:0 0 3px 0">{{ legal_para_2 }}</p>
+  <p style="text-align:justify;text-indent:2em;margin:0 0 1px 0;white-space:pre-wrap">{{ legal_para_1 }}</p>
+  <p style="text-align:justify;text-indent:2em;margin:0 0 3px 0;white-space:pre-wrap">{{ legal_para_2 }}</p>
 
   <!-- RECORD OF PERSONAL HEARING -->
   <div style="text-align:center;font-weight:bold;text-transform:uppercase;margin-bottom:1px"><span style="border-bottom:1px solid #000;padding-bottom:1px">{{ record_heading }}</span></div>
@@ -346,16 +346,16 @@
 
   <!-- Order paragraphs -->
   {% if conf_value > 0 and rf_amount > 0 %}
-  <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0">{{ para_rf }}</p>
+  <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0;white-space:pre-wrap">{{ para_rf }}</p>
   {% endif %}
   {% if re_exp_value > 0 and ref_amount > 0 %}
-  <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0">{{ para_ref }}</p>
+  <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0;white-space:pre-wrap">{{ para_ref }}</p>
   {% endif %}
   {% if abs_conf_value > 0 %}
-  <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0">{{ para_abs_conf }}</p>
+  <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0;white-space:pre-wrap">{{ para_abs_conf }}</p>
   {% endif %}
   {% if pp_amount > 0 %}
-  <p style="text-align:justify;text-indent:2em;margin:0 0 3px 0">{{ para_pp }}</p>
+  <p style="text-align:justify;text-indent:2em;margin:0 0 3px 0;white-space:pre-wrap">{{ para_pp }}</p>
   {% endif %}
 
   <!-- Deputy signature — right-aligned -->
@@ -365,9 +365,9 @@
   </div>
 
   <!-- Bottom N.B. -->
-  <p style="text-align:justify;margin:0 0 1px 0">{{ bottom_nb1 }}</p>
-  <p style="text-align:justify;margin:0 0 1px 2em">{{ bottom_nb2 }}</p>
-  <p style="text-align:justify;margin:0 0 3px 2em">{{ bottom_nb3 }}</p>
+  <p style="text-align:justify;margin:0 0 1px 0;white-space:pre-wrap">{{ bottom_nb1 }}</p>
+  <p style="text-align:justify;margin:0 0 1px 2em;white-space:pre-wrap">{{ bottom_nb2 }}</p>
+  <p style="text-align:justify;margin:0 0 3px 2em;white-space:pre-wrap">{{ bottom_nb3 }}</p>
 
   <!-- Record table -->
   <table class="adj-tbl" style="margin-bottom:4px">
