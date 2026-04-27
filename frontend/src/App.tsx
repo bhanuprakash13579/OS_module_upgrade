@@ -4,6 +4,7 @@ import api from './lib/api';
 import DevModeBanner from './components/DevModeBanner';
 import DownloadToast from './components/DownloadToast';
 import ErrorBoundary from './components/ErrorBoundary';
+import TrialBanner from './components/TrialBanner';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './pages/auth/Login';
 import ModuleSelection from './pages/ModuleSelection';
@@ -306,6 +307,7 @@ export default function App() {
           <DevModeBanner />
           <DownloadToast />
           <BrowserRouter>
+            <TrialBanner />
             <AppRoutes />
           </BrowserRouter>
         </BackendGate>

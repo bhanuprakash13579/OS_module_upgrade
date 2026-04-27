@@ -118,9 +118,15 @@ def apply_sqlite_migrations():
                 conn.execute(text("ALTER TABLE feature_flags ADD COLUMN trial_start_date TEXT"))
             if "trial_disabled" not in ff_cols:
                 conn.execute(text("ALTER TABLE feature_flags ADD COLUMN trial_disabled INTEGER DEFAULT 0"))
+            if "trial_days" not in ff_cols:
+                conn.execute(text("ALTER TABLE feature_flags ADD COLUMN trial_days INTEGER DEFAULT 30"))
             # Auto-init trial_start_date for existing rows (idempotent)
             conn.execute(text(
                 "UPDATE feature_flags SET trial_start_date = date('now') WHERE trial_start_date IS NULL"
+            ))
+            # Backfill trial_days for any rows that came in before this migration
+            conn.execute(text(
+                "UPDATE feature_flags SET trial_days = 30 WHERE trial_days IS NULL OR trial_days <= 0"
             ))
 
             # ── Backfill is_legacy for all pre-March-18-2026 records ─────────
@@ -762,14 +768,17 @@ def get_trial_status():
             db.commit()
 
         if flags.trial_disabled:
-            return {"trial_disabled": True, "days_remaining": None, "expired": False}
+            return {"trial_disabled": True, "days_remaining": None, "expired": False,
+                    "trial_days": int(flags.trial_days or 30)}
 
         start = _date.fromisoformat(flags.trial_start_date)
         days_elapsed = (_date.today() - start).days
-        days_remaining = max(0, 30 - days_elapsed)
+        trial_days = int(flags.trial_days or 30)
+        days_remaining = max(0, trial_days - days_elapsed)
         return {
             "trial_disabled": False,
             "trial_start_date": str(start),
+            "trial_days": trial_days,
             "days_elapsed": days_elapsed,
             "days_remaining": days_remaining,
             "expired": days_remaining == 0,

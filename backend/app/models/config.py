@@ -70,8 +70,10 @@ class FeatureFlags(Base):
     apis_enabled = Column(Boolean, default=False, nullable=False)
     session_timeout_minutes = Column(Integer, default=480, nullable=False)
     # Trial counter — trial_start_date set on first startup; trial_disabled=1 → permanent install
+    # trial_days = configurable trial duration (defaults to 30 if not set)
     trial_start_date = Column(String, nullable=True)
     trial_disabled = Column(Integer, default=0, nullable=False)
+    trial_days = Column(Integer, default=30, nullable=False)
 
 
 class PrintTemplateConfig(Base):

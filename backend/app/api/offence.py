@@ -1647,6 +1647,19 @@ def print_os_pdf(
             "RECORD OF PERSONAL HEARING & FINDINGS"),
         order_heading=_ptc("order_heading",
             "ORDER"),
+        # Currency-release order paragraph — export cases only, when there is
+        # a free allowance (typically Indian Currency declared up to FEMA
+        # Reg. 3 limit and being released back to the passenger).
+        # Trigger: export case AND total monetary FA > 0.
+        para_currency_release=_render_para(
+            _ptc(
+                "export_order_para_currency_release",
+                "I Order for the release of Indian currency amounting to Rs.{currency_value}/- (Rupees {currency_words} Only) as per Regulation 3 of the Foreign Exchange Management (Export and Import of Currency) Regulations, 2015."
+            ),
+            currency_value=int(total_fa_monetary),
+            currency_words=title_words(total_fa_monetary),
+        ) if (is_export and total_fa_monetary > 0) else "",
+        currency_value=int(total_fa_monetary) if is_export else 0,
         # Pre-rendered ORDER paragraphs (template substitution done in Python)
         para_rf=_render_para(
             _ptc(
@@ -1718,12 +1731,13 @@ def print_os_pdf(
     _STYLE_LEGAL2     = "text-align:justify;text-indent:2em;margin:0 0 3px 0"
     _STYLE_ORDER      = "text-align:justify;text-indent:2em;margin:0 0 2px 0"
     _STYLE_ORDER_LAST = "text-align:justify;text-indent:2em;margin:0 0 3px 0"
-    template_vars["legal_para_1_html"]   = _paragraphize(template_vars["legal_para_1"],   _STYLE_LEGAL1)
-    template_vars["legal_para_2_html"]   = _paragraphize(template_vars["legal_para_2"],   _STYLE_LEGAL2)
-    template_vars["para_rf_html"]        = _paragraphize(template_vars["para_rf"],        _STYLE_ORDER)
-    template_vars["para_ref_html"]       = _paragraphize(template_vars["para_ref"],       _STYLE_ORDER)
-    template_vars["para_abs_conf_html"]  = _paragraphize(template_vars["para_abs_conf"],  _STYLE_ORDER)
-    template_vars["para_pp_html"]        = _paragraphize(template_vars["para_pp"],        _STYLE_ORDER_LAST)
+    template_vars["legal_para_1_html"]         = _paragraphize(template_vars["legal_para_1"],         _STYLE_LEGAL1)
+    template_vars["legal_para_2_html"]         = _paragraphize(template_vars["legal_para_2"],         _STYLE_LEGAL2)
+    template_vars["para_currency_release_html"] = _paragraphize(template_vars["para_currency_release"], _STYLE_ORDER)
+    template_vars["para_rf_html"]              = _paragraphize(template_vars["para_rf"],              _STYLE_ORDER)
+    template_vars["para_ref_html"]             = _paragraphize(template_vars["para_ref"],             _STYLE_ORDER)
+    template_vars["para_abs_conf_html"]        = _paragraphize(template_vars["para_abs_conf"],        _STYLE_ORDER)
+    template_vars["para_pp_html"]              = _paragraphize(template_vars["para_pp"],              _STYLE_ORDER_LAST)
 
     # ── Generate PDF ───────────────────────────────────────────────────────────
     # Two independent top-down searches (Page 1 font, Page 2 font) run in

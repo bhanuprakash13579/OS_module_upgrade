@@ -318,7 +318,8 @@ def get_app_mode():
 
 @router.post("/trial/reset", dependencies=[Depends(require_admin)])
 def reset_trial(db: Session = Depends(get_db)):
-    """Reset trial start date to today, re-opening a fresh 30-day window."""
+    """Reset trial start date to today, re-opening a fresh trial window of
+    `trial_days` days (admin-configurable; default 30)."""
     flags = db.query(FeatureFlags).filter(FeatureFlags.id == 1).first()
     if not flags:
         flags = FeatureFlags(id=1, apis_enabled=False)
@@ -326,8 +327,10 @@ def reset_trial(db: Session = Depends(get_db)):
     flags.trial_start_date = str(date.today())
     flags.trial_disabled = False
     db.commit()
+    days = int(flags.trial_days or 30)
     return {"trial_start_date": flags.trial_start_date, "trial_disabled": False,
-            "message": "Trial reset — 30-day window starts today"}
+            "trial_days": days,
+            "message": f"Trial reset — {days}-day window starts today"}
 
 
 @router.post("/trial/disable", dependencies=[Depends(require_admin)])
@@ -341,6 +344,28 @@ def disable_trial(db: Session = Depends(get_db)):
     db.commit()
     return {"trial_disabled": True,
             "message": "Trial disabled — installation is now permanent"}
+
+
+class _TrialDaysPayload(BaseModel):
+    trial_days: int
+
+
+@router.post("/trial/set-days", dependencies=[Depends(require_admin)])
+def set_trial_days(payload: _TrialDaysPayload, db: Session = Depends(get_db)):
+    """Configure how many days the trial lasts (1–3650). Does not reset the
+    start date — the configured length is applied to the existing window."""
+    days = int(payload.trial_days)
+    if days < 1 or days > 3650:
+        raise HTTPException(status_code=400,
+                            detail="trial_days must be between 1 and 3650.")
+    flags = db.query(FeatureFlags).filter(FeatureFlags.id == 1).first()
+    if not flags:
+        flags = FeatureFlags(id=1, apis_enabled=False)
+        db.add(flags)
+    flags.trial_days = days
+    db.commit()
+    return {"trial_days": days,
+            "message": f"Trial duration set to {days} day{'s' if days != 1 else ''}"}
 
 
 # ── Network Access Control (IP/MAC Whitelist) ─────────────────────────────────
@@ -1329,83 +1354,181 @@ def admin_restore_backup(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Admin Config Backup / Restore — TEMPLATES & RULES ONLY (no OS / case data).
+# Admin Panel Backup / Restore — every admin-editable table.
 #
-# Use case: edit print templates / baggage rules on a test machine, ship just
-# those edits to the production machine without copying any operational data.
+# Use case: edit on a test machine, ship to production without disturbing any
+# OS/BR/DR/warehouse case data. Includes everything the admin can edit in the
+# System Admin Panel UI:
 #
-# Tables included (the admin-editable content tables):
-#   • print_template_config       — versioned OS print headings & paragraphs
-#   • baggage_rules_config        — versioned numeric baggage limits
-#   • special_item_allowances     — versioned per-item allowances
-#   • legal_statutes              — IPC/COFEPOSA/etc. lookup with goods clauses
+#   Templates & rules (versioned by effective_from):
+#     • print_template_config     — OS print headings & paragraphs
+#     • baggage_rules_config      — numeric baggage limits
+#     • special_item_allowances   — per-item allowances
 #
-# Format: a single JSON file with a versioned envelope. Restore is INSERT-only
-# by composite natural key — existing rows on the destination are never
-# overwritten or deleted, so reapplying the same backup is idempotent.
+#   Lookup tables:
+#     • legal_statutes
+#     • dc_master, airlines_mast, arrival_flight_master, airport_master,
+#       nationality_master, port_master, item_cat_master, duty_rate_master,
+#       br_no_limits
+#
+#   Settings (single-row id=1):
+#     • feature_flags, shift_timing_master, margin_master
+#
+#   User accounts (hashed passwords; user_id is the natural key):
+#     • users
+#
+# DELIBERATELY OMITTED:
+#   • cops_master / cops_items     (OS case data)
+#   • br_*, dr_*, wh_*, mhb_*,
+#     appeal_*, revenue, challans   (operational case data)
+#   • allowed_devices               (installation-specific MAC addresses)
+#
+# Format: a single JSON file. Restore is INSERT-only by natural key — existing
+# rows are never overwritten or deleted, so the same backup is idempotent.
+# Singleton settings are inserted only if missing on the destination, so a
+# production machine's tuned settings are never silently overwritten.
 # ──────────────────────────────────────────────────────────────────────────────
 
 _CONFIG_BACKUP_FORMAT = 1
 
-def _row_to_dict(row, cols: list) -> dict:
+# (json_key, model, unique_cols)
+_ADMIN_CONFIG_TABLES = [
+    # Versioned content
+    ("print_template_config",   PrintTemplateConfig,    ("field_key", "effective_from")),
+    ("baggage_rules_config",    BaggageRulesConfig,     ("rule_key", "effective_from")),
+    ("special_item_allowances", SpecialItemAllowance,   ("item_name", "effective_from")),
+    # Lookup tables
+    ("legal_statutes",          LegalStatute,           ("keyword",)),
+    ("dc_master",               DcMaster,               ("dc_code",)),
+    ("airlines_mast",           AirlinesMast,           ("airline_code",)),
+    ("arrival_flight_master",   ArrivalFlightMaster,    ("flight_no", "airline_code")),
+    ("airport_master",          AirportMaster,          ("airport_name",)),
+    ("nationality_master",      NationalityMaster,      ("nationality",)),
+    ("port_master",             PortMaster,             ("port_of_departure",)),
+    ("item_cat_master",         ItemCatMaster,          ("category_code",)),
+    ("duty_rate_master",        DutyRateMaster,         ("duty_category", "from_date")),
+    ("br_no_limits",            BrNoLimits,             ("br_type",)),
+    # Users (hashed passwords; user_id is unique)
+    ("users",                   User,                   ("user_id",)),
+]
+
+# (json_key, model) — single-row tables keyed by id=1
+_ADMIN_CONFIG_SINGLETONS = [
+    ("feature_flags",       FeatureFlags),
+    ("shift_timing_master", ShiftTimingMaster),
+    ("margin_master",       MarginMaster),
+]
+
+
+def _model_data_cols(model):
+    """All column objects (excluding id) for serialization/restore."""
+    return [c for c in model.__table__.columns if c.name != "id"]
+
+
+def _row_to_dict(row, cols) -> dict:
     out = {}
     for c in cols:
-        v = getattr(row, c, None)
+        name = c.name if hasattr(c, "name") else c
+        v = getattr(row, name, None)
         if isinstance(v, (date, datetime)):
-            out[c] = v.isoformat()
+            out[name] = v.isoformat()
         else:
-            out[c] = v
+            out[name] = v
     return out
+
+
+def _coerce_for_column(v, col):
+    """Convert a JSON-decoded value into the right Python type for the column."""
+    if v is None or v == "":
+        return None
+    try:
+        pytype = col.type.python_type
+    except (NotImplementedError, AttributeError):
+        return str(v)
+    if pytype is bool:
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "y")
+        return bool(v)
+    if pytype is datetime:                # check before date (datetime IS a date)
+        if isinstance(v, str):
+            try:
+                dt = datetime.fromisoformat(v.replace("Z", "+00:00"))
+            except ValueError:
+                return None
+            # Naive DateTime columns (the convention in this app) — strip tzinfo
+            if dt.tzinfo is not None:
+                dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+            return dt
+        if isinstance(v, datetime) and v.tzinfo is not None:
+            return v.astimezone(timezone.utc).replace(tzinfo=None)
+        return v
+    if pytype is date:
+        if isinstance(v, str):
+            try:
+                return date.fromisoformat(v[:10])
+            except ValueError:
+                return None
+        return v
+    if pytype is int:
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            return None
+    if pytype is float:
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return None
+    return str(v)
+
+
+def _row_has_required(row: dict, cols) -> bool:
+    """True if every NOT-NULL-no-default column in the model has a usable value."""
+    for c in cols:
+        if c.nullable:
+            continue
+        if c.default is not None or c.server_default is not None:
+            continue
+        if c.primary_key:
+            continue
+        v = _coerce_for_column(row.get(c.name), c)
+        if v is None:
+            return False
+    return True
 
 
 @router.get("/config/backup", dependencies=[Depends(require_admin)])
 def admin_config_backup(db: Session = Depends(get_db)):
-    """Export admin config tables (templates / rules / allowances / statutes)
-    as a JSON file. Does NOT include any OS, BR, DR, user or installation data."""
+    """Download every admin-editable table as a JSON file.
+    Excludes all operational case data and installation-specific entries."""
     import json as _json
 
-    ptc_cols = ["field_key", "field_label", "field_value",
-                "effective_from", "created_by", "created_at"]
-    brc_cols = ["rule_key", "rule_label", "rule_value", "rule_uqc",
-                "effective_from", "created_by", "created_at"]
-    sia_cols = ["item_name", "keywords", "allowance_qty", "allowance_uqc",
-                "effective_from", "active", "created_by", "created_at"]
-    statute_cols = ["keyword", "display_name", "is_prohibited",
-                    "supdt_goods_clause", "adjn_goods_clause", "legal_reference"]
+    tables_out = {}
+    for json_key, model, unique_cols in _ADMIN_CONFIG_TABLES:
+        cols = _model_data_cols(model)
+        order_attrs = [getattr(model, c) for c in unique_cols]
+        rows = db.query(model).order_by(*order_attrs).all()
+        tables_out[json_key] = [_row_to_dict(r, cols) for r in rows]
+
+    singletons_out = {}
+    for json_key, model in _ADMIN_CONFIG_SINGLETONS:
+        cols = _model_data_cols(model)
+        row = db.query(model).filter(model.id == 1).first()
+        singletons_out[json_key] = _row_to_dict(row, cols) if row else None
 
     payload = {
-        "format_version": _CONFIG_BACKUP_FORMAT,
-        "exported_at": datetime.now(timezone.utc).isoformat(),
-        "kind": "admin_config_only",
-        "note": "Templates & rules only — no OS, BR, DR, user or installation data.",
-        "tables": {
-            "print_template_config": [
-                _row_to_dict(r, ptc_cols)
-                for r in db.query(PrintTemplateConfig)
-                    .order_by(PrintTemplateConfig.field_key,
-                              PrintTemplateConfig.effective_from).all()
-            ],
-            "baggage_rules_config": [
-                _row_to_dict(r, brc_cols)
-                for r in db.query(BaggageRulesConfig)
-                    .order_by(BaggageRulesConfig.rule_key,
-                              BaggageRulesConfig.effective_from).all()
-            ],
-            "special_item_allowances": [
-                _row_to_dict(r, sia_cols)
-                for r in db.query(SpecialItemAllowance)
-                    .order_by(SpecialItemAllowance.item_name,
-                              SpecialItemAllowance.effective_from).all()
-            ],
-            "legal_statutes": [
-                _row_to_dict(r, statute_cols)
-                for r in db.query(LegalStatute).order_by(LegalStatute.keyword).all()
-            ],
-        },
+        "format_version":   _CONFIG_BACKUP_FORMAT,
+        "exported_at":      datetime.now(timezone.utc).isoformat(),
+        "kind":             "admin_config_only",
+        "note":             "Admin-editable config + masters + users + settings. "
+                            "No OS/BR/DR/warehouse case data. "
+                            "Restore is INSERT-only by natural key.",
+        "tables":           tables_out,
+        "singletons":       singletons_out,
     }
 
     body = _json.dumps(payload, indent=2, default=str)
-    filename = f"cops_config_backup_{date.today().isoformat()}.json"
+    filename = f"cops_admin_backup_{date.today().isoformat()}.json"
     return Response(
         content=body,
         media_type="application/json",
@@ -1421,9 +1544,9 @@ def admin_config_restore(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ):
-    """Restore admin config from a JSON file produced by /admin/config/backup.
-    INSERT-only by composite natural key — existing rows are never overwritten
-    or deleted. OS/BR/DR/user data is never touched."""
+    """Restore admin config from /admin/config/backup output.
+    INSERT-only by natural key. Settings (singletons) are added only if missing
+    on the destination, so production-tuned settings are never overwritten."""
     import json as _json
 
     try:
@@ -1431,12 +1554,12 @@ def admin_config_restore(
         payload = _json.loads(raw.decode("utf-8-sig"))
     except Exception:
         raise HTTPException(status_code=400,
-                            detail="Invalid JSON file. Expected a config backup produced by /admin/config/backup.")
+                            detail="Invalid JSON file. Expected an admin config backup.")
 
     if not isinstance(payload, dict) or payload.get("kind") != "admin_config_only":
         raise HTTPException(status_code=400,
                             detail="This file is not an admin config backup. "
-                                   "Use the OS Backup/Restore screen for full backups.")
+                                   "Use the Backup & Restore tab's full backup tools instead.")
 
     fmt = payload.get("format_version")
     if fmt != _CONFIG_BACKUP_FORMAT:
@@ -1444,160 +1567,115 @@ def admin_config_restore(
                             detail=f"Unsupported config backup version: {fmt}. "
                                    f"This server expects version {_CONFIG_BACKUP_FORMAT}.")
 
-    tables = payload.get("tables") or {}
+    tables_in     = payload.get("tables") or {}
+    singletons_in = payload.get("singletons") or {}
 
-    def _to_date(v):
-        if not v:
-            return None
-        if isinstance(v, date) and not isinstance(v, datetime):
-            return v
-        s = str(v)[:10]
-        try:
-            return date.fromisoformat(s)
-        except ValueError:
-            return None
+    counts = {}
+    summary_total_inserted = 0
 
-    def _to_dt(v):
-        if not v:
-            return None
-        try:
-            return datetime.fromisoformat(str(v).replace("Z", "+00:00"))
-        except ValueError:
-            return None
+    # ── Multi-row tables ─────────────────────────────────────────────────────
+    for json_key, model, unique_cols in _ADMIN_CONFIG_TABLES:
+        rows_in = tables_in.get(json_key) or []
+        cols    = _model_data_cols(model)
+        col_by_name = {c.name: c for c in cols}
 
-    counts = {
-        "print_template_config":  {"inserted": 0, "skipped": 0},
-        "baggage_rules_config":   {"inserted": 0, "skipped": 0},
-        "special_item_allowances":{"inserted": 0, "skipped": 0},
-        "legal_statutes":         {"inserted": 0, "skipped": 0},
-    }
+        # Build set of existing natural keys (always plain tuples — Row vs tuple
+        # differs across SA versions, so coerce explicitly via tuple()).
+        unique_attrs = [getattr(model, c) for c in unique_cols]
+        if len(unique_attrs) == 1:
+            existing_keys = {(v,) for (v,) in db.query(*unique_attrs).all()}
+        else:
+            existing_keys = {tuple(t) for t in db.query(*unique_attrs).all()}
 
-    # ── print_template_config ────────────────────────────────────────────────
-    ptc_rows = tables.get("print_template_config") or []
-    if ptc_rows:
-        existing = {
-            (r[0], r[1]) for r in db.query(
-                PrintTemplateConfig.field_key, PrintTemplateConfig.effective_from
-            ).all()
-        }
-        for row in ptc_rows:
-            key = (row.get("field_key") or "").strip()
-            eff = _to_date(row.get("effective_from"))
-            if not key or eff is None:
-                counts["print_template_config"]["skipped"] += 1
+        ins = skip = 0
+        for row in rows_in:
+            if not isinstance(row, dict):
+                skip += 1
                 continue
-            if (key, eff) in existing:
-                counts["print_template_config"]["skipped"] += 1
-                continue
-            db.add(PrintTemplateConfig(
-                field_key=key,
-                field_label=(row.get("field_label") or None),
-                field_value=(row.get("field_value") or ""),
-                effective_from=eff,
-                created_by=(row.get("created_by") or None),
-                created_at=_to_dt(row.get("created_at")),
-            ))
-            existing.add((key, eff))
-            counts["print_template_config"]["inserted"] += 1
-
-    # ── baggage_rules_config ─────────────────────────────────────────────────
-    brc_rows = tables.get("baggage_rules_config") or []
-    if brc_rows:
-        existing = {
-            (r[0], r[1]) for r in db.query(
-                BaggageRulesConfig.rule_key, BaggageRulesConfig.effective_from
-            ).all()
-        }
-        for row in brc_rows:
-            key = (row.get("rule_key") or "").strip()
-            eff = _to_date(row.get("effective_from"))
+            # Build natural-key tuple from input row (coerced to column type)
             try:
-                rule_val = float(row.get("rule_value"))
-            except (TypeError, ValueError):
-                rule_val = None
-            if not key or eff is None or rule_val is None:
-                counts["baggage_rules_config"]["skipped"] += 1
+                key_tuple = tuple(
+                    _coerce_for_column(row.get(c), col_by_name[c]) for c in unique_cols
+                )
+            except KeyError:
+                skip += 1
                 continue
-            if (key, eff) in existing:
-                counts["baggage_rules_config"]["skipped"] += 1
+            if any(v is None for v in key_tuple):
+                skip += 1
                 continue
-            db.add(BaggageRulesConfig(
-                rule_key=key,
-                rule_label=(row.get("rule_label") or None),
-                rule_value=rule_val,
-                rule_uqc=(row.get("rule_uqc") or None),
-                effective_from=eff,
-                created_by=(row.get("created_by") or None),
-                created_at=_to_dt(row.get("created_at")),
-            ))
-            existing.add((key, eff))
-            counts["baggage_rules_config"]["inserted"] += 1
+            if key_tuple in existing_keys:
+                skip += 1
+                continue
 
-    # ── special_item_allowances ──────────────────────────────────────────────
-    sia_rows = tables.get("special_item_allowances") or []
-    if sia_rows:
-        existing = {
-            (r[0], r[1]) for r in db.query(
-                SpecialItemAllowance.item_name, SpecialItemAllowance.effective_from
-            ).all()
-        }
-        for row in sia_rows:
-            item_name = (row.get("item_name") or "").strip()
-            eff = _to_date(row.get("effective_from"))
+            # Pre-validate required columns up-front so a bad row can't
+            # poison the whole transaction at flush time.
+            if not _row_has_required(row, cols):
+                skip += 1
+                continue
+
+            kwargs = {}
+            for c in cols:
+                v = _coerce_for_column(row.get(c.name), c)
+                # If value is NULL and the column has a default, omit so the
+                # default kicks in instead of writing NULL.
+                if v is None and (c.default is not None or c.server_default is not None):
+                    continue
+                kwargs[c.name] = v
+
+            # Each insert in its own SAVEPOINT — a row-level error doesn't
+            # nuke the rows already inserted in this batch.
+            sp = db.begin_nested()
             try:
-                qty = float(row.get("allowance_qty"))
-            except (TypeError, ValueError):
-                qty = None
-            if not item_name or eff is None or qty is None:
-                counts["special_item_allowances"]["skipped"] += 1
-                continue
-            if (item_name, eff) in existing:
-                counts["special_item_allowances"]["skipped"] += 1
-                continue
-            db.add(SpecialItemAllowance(
-                item_name=item_name,
-                keywords=(row.get("keywords") or None),
-                allowance_qty=qty,
-                allowance_uqc=(row.get("allowance_uqc") or None),
-                effective_from=eff,
-                active=(row.get("active") or "Y"),
-                created_by=(row.get("created_by") or None),
-                created_at=_to_dt(row.get("created_at")),
-            ))
-            existing.add((item_name, eff))
-            counts["special_item_allowances"]["inserted"] += 1
+                db.add(model(**kwargs))
+                db.flush()
+                sp.commit()
+                existing_keys.add(key_tuple)
+                ins += 1
+            except Exception:
+                sp.rollback()
+                skip += 1
 
-    # ── legal_statutes (keyword is unique — INSERT new only) ─────────────────
-    statute_rows = tables.get("legal_statutes") or []
-    if statute_rows:
-        existing_kw = {r[0] for r in db.query(LegalStatute.keyword).all()}
-        for row in statute_rows:
-            kw = (row.get("keyword") or "").strip()
-            display = (row.get("display_name") or "").strip()
-            if not kw or not display:
-                counts["legal_statutes"]["skipped"] += 1
+        counts[json_key] = {"inserted": ins, "skipped": skip}
+        summary_total_inserted += ins
+
+    # ── Single-row settings (insert only if missing on destination) ─────────
+    for json_key, model in _ADMIN_CONFIG_SINGLETONS:
+        data = singletons_in.get(json_key)
+        if not data or not isinstance(data, dict):
+            counts[json_key] = {"inserted": 0, "skipped": 0}
+            continue
+        existing = db.query(model).filter(model.id == 1).first()
+        if existing is not None:
+            counts[json_key] = {"inserted": 0, "skipped": 1}
+            continue
+        kwargs = {"id": 1}
+        for c in _model_data_cols(model):
+            v = _coerce_for_column(data.get(c.name), c)
+            if v is None and (c.default is not None or c.server_default is not None):
                 continue
-            if kw in existing_kw:
-                counts["legal_statutes"]["skipped"] += 1
-                continue
-            db.add(LegalStatute(
-                keyword=kw,
-                display_name=display,
-                is_prohibited=bool(row.get("is_prohibited") or False),
-                supdt_goods_clause=(row.get("supdt_goods_clause") or ""),
-                adjn_goods_clause=(row.get("adjn_goods_clause") or ""),
-                legal_reference=(row.get("legal_reference") or ""),
-            ))
-            existing_kw.add(kw)
-            counts["legal_statutes"]["inserted"] += 1
+            kwargs[c.name] = v
+        sp = db.begin_nested()
+        try:
+            db.add(model(**kwargs))
+            db.flush()
+            sp.commit()
+            counts[json_key] = {"inserted": 1, "skipped": 0}
+            summary_total_inserted += 1
+        except Exception:
+            sp.rollback()
+            counts[json_key] = {"inserted": 0, "skipped": 1}
 
     db.commit()
+    # Master tables may have been written — bust the in-process caches so the
+    # next request reflects the freshly-imported lookups.
+    bust_all_master_caches()
 
     return {
-        "ok": True,
-        "format_version": fmt,
-        "exported_at": payload.get("exported_at"),
-        "counts": counts,
+        "ok":               True,
+        "format_version":   fmt,
+        "exported_at":      payload.get("exported_at"),
+        "total_inserted":   summary_total_inserted,
+        "counts":           counts,
     }
 
 

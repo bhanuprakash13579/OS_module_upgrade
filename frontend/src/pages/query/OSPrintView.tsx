@@ -173,6 +173,8 @@ export default function OSPrintView() {
     : pitText('legal_para_2', "Import of goods non-declared / misdeclared / concealed / in trade and in commercial quantity / non-bonafide in excess of the baggage allowance is therefore liable for confiscation under {confiscation_full_ref} read with Section 3(3) of the Foreign Trade (Development & Regulation) Act, 1992.");
   const recordHeading   = pitText('record_heading',    "RECORD OF PERSONAL HEARING & FINDINGS");
   const orderHeading    = pitText('order_heading',     "ORDER");
+  const orderParaCurrencyReleaseTpl = pitText('export_order_para_currency_release',
+    "I Order for the release of Indian currency amounting to Rs.{currency_value}/- (Rupees {currency_words} Only) as per Regulation 3 of the Foreign Exchange Management (Export and Import of Currency) Regulations, 2015.");
   const orderParaRfTpl      = isExportCase
     ? pitText('export_order_para_rf', "I Order confiscation of the goods{rf_slnos_text} valued at Rs.{conf_value}/- under {confiscation_full_ref}, but allow the passenger an option to redeem the goods valued at Rs.{conf_value}/- on a fine of Rs.{rf_amount}/- (Rupees {rf_words} Only) in lieu of confiscation under Section 125 of the Customs Act 1962 within 7 days from the date of receipt of this Order.")
     : pitText('order_para_rf', "I Order confiscation of the goods{rf_slnos_text} valued at Rs.{conf_value}/- under {confiscation_full_ref} read with Section 3(3) of Foreign Trade (D&R) Act, 1992, but allow the passenger an option to redeem the goods valued at Rs.{conf_value}/- on a fine of Rs.{rf_amount}/- (Rupees {rf_words} Only) in lieu of confiscation under Section 125 of the Customs Act 1962 within 7 days from the date of receipt of this Order, Duty extra.");
@@ -623,6 +625,14 @@ export default function OSPrintView() {
 
           <div className="font-bold underline text-center uppercase mb-1">{orderHeading}</div>
           <div className="mb-2 text-justify">
+            {/* Currency release — export-only, when free allowance entered (e.g. Indian Currency declared) */}
+            {isExportCase && totalFaMonetary > 0 && renderParas(
+              fillTpl(orderParaCurrencyReleaseTpl, {
+                currency_value:  Math.round(totalFaMonetary),
+                currency_words:  numberToWords(Math.round(totalFaMonetary)).trim().replace(/\b\w/g, (l: string) => l.toUpperCase()),
+              }),
+              "mb-1 indent-8",
+            )}
             {confValue > 0 && (data.rf_amount || 0) > 0 && renderParas(
               fillTpl(orderParaRfTpl, {
                 confiscation_full_ref: confiscationRef,

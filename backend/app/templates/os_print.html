@@ -345,6 +345,10 @@
   <div style="text-align:center;font-weight:bold;margin-bottom:2px"><span style="border-bottom:1px solid #000;padding-bottom:1px">{{ order_heading }}</span></div>
 
   <!-- Order paragraphs (multi-paragraph aware: blank line in source → new <p>) -->
+  {# Currency release — export-only, only when FA > 0 (e.g. Indian Currency declared) #}
+  {% if currency_value > 0 %}
+  <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0">{{ para_currency_release_html | safe }}</p>
+  {% endif %}
   {% if conf_value > 0 and rf_amount > 0 %}
   <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0">{{ para_rf_html | safe }}</p>
   {% endif %}

@@ -99,9 +99,10 @@ export default function RestoreBackup() {
   const [flagsMsg, setFlagsMsg] = useState('');
 
   // Trial counter
-  const [trialStatus, setTrialStatus] = useState<{ trial_disabled: boolean; days_remaining: number | null; expired: boolean } | null>(null);
+  const [trialStatus, setTrialStatus] = useState<{ trial_disabled: boolean; days_remaining: number | null; trial_days: number; expired: boolean } | null>(null);
   const [trialLoading, setTrialLoading] = useState(false);
   const [trialMsg, setTrialMsg] = useState('');
+  const [trialDaysInput, setTrialDaysInput] = useState('30');
 
   // App mode
   const [prodMode, setProdMode] = useState(false);
@@ -196,11 +197,16 @@ export default function RestoreBackup() {
     loadDevices();
     // Load trial status via public endpoint (no admin token needed)
     api.get('/trial-status')
-      .then(r => setTrialStatus({
-        trial_disabled: !!r.data.trial_disabled,
-        days_remaining: r.data.days_remaining ?? null,
-        expired: !!r.data.expired,
-      }))
+      .then(r => {
+        const td = r.data.trial_days ?? 30;
+        setTrialStatus({
+          trial_disabled: !!r.data.trial_disabled,
+          days_remaining: r.data.days_remaining ?? null,
+          trial_days: td,
+          expired: !!r.data.expired,
+        });
+        setTrialDaysInput(String(td));
+      })
       .catch(() => {});
   }, [adminToken]);
 
@@ -269,13 +275,25 @@ export default function RestoreBackup() {
     }
   };
 
+  const reloadTrial = async () => {
+    const r = await api.get('/trial-status');
+    const td = r.data.trial_days ?? 30;
+    setTrialStatus({
+      trial_disabled: !!r.data.trial_disabled,
+      days_remaining: r.data.days_remaining ?? null,
+      trial_days: td,
+      expired: !!r.data.expired,
+    });
+    setTrialDaysInput(String(td));
+    return r.data;
+  };
+
   const handleTrialReset = async () => {
     setTrialLoading(true); setTrialMsg('');
     try {
-      await api.post('/admin/trial/reset', {}, { headers: adminHeaders(adminToken) });
-      const r = await api.get('/trial-status');
-      setTrialStatus({ trial_disabled: !!r.data.trial_disabled, days_remaining: r.data.days_remaining ?? null, expired: !!r.data.expired });
-      setTrialMsg('Trial reset — 30-day window starts today.');
+      const res = await api.post('/admin/trial/reset', {}, { headers: adminHeaders(adminToken) });
+      await reloadTrial();
+      setTrialMsg(res.data?.message || `Trial reset — ${res.data?.trial_days ?? 30}-day window starts today.`);
     } catch (err: any) {
       setTrialMsg(err.response?.data?.detail || 'Failed to reset trial.');
     } finally { setTrialLoading(false); }
@@ -285,10 +303,33 @@ export default function RestoreBackup() {
     setTrialLoading(true); setTrialMsg('');
     try {
       await api.post('/admin/trial/disable', {}, { headers: adminHeaders(adminToken) });
-      setTrialStatus({ trial_disabled: true, days_remaining: null, expired: false });
+      // trial_days is preserved; only trial_disabled flips
+      setTrialStatus(prev => ({
+        trial_disabled: true,
+        days_remaining: null,
+        trial_days: prev?.trial_days ?? 30,
+        expired: false,
+      }));
       setTrialMsg('Trial disabled — installation is now permanent.');
     } catch (err: any) {
       setTrialMsg(err.response?.data?.detail || 'Failed to disable trial.');
+    } finally { setTrialLoading(false); }
+  };
+
+  const handleTrialDaysSave = async () => {
+    const days = parseInt(trialDaysInput, 10);
+    if (isNaN(days) || days < 1 || days > 3650) {
+      setTrialMsg('Enter a number of days between 1 and 3650.');
+      return;
+    }
+    setTrialLoading(true); setTrialMsg('');
+    try {
+      const res = await api.post('/admin/trial/set-days', { trial_days: days },
+                                  { headers: adminHeaders(adminToken) });
+      await reloadTrial();
+      setTrialMsg(res.data?.message || `Trial duration set to ${days} day${days === 1 ? '' : 's'}.`);
+    } catch (err: any) {
+      setTrialMsg(err.response?.data?.detail || 'Failed to update trial duration.');
     } finally { setTrialLoading(false); }
   };
 
@@ -709,6 +750,7 @@ export default function RestoreBackup() {
         timeout: 60000,
       });
       const counts = res.data?.counts || {};
+      const total = res.data?.total_inserted ?? 0;
       const parts: string[] = [];
       const fmt = (label: string, key: string) => {
         const c = counts[key];
@@ -716,11 +758,31 @@ export default function RestoreBackup() {
         if ((c.inserted || 0) + (c.skipped || 0) === 0) return;
         parts.push(`${label}: ${c.inserted} added (${c.skipped} skipped)`);
       };
-      fmt('Templates',      'print_template_config');
-      fmt('Baggage rules',  'baggage_rules_config');
-      fmt('Special items',  'special_item_allowances');
-      fmt('Legal statutes', 'legal_statutes');
-      setCfgRestoreMsg(parts.length ? `Restored — ${parts.join(' | ')}` : 'No new config rows found in file (already in sync).');
+      // Versioned content
+      fmt('Print template',        'print_template_config');
+      fmt('Baggage rules',         'baggage_rules_config');
+      fmt('Special allowances',    'special_item_allowances');
+      // Lookups
+      fmt('Legal statutes',        'legal_statutes');
+      fmt('DC master',             'dc_master');
+      fmt('Airlines',              'airlines_mast');
+      fmt('Flights',               'arrival_flight_master');
+      fmt('Airports',              'airport_master');
+      fmt('Nationalities',         'nationality_master');
+      fmt('Ports',                 'port_master');
+      fmt('Item categories',       'item_cat_master');
+      fmt('Duty rates',            'duty_rate_master');
+      fmt('BR no. limits',         'br_no_limits');
+      // Users
+      fmt('Users',                 'users');
+      // Settings (singletons — usually skipped because production already has its own)
+      fmt('Feature flags',         'feature_flags');
+      fmt('Shift timings',         'shift_timing_master');
+      fmt('Print margins',         'margin_master');
+      const summary = parts.length
+        ? `Restored ${total} new row${total === 1 ? '' : 's'} — ${parts.join(' | ')}`
+        : 'No new admin config rows found in file (this machine is already in sync).';
+      setCfgRestoreMsg(summary);
       setCfgRestoreFile(null);
       if (cfgRestoreRef.current) cfgRestoreRef.current.value = '';
     } catch (err: any) {
@@ -1252,7 +1314,11 @@ export default function RestoreBackup() {
               <Clock size={18} className="text-blue-600" />
               <div>
                 <h2 className="text-sm font-semibold text-slate-700">Trial / License</h2>
-                <p className="text-xs text-slate-500 mt-0.5">Manage the 30-day trial counter for this installation.</p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Manage the trial counter for this installation. The duration is admin-configurable
+                  (default 30 days). When the trial ends, regular users see a block screen with a
+                  link to the admin panel — admins can always reach this screen to extend or activate.
+                </p>
               </div>
             </div>
 
@@ -1265,20 +1331,49 @@ export default function RestoreBackup() {
               ) : (
                 <div className={`flex items-center gap-3 px-4 py-3 rounded-lg border ${
                   trialStatus.expired ? 'bg-red-50 border-red-300' :
-                  (trialStatus.days_remaining ?? 30) <= 7 ? 'bg-orange-50 border-orange-300' :
+                  (trialStatus.days_remaining ?? trialStatus.trial_days) <= 7 ? 'bg-orange-50 border-orange-300' :
                   'bg-blue-50 border-blue-200'
                 }`}>
                   <Clock size={16} className={trialStatus.expired ? 'text-red-600' : 'text-blue-600'} />
                   <p className={`text-sm font-semibold ${trialStatus.expired ? 'text-red-800' : 'text-blue-800'}`}>
                     {trialStatus.expired
-                      ? 'Trial EXPIRED — application is blocked for regular users'
-                      : `${trialStatus.days_remaining} day${trialStatus.days_remaining === 1 ? '' : 's'} remaining in trial`}
+                      ? `Trial ENDED — ${trialStatus.trial_days}-day window has expired (regular users are blocked)`
+                      : `${trialStatus.days_remaining} of ${trialStatus.trial_days} day${trialStatus.trial_days === 1 ? '' : 's'} remaining in trial`}
                   </p>
                 </div>
               )
             ) : (
               <p className="text-xs text-slate-400 italic">Loading trial status…</p>
             )}
+
+            {/* Trial duration setter */}
+            <div className="border border-slate-200 rounded-lg p-3 bg-slate-50/50 space-y-2">
+              <label className="block text-[11px] font-semibold text-slate-600">
+                Trial duration (days)
+                <span className="ml-1 font-normal text-slate-400">— between 1 and 3650</span>
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={1}
+                  max={3650}
+                  value={trialDaysInput}
+                  onChange={e => setTrialDaysInput(e.target.value)}
+                  className="w-24 border border-slate-200 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+                <button
+                  type="button"
+                  disabled={trialLoading}
+                  onClick={handleTrialDaysSave}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md bg-slate-700 text-white hover:bg-slate-800 disabled:opacity-60 font-semibold"
+                >
+                  Save Duration
+                </button>
+                <span className="text-[10.5px] text-slate-500">
+                  Applies to the active trial window — does not reset the start date.
+                </span>
+              </div>
+            </div>
 
             <div className="flex gap-3 flex-wrap">
               <button
@@ -1287,7 +1382,7 @@ export default function RestoreBackup() {
                 onClick={handleTrialReset}
                 className="flex items-center gap-2 px-4 py-2 text-xs rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60 font-semibold"
               >
-                <RefreshCw size={13} /> Reset Trial (restart 30-day window)
+                <RefreshCw size={13} /> Reset Trial (restart {trialStatus?.trial_days ?? 30}-day window)
               </button>
               <button
                 type="button"
@@ -1364,6 +1459,65 @@ export default function RestoreBackup() {
               </div>
               {fullDbRestoreErr    && <p className="text-xs text-red-600">{fullDbRestoreErr}</p>}
               {fullDbRestoreResult && <p className="text-xs text-emerald-700 font-medium">{fullDbRestoreResult}</p>}
+            </form>
+          </section>
+
+          {/* ── Admin Panel Backup (admin-editable config only — no case data) ── */}
+          <section className="bg-white rounded-xl border border-indigo-200 shadow-sm p-5 space-y-3">
+            <div className="flex items-center gap-2">
+              <Settings size={18} className="text-indigo-600" />
+              <div>
+                <h2 className="text-sm font-semibold text-slate-700">
+                  Admin Panel Backup
+                  <span className="ml-1 text-xs font-normal text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-1.5 py-0.5">No Case Data</span>
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Edit templates / masters / users on a test machine, ship just those edits to production. Includes everything the admin can edit:
+                  print template, baggage rules, special allowances, legal statutes, all master tables, settings, and user accounts.
+                  <span className="text-emerald-700 font-medium"> OS, BR, DR and warehouse case data is never touched.</span>
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button onClick={downloadConfigBackup} disabled={cfgDownloading}
+                className="flex items-center gap-2 px-4 py-2 text-xs rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60">
+                <Download size={13} />
+                {cfgDownloading ? 'Preparing…' : 'Download Admin Backup (.json)'}
+              </button>
+            </div>
+            {cfgDownloadMsg && (
+              <p className={`text-xs ${cfgDownloadMsg.startsWith('Download failed') ? 'text-red-600' : 'text-emerald-700'}`}>
+                {cfgDownloadMsg}
+              </p>
+            )}
+          </section>
+
+          {/* ── Restore Admin Panel Backup ── */}
+          <section className="bg-white rounded-xl border border-indigo-200 shadow-sm p-5 space-y-3">
+            <div className="flex items-center gap-2">
+              <Upload size={18} className="text-indigo-600" />
+              <div>
+                <h2 className="text-sm font-semibold text-slate-700">Restore Admin Panel Backup</h2>
+                <p className="text-xs text-slate-500 mt-0.5 break-words">
+                  Upload a <code className="bg-slate-100 px-1 rounded">.json</code> file produced by the button above.
+                  New rows are inserted by natural key; existing rows are kept as-is. Settings (shift, margins, feature flags) are added only if not already configured on this machine —
+                  <span className="font-medium"> production-tuned settings are never silently overwritten.</span>
+                </p>
+              </div>
+            </div>
+            <form onSubmit={uploadConfigRestore} className="space-y-3">
+              <div className="flex items-center gap-3 flex-wrap">
+                <input ref={cfgRestoreRef} type="file" accept=".json,application/json"
+                  onChange={e => { setCfgRestoreFile(e.target.files?.[0] || null); setCfgRestoreMsg(''); setCfgRestoreErr(''); }}
+                  className="text-xs text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200" />
+                <button type="submit" disabled={!cfgRestoreFile || cfgRestoreLoading}
+                  className="flex items-center gap-2 px-4 py-1.5 text-xs rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50">
+                  <Upload size={13} />
+                  {cfgRestoreLoading ? 'Restoring…' : 'Restore Admin Backup'}
+                </button>
+              </div>
+              {cfgRestoreErr && <p className="text-xs text-red-600">{cfgRestoreErr}</p>}
+              {cfgRestoreMsg && <p className="text-xs text-emerald-700 font-medium">{cfgRestoreMsg}</p>}
             </form>
           </section>
 
@@ -1500,78 +1654,6 @@ export default function RestoreBackup() {
       {/* ══ TAB: OS CONFIG ═══════════════════════════════════════════════════ */}
       {activeTab === 'osconfig' && (
         <div className="space-y-6">
-
-          {/* Config-only Backup / Restore — templates & rules only, no case data */}
-          <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Database size={16} className="text-indigo-600" />
-              <div>
-                <h2 className="text-sm font-semibold text-slate-700">Config Backup &amp; Restore</h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Move <span className="font-semibold">just the admin templates &amp; rules</span> between machines —
-                  print template, baggage rules, special allowances, legal statutes.
-                  <span className="text-emerald-700 font-medium"> No OS, BR, DR, or user data is touched.</span>
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {/* Download */}
-              <div className="border border-slate-200 rounded-lg p-3 bg-slate-50/50">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <Download size={13} className="text-slate-600" />
-                  <span className="text-xs font-semibold text-slate-700">Download config from this machine</span>
-                </div>
-                <p className="text-[10.5px] text-slate-500 leading-snug mb-2">
-                  Saves a small JSON file containing all admin-editable config rows. Apply it on the other machine using Restore below.
-                </p>
-                <button
-                  onClick={downloadConfigBackup}
-                  disabled={cfgDownloading}
-                  className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-md bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 disabled:opacity-60"
-                >
-                  <Download size={12} />
-                  {cfgDownloading ? 'Preparing…' : 'Download Config Backup'}
-                </button>
-                {cfgDownloadMsg && (
-                  <p className={`mt-2 text-[10.5px] ${cfgDownloadMsg.startsWith('Download failed') ? 'text-red-600' : 'text-emerald-700'}`}>
-                    {cfgDownloadMsg}
-                  </p>
-                )}
-              </div>
-
-              {/* Restore */}
-              <div className="border border-slate-200 rounded-lg p-3 bg-slate-50/50">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <Upload size={13} className="text-slate-600" />
-                  <span className="text-xs font-semibold text-slate-700">Restore config on this machine</span>
-                </div>
-                <p className="text-[10.5px] text-slate-500 leading-snug mb-2">
-                  New rows are added; existing rows are kept as-is (idempotent — same file can be applied repeatedly without harm).
-                </p>
-                <form onSubmit={uploadConfigRestore} className="space-y-2">
-                  <input
-                    ref={cfgRestoreRef}
-                    type="file"
-                    accept=".json,application/json"
-                    onChange={e => setCfgRestoreFile(e.target.files?.[0] || null)}
-                    className="block w-full text-[11px] text-slate-600 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-[11px] file:font-semibold file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300"
-                  />
-                  <button
-                    type="submit"
-                    disabled={!cfgRestoreFile || cfgRestoreLoading}
-                    className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 disabled:opacity-60"
-                  >
-                    <Upload size={12} />
-                    {cfgRestoreLoading ? 'Restoring…' : 'Restore Config'}
-                  </button>
-                </form>
-                {cfgRestoreErr && <p className="mt-2 text-[10.5px] text-red-600">{cfgRestoreErr}</p>}
-                {cfgRestoreMsg && <p className="mt-2 text-[10.5px] text-emerald-700">{cfgRestoreMsg}</p>}
-              </div>
-            </div>
-          </section>
-
           <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
             <div className="flex items-center gap-2 mb-4">
               <Settings size={16} className="text-slate-600" />
