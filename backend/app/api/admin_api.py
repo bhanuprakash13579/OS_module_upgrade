@@ -1328,6 +1328,279 @@ def admin_restore_backup(
     }
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Admin Config Backup / Restore — TEMPLATES & RULES ONLY (no OS / case data).
+#
+# Use case: edit print templates / baggage rules on a test machine, ship just
+# those edits to the production machine without copying any operational data.
+#
+# Tables included (the admin-editable content tables):
+#   • print_template_config       — versioned OS print headings & paragraphs
+#   • baggage_rules_config        — versioned numeric baggage limits
+#   • special_item_allowances     — versioned per-item allowances
+#   • legal_statutes              — IPC/COFEPOSA/etc. lookup with goods clauses
+#
+# Format: a single JSON file with a versioned envelope. Restore is INSERT-only
+# by composite natural key — existing rows on the destination are never
+# overwritten or deleted, so reapplying the same backup is idempotent.
+# ──────────────────────────────────────────────────────────────────────────────
+
+_CONFIG_BACKUP_FORMAT = 1
+
+def _row_to_dict(row, cols: list) -> dict:
+    out = {}
+    for c in cols:
+        v = getattr(row, c, None)
+        if isinstance(v, (date, datetime)):
+            out[c] = v.isoformat()
+        else:
+            out[c] = v
+    return out
+
+
+@router.get("/config/backup", dependencies=[Depends(require_admin)])
+def admin_config_backup(db: Session = Depends(get_db)):
+    """Export admin config tables (templates / rules / allowances / statutes)
+    as a JSON file. Does NOT include any OS, BR, DR, user or installation data."""
+    import json as _json
+
+    ptc_cols = ["field_key", "field_label", "field_value",
+                "effective_from", "created_by", "created_at"]
+    brc_cols = ["rule_key", "rule_label", "rule_value", "rule_uqc",
+                "effective_from", "created_by", "created_at"]
+    sia_cols = ["item_name", "keywords", "allowance_qty", "allowance_uqc",
+                "effective_from", "active", "created_by", "created_at"]
+    statute_cols = ["keyword", "display_name", "is_prohibited",
+                    "supdt_goods_clause", "adjn_goods_clause", "legal_reference"]
+
+    payload = {
+        "format_version": _CONFIG_BACKUP_FORMAT,
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "kind": "admin_config_only",
+        "note": "Templates & rules only — no OS, BR, DR, user or installation data.",
+        "tables": {
+            "print_template_config": [
+                _row_to_dict(r, ptc_cols)
+                for r in db.query(PrintTemplateConfig)
+                    .order_by(PrintTemplateConfig.field_key,
+                              PrintTemplateConfig.effective_from).all()
+            ],
+            "baggage_rules_config": [
+                _row_to_dict(r, brc_cols)
+                for r in db.query(BaggageRulesConfig)
+                    .order_by(BaggageRulesConfig.rule_key,
+                              BaggageRulesConfig.effective_from).all()
+            ],
+            "special_item_allowances": [
+                _row_to_dict(r, sia_cols)
+                for r in db.query(SpecialItemAllowance)
+                    .order_by(SpecialItemAllowance.item_name,
+                              SpecialItemAllowance.effective_from).all()
+            ],
+            "legal_statutes": [
+                _row_to_dict(r, statute_cols)
+                for r in db.query(LegalStatute).order_by(LegalStatute.keyword).all()
+            ],
+        },
+    }
+
+    body = _json.dumps(payload, indent=2, default=str)
+    filename = f"cops_config_backup_{date.today().isoformat()}.json"
+    return Response(
+        content=body,
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Encoding": "identity",
+        },
+    )
+
+
+@router.post("/config/restore", dependencies=[Depends(require_admin)])
+def admin_config_restore(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """Restore admin config from a JSON file produced by /admin/config/backup.
+    INSERT-only by composite natural key — existing rows are never overwritten
+    or deleted. OS/BR/DR/user data is never touched."""
+    import json as _json
+
+    try:
+        raw = file.file.read()
+        payload = _json.loads(raw.decode("utf-8-sig"))
+    except Exception:
+        raise HTTPException(status_code=400,
+                            detail="Invalid JSON file. Expected a config backup produced by /admin/config/backup.")
+
+    if not isinstance(payload, dict) or payload.get("kind") != "admin_config_only":
+        raise HTTPException(status_code=400,
+                            detail="This file is not an admin config backup. "
+                                   "Use the OS Backup/Restore screen for full backups.")
+
+    fmt = payload.get("format_version")
+    if fmt != _CONFIG_BACKUP_FORMAT:
+        raise HTTPException(status_code=400,
+                            detail=f"Unsupported config backup version: {fmt}. "
+                                   f"This server expects version {_CONFIG_BACKUP_FORMAT}.")
+
+    tables = payload.get("tables") or {}
+
+    def _to_date(v):
+        if not v:
+            return None
+        if isinstance(v, date) and not isinstance(v, datetime):
+            return v
+        s = str(v)[:10]
+        try:
+            return date.fromisoformat(s)
+        except ValueError:
+            return None
+
+    def _to_dt(v):
+        if not v:
+            return None
+        try:
+            return datetime.fromisoformat(str(v).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+
+    counts = {
+        "print_template_config":  {"inserted": 0, "skipped": 0},
+        "baggage_rules_config":   {"inserted": 0, "skipped": 0},
+        "special_item_allowances":{"inserted": 0, "skipped": 0},
+        "legal_statutes":         {"inserted": 0, "skipped": 0},
+    }
+
+    # ── print_template_config ────────────────────────────────────────────────
+    ptc_rows = tables.get("print_template_config") or []
+    if ptc_rows:
+        existing = {
+            (r[0], r[1]) for r in db.query(
+                PrintTemplateConfig.field_key, PrintTemplateConfig.effective_from
+            ).all()
+        }
+        for row in ptc_rows:
+            key = (row.get("field_key") or "").strip()
+            eff = _to_date(row.get("effective_from"))
+            if not key or eff is None:
+                counts["print_template_config"]["skipped"] += 1
+                continue
+            if (key, eff) in existing:
+                counts["print_template_config"]["skipped"] += 1
+                continue
+            db.add(PrintTemplateConfig(
+                field_key=key,
+                field_label=(row.get("field_label") or None),
+                field_value=(row.get("field_value") or ""),
+                effective_from=eff,
+                created_by=(row.get("created_by") or None),
+                created_at=_to_dt(row.get("created_at")),
+            ))
+            existing.add((key, eff))
+            counts["print_template_config"]["inserted"] += 1
+
+    # ── baggage_rules_config ─────────────────────────────────────────────────
+    brc_rows = tables.get("baggage_rules_config") or []
+    if brc_rows:
+        existing = {
+            (r[0], r[1]) for r in db.query(
+                BaggageRulesConfig.rule_key, BaggageRulesConfig.effective_from
+            ).all()
+        }
+        for row in brc_rows:
+            key = (row.get("rule_key") or "").strip()
+            eff = _to_date(row.get("effective_from"))
+            try:
+                rule_val = float(row.get("rule_value"))
+            except (TypeError, ValueError):
+                rule_val = None
+            if not key or eff is None or rule_val is None:
+                counts["baggage_rules_config"]["skipped"] += 1
+                continue
+            if (key, eff) in existing:
+                counts["baggage_rules_config"]["skipped"] += 1
+                continue
+            db.add(BaggageRulesConfig(
+                rule_key=key,
+                rule_label=(row.get("rule_label") or None),
+                rule_value=rule_val,
+                rule_uqc=(row.get("rule_uqc") or None),
+                effective_from=eff,
+                created_by=(row.get("created_by") or None),
+                created_at=_to_dt(row.get("created_at")),
+            ))
+            existing.add((key, eff))
+            counts["baggage_rules_config"]["inserted"] += 1
+
+    # ── special_item_allowances ──────────────────────────────────────────────
+    sia_rows = tables.get("special_item_allowances") or []
+    if sia_rows:
+        existing = {
+            (r[0], r[1]) for r in db.query(
+                SpecialItemAllowance.item_name, SpecialItemAllowance.effective_from
+            ).all()
+        }
+        for row in sia_rows:
+            item_name = (row.get("item_name") or "").strip()
+            eff = _to_date(row.get("effective_from"))
+            try:
+                qty = float(row.get("allowance_qty"))
+            except (TypeError, ValueError):
+                qty = None
+            if not item_name or eff is None or qty is None:
+                counts["special_item_allowances"]["skipped"] += 1
+                continue
+            if (item_name, eff) in existing:
+                counts["special_item_allowances"]["skipped"] += 1
+                continue
+            db.add(SpecialItemAllowance(
+                item_name=item_name,
+                keywords=(row.get("keywords") or None),
+                allowance_qty=qty,
+                allowance_uqc=(row.get("allowance_uqc") or None),
+                effective_from=eff,
+                active=(row.get("active") or "Y"),
+                created_by=(row.get("created_by") or None),
+                created_at=_to_dt(row.get("created_at")),
+            ))
+            existing.add((item_name, eff))
+            counts["special_item_allowances"]["inserted"] += 1
+
+    # ── legal_statutes (keyword is unique — INSERT new only) ─────────────────
+    statute_rows = tables.get("legal_statutes") or []
+    if statute_rows:
+        existing_kw = {r[0] for r in db.query(LegalStatute.keyword).all()}
+        for row in statute_rows:
+            kw = (row.get("keyword") or "").strip()
+            display = (row.get("display_name") or "").strip()
+            if not kw or not display:
+                counts["legal_statutes"]["skipped"] += 1
+                continue
+            if kw in existing_kw:
+                counts["legal_statutes"]["skipped"] += 1
+                continue
+            db.add(LegalStatute(
+                keyword=kw,
+                display_name=display,
+                is_prohibited=bool(row.get("is_prohibited") or False),
+                supdt_goods_clause=(row.get("supdt_goods_clause") or ""),
+                adjn_goods_clause=(row.get("adjn_goods_clause") or ""),
+                legal_reference=(row.get("legal_reference") or ""),
+            ))
+            existing_kw.add(kw)
+            counts["legal_statutes"]["inserted"] += 1
+
+    db.commit()
+
+    return {
+        "ok": True,
+        "format_version": fmt,
+        "exported_at": payload.get("exported_at"),
+        "counts": counts,
+    }
+
+
 @router.post("/backup/upload-legacy")
 def admin_upload_legacy(
     file: UploadFile = File(...),

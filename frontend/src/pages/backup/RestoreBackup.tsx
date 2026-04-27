@@ -159,6 +159,15 @@ export default function RestoreBackup() {
   const [fullDbRestoreResult, setFullDbRestoreResult] = useState('');
   const [fullDbRestoreErr, setFullDbRestoreErr] = useState('');
 
+  // Config-only backup / restore (templates & rules; no OS / case data)
+  const [cfgDownloading, setCfgDownloading] = useState(false);
+  const [cfgDownloadMsg, setCfgDownloadMsg] = useState('');
+  const [cfgRestoreFile, setCfgRestoreFile] = useState<File | null>(null);
+  const cfgRestoreRef = useRef<HTMLInputElement | null>(null);
+  const [cfgRestoreLoading, setCfgRestoreLoading] = useState(false);
+  const [cfgRestoreMsg, setCfgRestoreMsg] = useState('');
+  const [cfgRestoreErr, setCfgRestoreErr] = useState('');
+
   // Tab navigation
   const [activeTab, setActiveTab] = useState<'security' | 'users' | 'settings' | 'backup' | 'osconfig' | 'statutes' | 'danger'>('security');
 
@@ -637,6 +646,87 @@ export default function RestoreBackup() {
       setRestoreErr(err.response?.data?.detail || 'Restore failed.');
     } finally {
       setRestoreLoading(false);
+    }
+  };
+
+  // ── Config-only backup (templates & rules; no OS / case data) ─────────────
+  const downloadConfigBackup = async () => {
+    setCfgDownloading(true);
+    setCfgDownloadMsg('');
+    try {
+      const res = await api.get('/admin/config/backup', {
+        headers: adminHeaders(adminToken),
+        responseType: 'blob',
+        timeout: 60000,
+      });
+      const defaultName = `cops_config_backup_${new Date().toISOString().slice(0, 10)}.json`;
+      try {
+        const { save } = await import('@tauri-apps/plugin-dialog');
+        const { writeFile } = await import('@tauri-apps/plugin-fs');
+        const savePath = await save({
+          title: 'Save Admin Config Backup (templates & rules only)',
+          defaultPath: defaultName,
+          filters: [{ name: 'JSON', extensions: ['json'] }],
+        });
+        if (savePath) {
+          const arrayBuf = await (res.data as Blob).arrayBuffer();
+          await writeFile(savePath, new Uint8Array(arrayBuf));
+          setCfgDownloadMsg('Config backup saved.');
+          showDownloadToast(`Config backup saved to ${savePath}`);
+        } else {
+          setCfgDownloadMsg('Save cancelled.');
+        }
+      } catch (fsErr) {
+        if (String(fsErr).includes('plugin-dialog') || String(fsErr).includes('__TAURI_IPC__')) {
+          const url = URL.createObjectURL(res.data);
+          const a = document.createElement('a');
+          a.href = url; a.download = defaultName; a.click();
+          URL.revokeObjectURL(url);
+          setCfgDownloadMsg('Config backup downloaded.');
+          showDownloadToast(`Config backup downloaded as ${defaultName}`);
+        } else {
+          throw new Error(`Disk write failed: ${fsErr}`);
+        }
+      }
+    } catch (err: any) {
+      setCfgDownloadMsg(`Download failed: ${err.response?.data?.detail || err.message || err}`);
+    } finally {
+      setCfgDownloading(false);
+    }
+  };
+
+  const uploadConfigRestore = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cfgRestoreFile) return;
+    setCfgRestoreErr('');
+    setCfgRestoreMsg('');
+    setCfgRestoreLoading(true);
+    const fd = new FormData();
+    fd.append('file', cfgRestoreFile);
+    try {
+      const res = await api.post('/admin/config/restore', fd, {
+        headers: { ...adminHeaders(adminToken), 'Content-Type': 'multipart/form-data' },
+        timeout: 60000,
+      });
+      const counts = res.data?.counts || {};
+      const parts: string[] = [];
+      const fmt = (label: string, key: string) => {
+        const c = counts[key];
+        if (!c) return;
+        if ((c.inserted || 0) + (c.skipped || 0) === 0) return;
+        parts.push(`${label}: ${c.inserted} added (${c.skipped} skipped)`);
+      };
+      fmt('Templates',      'print_template_config');
+      fmt('Baggage rules',  'baggage_rules_config');
+      fmt('Special items',  'special_item_allowances');
+      fmt('Legal statutes', 'legal_statutes');
+      setCfgRestoreMsg(parts.length ? `Restored — ${parts.join(' | ')}` : 'No new config rows found in file (already in sync).');
+      setCfgRestoreFile(null);
+      if (cfgRestoreRef.current) cfgRestoreRef.current.value = '';
+    } catch (err: any) {
+      setCfgRestoreErr(err.response?.data?.detail || 'Config restore failed.');
+    } finally {
+      setCfgRestoreLoading(false);
     }
   };
 
@@ -1410,6 +1500,78 @@ export default function RestoreBackup() {
       {/* ══ TAB: OS CONFIG ═══════════════════════════════════════════════════ */}
       {activeTab === 'osconfig' && (
         <div className="space-y-6">
+
+          {/* Config-only Backup / Restore — templates & rules only, no case data */}
+          <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Database size={16} className="text-indigo-600" />
+              <div>
+                <h2 className="text-sm font-semibold text-slate-700">Config Backup &amp; Restore</h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Move <span className="font-semibold">just the admin templates &amp; rules</span> between machines —
+                  print template, baggage rules, special allowances, legal statutes.
+                  <span className="text-emerald-700 font-medium"> No OS, BR, DR, or user data is touched.</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* Download */}
+              <div className="border border-slate-200 rounded-lg p-3 bg-slate-50/50">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Download size={13} className="text-slate-600" />
+                  <span className="text-xs font-semibold text-slate-700">Download config from this machine</span>
+                </div>
+                <p className="text-[10.5px] text-slate-500 leading-snug mb-2">
+                  Saves a small JSON file containing all admin-editable config rows. Apply it on the other machine using Restore below.
+                </p>
+                <button
+                  onClick={downloadConfigBackup}
+                  disabled={cfgDownloading}
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-md bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 disabled:opacity-60"
+                >
+                  <Download size={12} />
+                  {cfgDownloading ? 'Preparing…' : 'Download Config Backup'}
+                </button>
+                {cfgDownloadMsg && (
+                  <p className={`mt-2 text-[10.5px] ${cfgDownloadMsg.startsWith('Download failed') ? 'text-red-600' : 'text-emerald-700'}`}>
+                    {cfgDownloadMsg}
+                  </p>
+                )}
+              </div>
+
+              {/* Restore */}
+              <div className="border border-slate-200 rounded-lg p-3 bg-slate-50/50">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Upload size={13} className="text-slate-600" />
+                  <span className="text-xs font-semibold text-slate-700">Restore config on this machine</span>
+                </div>
+                <p className="text-[10.5px] text-slate-500 leading-snug mb-2">
+                  New rows are added; existing rows are kept as-is (idempotent — same file can be applied repeatedly without harm).
+                </p>
+                <form onSubmit={uploadConfigRestore} className="space-y-2">
+                  <input
+                    ref={cfgRestoreRef}
+                    type="file"
+                    accept=".json,application/json"
+                    onChange={e => setCfgRestoreFile(e.target.files?.[0] || null)}
+                    className="block w-full text-[11px] text-slate-600 file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-[11px] file:font-semibold file:bg-slate-200 file:text-slate-700 hover:file:bg-slate-300"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!cfgRestoreFile || cfgRestoreLoading}
+                    className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-md bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 disabled:opacity-60"
+                  >
+                    <Upload size={12} />
+                    {cfgRestoreLoading ? 'Restoring…' : 'Restore Config'}
+                  </button>
+                </form>
+                {cfgRestoreErr && <p className="mt-2 text-[10.5px] text-red-600">{cfgRestoreErr}</p>}
+                {cfgRestoreMsg && <p className="mt-2 text-[10.5px] text-emerald-700">{cfgRestoreMsg}</p>}
+              </div>
+            </div>
+          </section>
+
           <section className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
             <div className="flex items-center gap-2 mb-4">
               <Settings size={16} className="text-slate-600" />
