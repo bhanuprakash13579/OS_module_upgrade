@@ -333,9 +333,9 @@
   <!-- Note: SCN waived -->
   <p style="text-align:justify;margin:0 0 2px 0;white-space:pre-wrap"><b>{{ note_scn_waived }}</b></p>
 
-  <!-- Legal paragraphs -->
-  <p style="text-align:justify;text-indent:2em;margin:0 0 1px 0;white-space:pre-wrap">{{ legal_para_1 }}</p>
-  <p style="text-align:justify;text-indent:2em;margin:0 0 3px 0;white-space:pre-wrap">{{ legal_para_2 }}</p>
+  <!-- Legal paragraphs (multi-paragraph aware: blank line in source → new <p>) -->
+  <p style="text-align:justify;text-indent:2em;margin:0 0 1px 0">{{ legal_para_1_html | safe }}</p>
+  <p style="text-align:justify;text-indent:2em;margin:0 0 3px 0">{{ legal_para_2_html | safe }}</p>
 
   <!-- RECORD OF PERSONAL HEARING -->
   <div style="text-align:center;font-weight:bold;text-transform:uppercase;margin-bottom:1px"><span style="border-bottom:1px solid #000;padding-bottom:1px">{{ record_heading }}</span></div>
@@ -344,18 +344,18 @@
   <!-- ORDER heading — centered -->
   <div style="text-align:center;font-weight:bold;margin-bottom:2px"><span style="border-bottom:1px solid #000;padding-bottom:1px">{{ order_heading }}</span></div>
 
-  <!-- Order paragraphs -->
+  <!-- Order paragraphs (multi-paragraph aware: blank line in source → new <p>) -->
   {% if conf_value > 0 and rf_amount > 0 %}
-  <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0;white-space:pre-wrap">{{ para_rf }}</p>
+  <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0">{{ para_rf_html | safe }}</p>
   {% endif %}
   {% if re_exp_value > 0 and ref_amount > 0 %}
-  <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0;white-space:pre-wrap">{{ para_ref }}</p>
+  <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0">{{ para_ref_html | safe }}</p>
   {% endif %}
   {% if abs_conf_value > 0 %}
-  <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0;white-space:pre-wrap">{{ para_abs_conf }}</p>
+  <p style="text-align:justify;text-indent:2em;margin:0 0 2px 0">{{ para_abs_conf_html | safe }}</p>
   {% endif %}
   {% if pp_amount > 0 %}
-  <p style="text-align:justify;text-indent:2em;margin:0 0 3px 0;white-space:pre-wrap">{{ para_pp }}</p>
+  <p style="text-align:justify;text-indent:2em;margin:0 0 3px 0">{{ para_pp_html | safe }}</p>
   {% endif %}
 
   <!-- Deputy signature — right-aligned -->

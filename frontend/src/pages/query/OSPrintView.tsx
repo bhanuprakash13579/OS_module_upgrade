@@ -196,6 +196,21 @@ export default function OSPrintView() {
 
   const slnosText = (nos: number[]) => nos.length > 0 ? ` at Sl.No(s). ${nos.join(', ')}` : '';
 
+  // Render plaintext as multiple <p>s split on blank lines (matches PDF backend).
+  // Single \n inside a block becomes <br>. Each paragraph gets the same className
+  // so first-line indent (e.g. "indent-8") applies to every paragraph.
+  const renderParas = (text: string, className?: string) => {
+    if (!text) return null;
+    const blocks = text.split(/\n[ \t]*\n+/);
+    return blocks.map((block, bi) => (
+      <p key={bi} className={className}>
+        {block.split('\n').map((line, li, arr) => (
+          <span key={li}>{line}{li < arr.length - 1 && <br />}</span>
+        ))}
+      </p>
+    ));
+  };
+
   const handlePrint = async () => {
     // Use the pre-generated PDF (started when page loaded); fall back to a fresh request
     const pdfReady = pdfPromiseRef.current
@@ -595,8 +610,8 @@ export default function OSPrintView() {
           <p className="mb-2 indent-8" style={{ whiteSpace: 'pre-wrap' }}><span className="font-bold">{noteScnWaived}</span></p>
 
           <div className="mb-2 space-y-1 text-justify">
-            <p className="indent-8" style={{ whiteSpace: 'pre-wrap' }}>{legalPara1}</p>
-            <p className="indent-8" style={{ whiteSpace: 'pre-wrap' }}>{fillTpl(legalPara2, { confiscation_full_ref: confiscationRef })}</p>
+            {renderParas(legalPara1, "indent-8")}
+            {renderParas(fillTpl(legalPara2, { confiscation_full_ref: confiscationRef }), "indent-8")}
           </div>
 
           <div className="font-bold underline text-center uppercase mb-1">{recordHeading}</div>
@@ -608,44 +623,40 @@ export default function OSPrintView() {
 
           <div className="font-bold underline text-center uppercase mb-1">{orderHeading}</div>
           <div className="mb-2 text-justify">
-            {confValue > 0 && (data.rf_amount || 0) > 0 && (
-              <p className="mb-1 indent-8" style={{ whiteSpace: 'pre-wrap' }}>
-                {fillTpl(orderParaRfTpl, {
-                  confiscation_full_ref: confiscationRef,
-                  rf_slnos_text: slnosText(rfSlNos),
-                  conf_value: confValue,
-                  rf_amount: data.rf_amount || 0,
-                  rf_words: numberToWords(data.rf_amount || 0).trim().replace(/\b\w/g, (l: string) => l.toUpperCase()),
-                })}
-              </p>
+            {confValue > 0 && (data.rf_amount || 0) > 0 && renderParas(
+              fillTpl(orderParaRfTpl, {
+                confiscation_full_ref: confiscationRef,
+                rf_slnos_text: slnosText(rfSlNos),
+                conf_value: confValue,
+                rf_amount: data.rf_amount || 0,
+                rf_words: numberToWords(data.rf_amount || 0).trim().replace(/\b\w/g, (l: string) => l.toUpperCase()),
+              }),
+              "mb-1 indent-8",
             )}
-            {reExpValue > 0 && (data.ref_amount || 0) > 0 && !isExportCase && (
-              <p className="mb-1 indent-8" style={{ whiteSpace: 'pre-wrap' }}>
-                {fillTpl(orderParaRefTpl, {
-                  ref_slnos_text: slnosText(refSlNos),
-                  re_exp_value: reExpValue,
-                  ref_amount: data.ref_amount || 0,
-                  ref_words: numberToWords(data.ref_amount || 0).trim().replace(/\b\w/g, (l: string) => l.toUpperCase()),
-                })}
-              </p>
+            {reExpValue > 0 && (data.ref_amount || 0) > 0 && !isExportCase && renderParas(
+              fillTpl(orderParaRefTpl, {
+                ref_slnos_text: slnosText(refSlNos),
+                re_exp_value: reExpValue,
+                ref_amount: data.ref_amount || 0,
+                ref_words: numberToWords(data.ref_amount || 0).trim().replace(/\b\w/g, (l: string) => l.toUpperCase()),
+              }),
+              "mb-1 indent-8",
             )}
-            {absConfValue > 0 && (
-              <p className="mb-1 indent-8" style={{ whiteSpace: 'pre-wrap' }}>
-                {fillTpl(orderParaAbsConfTpl, {
-                  confiscation_full_ref: confiscationRef,
-                  also_text: (confValue > 0 || reExpValue > 0) ? 'also ' : '',
-                  abs_conf_slnos_text: slnosText(allAbsConfSlNos),
-                  abs_conf_value: absConfValue,
-                })}
-              </p>
+            {absConfValue > 0 && renderParas(
+              fillTpl(orderParaAbsConfTpl, {
+                confiscation_full_ref: confiscationRef,
+                also_text: (confValue > 0 || reExpValue > 0) ? 'also ' : '',
+                abs_conf_slnos_text: slnosText(allAbsConfSlNos),
+                abs_conf_value: absConfValue,
+              }),
+              "mb-1 indent-8",
             )}
-            {(data.pp_amount || 0) > 0 && (
-              <p className="indent-8" style={{ whiteSpace: 'pre-wrap' }}>
-                {fillTpl(orderParaPpTpl, {
-                  pp_amount: data.pp_amount || 0,
-                  pp_words: numberToWords(data.pp_amount || 0).trim().replace(/\b\w/g, (l: string) => l.toUpperCase()),
-                })}
-              </p>
+            {(data.pp_amount || 0) > 0 && renderParas(
+              fillTpl(orderParaPpTpl, {
+                pp_amount: data.pp_amount || 0,
+                pp_words: numberToWords(data.pp_amount || 0).trim().replace(/\b\w/g, (l: string) => l.toUpperCase()),
+              }),
+              "indent-8",
             )}
           </div>
 

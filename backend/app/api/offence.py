@@ -1449,6 +1449,23 @@ def print_os_pdf(
         """Substitute {placeholder} values into an ORDER paragraph template."""
         return tpl.format_map(_SafeDict(kw))
 
+    # Convert plaintext (with blank-line paragraph breaks + single-line breaks)
+    # into HTML inner content suitable to drop inside a <p style="X">…</p>:
+    # blank lines become </p><p style="X">  → a true new <p> with the same style
+    # (so text-indent applies to each paragraph), single \n becomes <br>.
+    import re as _re
+    from markupsafe import Markup as _Markup, escape as _esc
+    def _paragraphize(text: str, style: str):
+        if not text:
+            return _Markup("")
+        blocks = _re.split(r"\n[ \t]*\n+", str(text))
+        sep = f'</p><p style="{style}">'
+        pieces = []
+        for block in blocks:
+            lines = [str(_esc(line)) for line in block.split("\n")]
+            pieces.append("<br>".join(lines))
+        return _Markup(sep.join(pieces))
+
     def _slnos_text(slnos: list) -> str:
         return f" at Sl.No(s). {', '.join(str(s) for s in slnos)}" if slnos else ""
 
@@ -1690,6 +1707,23 @@ def print_os_pdf(
         br_display=_fmt_br_entries(os_obj.post_adj_br_entries),
         dr_display=_fmt_dr(os_obj.post_adj_dr_no, os_obj.post_adj_dr_date),
     )
+
+    # ── Multi-paragraph rendering ────────────────────────────────────────────
+    # For body fields where users may want to add new paragraphs (Enter-Enter
+    # in the admin editor), pre-build HTML versions that turn blank lines into
+    # real <p> breaks (so each paragraph keeps its first-line text-indent),
+    # and single newlines into <br>. These are dropped inside the existing
+    # outer <p style="X">…</p> wrapper in the Jinja template via |safe.
+    _STYLE_LEGAL1     = "text-align:justify;text-indent:2em;margin:0 0 1px 0"
+    _STYLE_LEGAL2     = "text-align:justify;text-indent:2em;margin:0 0 3px 0"
+    _STYLE_ORDER      = "text-align:justify;text-indent:2em;margin:0 0 2px 0"
+    _STYLE_ORDER_LAST = "text-align:justify;text-indent:2em;margin:0 0 3px 0"
+    template_vars["legal_para_1_html"]   = _paragraphize(template_vars["legal_para_1"],   _STYLE_LEGAL1)
+    template_vars["legal_para_2_html"]   = _paragraphize(template_vars["legal_para_2"],   _STYLE_LEGAL2)
+    template_vars["para_rf_html"]        = _paragraphize(template_vars["para_rf"],        _STYLE_ORDER)
+    template_vars["para_ref_html"]       = _paragraphize(template_vars["para_ref"],       _STYLE_ORDER)
+    template_vars["para_abs_conf_html"]  = _paragraphize(template_vars["para_abs_conf"],  _STYLE_ORDER)
+    template_vars["para_pp_html"]        = _paragraphize(template_vars["para_pp"],        _STYLE_ORDER_LAST)
 
     # ── Generate PDF ───────────────────────────────────────────────────────────
     # Two independent top-down searches (Page 1 font, Page 2 font) run in
