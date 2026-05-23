@@ -110,6 +110,37 @@ unsafe extern "system" fn hide_webview2_thumbnail(
     win32::TRUE
 }
 
+/// Remove all but the most-recently-modified `_MEI*` subdirectory inside
+/// `runtime_cache`.  PyInstaller creates a new extraction directory every time
+/// the binary changes (different mtime → different hash).  Old ones are never
+/// cleaned up automatically, so they accumulate — each one is ~180 MB.
+/// This function keeps exactly one (the newest) and deletes the rest.
+/// Safe to call with no sidecar running: all existing `_MEI*` dirs are orphans.
+fn cleanup_stale_mei_dirs(runtime_cache: &std::path::Path) {
+    let Ok(entries) = std::fs::read_dir(runtime_cache) else { return };
+    let mut mei_dirs: Vec<(std::time::SystemTime, std::path::PathBuf)> = entries
+        .flatten()
+        .filter(|e| e.file_name().to_string_lossy().starts_with("_MEI") && e.path().is_dir())
+        .filter_map(|e| {
+            let mtime = e.metadata().ok()?.modified().ok()?;
+            Some((mtime, e.path()))
+        })
+        .collect();
+
+    if mei_dirs.len() <= 1 {
+        return; // nothing to clean up
+    }
+    // Sort newest-first; keep index 0, delete the rest.
+    mei_dirs.sort_by(|a, b| b.0.cmp(&a.0));
+    for (_, stale) in mei_dirs.iter().skip(1) {
+        if let Err(e) = std::fs::remove_dir_all(stale) {
+            eprintln!("[cops] Warning: could not remove stale cache {:?}: {e}", stale);
+        } else {
+            eprintln!("[cops] Cleaned up stale PyInstaller cache: {:?}", stale);
+        }
+    }
+}
+
 /// Holds the python-server child process (updated on every restart).
 struct PythonSidecar(Mutex<Option<CommandChild>>);
 
@@ -226,6 +257,11 @@ pub fn run() {
           }
         }
       }
+
+      // Clean up stale PyInstaller extraction dirs before first spawn.
+      // Each build produces a new _MEI<hash>/ directory (~180 MB) that
+      // is never auto-removed.  Keep only the most recent one.
+      cleanup_stale_mei_dirs(&runtime_cache);
 
       let app_handle = app.handle().clone();
       let db_path_owned = db_path_str;

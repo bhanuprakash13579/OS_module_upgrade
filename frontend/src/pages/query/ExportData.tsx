@@ -48,19 +48,31 @@ export default function ExportData() {
       try {
         const { save } = await import('@tauri-apps/plugin-dialog');
         const { writeFile } = await import('@tauri-apps/plugin-fs');
-        const savePath = await save({ 
-          title: 'Save CSV Backup (Includes all modules e.g. BR/DR)', 
-          defaultPath: defaultName, 
-          filters: [{ name: 'ZIP', extensions: ['zip'] }] 
+        const savePath = await save({
+          title: 'Save CSV Backup (Includes all modules e.g. BR/DR)',
+          defaultPath: defaultName,
+          filters: [{ name: 'ZIP', extensions: ['zip'] }]
         });
-        
+
         if (savePath) {
           setCsvProgress('Writing to disk…');
-          const arrayBuf = await (res.data as Blob).arrayBuffer();
-          await writeFile(savePath, new Uint8Array(arrayBuf));
-          setCsvProgress('');
-          setCsvMsg(`Backup saved successfully.`);
-          showDownloadToast(`Backup saved to ${savePath}`);
+          try {
+            const arrayBuf = await (res.data as Blob).arrayBuffer();
+            await writeFile(savePath, new Uint8Array(arrayBuf));
+            setCsvProgress('');
+            setCsvMsg(`Backup saved successfully.`);
+            showDownloadToast(`Backup saved to ${savePath}`);
+          } catch {
+            // writeFile failed (common for large files due to IPC size limits).
+            // Fall back to browser-native download — works for any file size.
+            setCsvProgress('');
+            const url = window.URL.createObjectURL(res.data as Blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = defaultName; a.click();
+            window.URL.revokeObjectURL(url);
+            setCsvMsg(`Backup downloaded (saved to your Downloads folder).`);
+            showDownloadToast(`Downloaded as ${defaultName}`);
+          }
         } else {
           setCsvMsg('Save cancelled.');
         }
@@ -119,19 +131,31 @@ export default function ExportData() {
       try {
         const { save } = await import('@tauri-apps/plugin-dialog');
         const { writeFile } = await import('@tauri-apps/plugin-fs');
-        const savePath = await save({ 
-          title: 'Save Database Backup (Includes all modules e.g. BR/DR)', 
-          defaultPath: defaultName, 
-          filters: [{ name: 'Database', extensions: ['db'] }] 
+        const savePath = await save({
+          title: 'Save Database Backup (Includes all modules e.g. BR/DR)',
+          defaultPath: defaultName,
+          filters: [{ name: 'Database', extensions: ['db'] }]
         });
-        
+
         if (savePath) {
           setDbProgress('Writing to disk…');
-          const arrayBuf = await (res.data as Blob).arrayBuffer();
-          await writeFile(savePath, new Uint8Array(arrayBuf));
-          setDbProgress('');
-          setDbMsg(`Database saved successfully.`);
-          showDownloadToast(`Database saved to ${savePath}`);
+          try {
+            const arrayBuf = await (res.data as Blob).arrayBuffer();
+            await writeFile(savePath, new Uint8Array(arrayBuf));
+            setDbProgress('');
+            setDbMsg(`Database saved successfully.`);
+            showDownloadToast(`Database saved to ${savePath}`);
+          } catch {
+            // writeFile failed (common for large files due to IPC size limits).
+            // Fall back to browser-native download — works for any file size.
+            setDbProgress('');
+            const url = window.URL.createObjectURL(res.data as Blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = defaultName; a.click();
+            window.URL.revokeObjectURL(url);
+            setDbMsg(`Database downloaded (saved to your Downloads folder).`);
+            showDownloadToast(`Downloaded as ${defaultName}`);
+          }
         } else {
           setDbMsg('Save cancelled.');
         }

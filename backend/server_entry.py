@@ -19,17 +19,19 @@ _LOG_PATH = pathlib.Path(
     os.environ.get("RUNNER_TEMP") or os.environ.get("TEMP") or "."
 ) / "cops_startup.log"
 
+_slog_initialized = False  # True after first write in this process
+
 def _slog(msg: str) -> None:
+    """Log a startup message.  First call opens in 'w' (overwrite) so the log
+    file contains only the current session and never accumulates across restarts."""
+    global _slog_initialized
     ts = datetime.datetime.now().isoformat(timespec="milliseconds")
     line = f"[{ts}] {msg}\n"
+    mode = "a" if _slog_initialized else "w"
+    _slog_initialized = True
     try:
-        with open(_LOG_PATH, "a", encoding="utf-8") as f:
+        with open(_LOG_PATH, mode, encoding="utf-8") as f:
             f.write(line)
-    except Exception:
-        pass
-    # Also try stdout (works in console builds / dev mode)
-    try:
-        print(line, end="", flush=True)
     except Exception:
         pass
 
@@ -135,11 +137,19 @@ try:
         _slog(f"Warning: could not create stdin pipe: {_pipe_err}")
 
     import logging
-    # Pre-startup logging (sqlalchemy, asyncio, app imports)
+
+    # Determine environment first — controls root logger level and all log verbosity.
+    _cops_env = os.environ.get("COPS_ENV", "production").strip().lower()
+    _is_prod = (_cops_env == "production")
+    _uvicorn_level = "INFO" if _is_prod else "DEBUG"
+
+    # Pre-startup logging (sqlalchemy, asyncio, app imports).
+    # Production: WARNING — suppresses noisy library debug/info (fontTools, multipart, PIL…).
+    # Dev: DEBUG — full verbosity.
     _file_handler = logging.FileHandler(_LOG_PATH, encoding="utf-8")
     _file_handler.setFormatter(logging.Formatter("[%(asctime)s] %(name)s %(levelname)s: %(message)s"))
     logging.root.addHandler(_file_handler)
-    logging.root.setLevel(logging.DEBUG)
+    logging.root.setLevel(logging.WARNING if _is_prod else logging.DEBUG)
 
     _slog("importing uvicorn...")
     import uvicorn
@@ -166,11 +176,14 @@ try:
             },
         },
         "loggers": {
-            "uvicorn":        {"handlers": ["file"], "level": "DEBUG", "propagate": False},
-            "uvicorn.error":  {"handlers": ["file"], "level": "DEBUG", "propagate": False},
-            "uvicorn.access": {"handlers": ["file"], "level": "DEBUG", "propagate": False},
-            "fastapi":        {"handlers": ["file"], "level": "DEBUG", "propagate": False},
-            "sqlalchemy":     {"handlers": ["file"], "level": "INFO",  "propagate": False},
+            "uvicorn":        {"handlers": ["file"], "level": _uvicorn_level,                    "propagate": False},
+            "uvicorn.error":  {"handlers": ["file"], "level": _uvicorn_level,                    "propagate": False},
+            "uvicorn.access": {"handlers": ["file"], "level": _uvicorn_level,                    "propagate": False},
+            "fastapi":        {"handlers": ["file"], "level": _uvicorn_level,                    "propagate": False},
+            "sqlalchemy":     {"handlers": ["file"], "level": "WARNING" if _is_prod else "INFO", "propagate": False},
+            "fontTools":      {"handlers": ["file"], "level": "WARNING",                         "propagate": False},
+            "multipart":      {"handlers": ["file"], "level": "WARNING",                         "propagate": False},
+            "PIL":            {"handlers": ["file"], "level": "WARNING",                         "propagate": False},
         },
     }
 
@@ -182,7 +195,7 @@ try:
                 app,
                 host="127.0.0.1",
                 port=8000,
-                log_level="debug",
+                log_level="info" if _is_prod else "debug",
                 access_log=False,
                 log_config=_uvicorn_log_config,
             )

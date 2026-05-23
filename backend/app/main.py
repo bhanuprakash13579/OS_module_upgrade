@@ -567,8 +567,10 @@ def _load_state_from_db():
 
 def _llog(msg: str) -> None:
     """Direct file write to cops_startup.log — bypasses logging/stdout so it
-    always appears even in windowed PyInstaller builds."""
-    import pathlib, datetime, traceback
+    always appears even in windowed PyInstaller builds.
+    server_entry.py truncates the file at process start (first _slog call uses
+    'w' mode), so _llog always appends within the current session."""
+    import pathlib, datetime
     _p = pathlib.Path(
         os.environ.get("RUNNER_TEMP") or os.environ.get("TEMP") or "."
     ) / "cops_startup.log"
