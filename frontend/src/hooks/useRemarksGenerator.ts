@@ -508,8 +508,19 @@ export function useRemarksGenerator() {
     }
 
     // 5. OVER-ALLOWANCE / DUTIABLE ITEMS — FA deduction detail
-    const nonProhibitedGroups = [...statuteGroups.values()].filter(g => !g.statute.is_prohibited);
-    for (const grp of nonProhibitedGroups) {
+    // Merge statute groups that share the same supdt_goods_clause so that
+    // items of the same broad type (e.g. iPhone 17 512GB + 256GB + iPhone 16)
+    // produce ONE block instead of one per matched statute.
+    // Groups with distinct clauses (cigarettes vs e-cigarettes vs phones vs
+    // RF laptops) remain separate — correct distinct legal language is preserved.
+    const _npMerged = new Map<string, { statute: Statute; items: any[] }>();
+    for (const grp of [...statuteGroups.values()].filter(g => !g.statute.is_prohibited)) {
+      const key = grp.statute.supdt_goods_clause || grp.statute.keyword;
+      if (!_npMerged.has(key)) _npMerged.set(key, { statute: grp.statute, items: [] });
+      _npMerged.get(key)!.items.push(...grp.items);
+    }
+
+    for (const grp of _npMerged.values()) {
       const relevant = grp.items.filter(i => !isDuty(i));
       if (relevant.length === 0 && grp.items.some(isDuty)) continue;
 
@@ -518,28 +529,34 @@ export function useRemarksGenerator() {
       const totalFaQty = allGroupItems.reduce((s: number, i: any) => s + Number(i.items_fa_qty || 0), 0);
       const hasFaQty = totalFaQty > 0 && allGroupItems.some(i => (i.items_fa_type || 'value') === 'qty');
       const totalFaVal = allGroupItems.reduce((s: number, i: any) => s + Number(i.items_fa || 0), 0);
-      const desc = (allGroupItems[0].items_desc || 'goods').trim();
+      // Use first item's desc only for single-item groups; use a generic label for multi-item groups
+      // so we don't misleadingly name only one model when several are present.
       const uqc = uqcLabel(allGroupItems[0].items_uqc || 'NOS');
+      // For a single item use its description; for several merged items use a
+      // clean generic label — avoids "of 1 Nos. of X, 1 Nos. of Y, …" in the middle of a sentence.
+      const descLabel = allGroupItems.length === 1
+        ? (allGroupItems[0].items_desc || 'goods').trim()
+        : 'the aforesaid goods';
       const totalVal = allGroupItems.reduce((s: number, i: any) => s + Number(i.items_value || 0), 0);
 
       if (hasFaQty && totalFaQty > 0) {
         const excess = Math.max(0, totalQty - totalFaQty);
         parts.push(
-          `Out of the total ${fmtQty(totalQty)} ${uqc} of ${desc} brought by the pax, a free allowance of ${fmtQty(totalFaQty)} ${uqc} is admissible under the Baggage Rules, 2016. ` +
+          `Out of the total ${fmtQty(totalQty)} ${uqc} of ${descLabel} brought by the pax, a free allowance of ${fmtQty(totalFaQty)} ${uqc} is admissible under the Baggage Rules, 2016. ` +
           (excess > 0
-            ? `The remaining ${fmtQty(excess)} ${uqc} of ${desc}, valued at approximately Rs. ${Math.round(totalVal * excess / totalQty).toLocaleString('en-IN')}/-, exceeds the permissible free allowance and is commercial in nature and non-bonafide baggage.`
+            ? `The remaining ${fmtQty(excess)} ${uqc} of ${descLabel}, valued at approximately Rs. ${Math.round(totalVal * excess / totalQty).toLocaleString('en-IN')}/-, exceeds the permissible free allowance and is commercial in nature and non-bonafide baggage.`
             : ``)
         );
       } else if (totalFaVal > 0) {
         const excessVal = Math.max(0, totalVal - totalFaVal);
         parts.push(
-          `Out of the total value of Rs. ${Math.round(totalVal).toLocaleString('en-IN')}/- of ${desc} brought by the pax, a free allowance of Rs. ${Math.round(totalFaVal).toLocaleString('en-IN')}/- is admissible under the Baggage Rules, 2016. ` +
+          `Out of the total value of Rs. ${Math.round(totalVal).toLocaleString('en-IN')}/- of ${descLabel} brought by the pax, a free allowance of Rs. ${Math.round(totalFaVal).toLocaleString('en-IN')}/- is admissible under the Baggage Rules, 2016. ` +
           (excessVal > 0
             ? `The remaining value of Rs. ${Math.round(excessVal).toLocaleString('en-IN')}/- exceeds the permissible free allowance and is therefore dutiable.`
             : `The goods fall entirely within the free allowance.`)
         );
       } else if (relevant.length > 0) {
-        // No FA at all — commercial goods
+        // No FA at all — commercial goods; clause already unique per merged group
         parts.push(grp.statute.supdt_goods_clause);
         parts.push(`The said goods are commercial in nature and not bonafide baggage.`);
       }
@@ -667,8 +684,15 @@ export function useRemarksGenerator() {
     }
 
     // 5. NON-PROHIBITED OVER-ALLOWANCE ITEMS — FA detail in AC findings
-    const nonProhibitedGroups = [...statuteGroups.values()].filter(g => !g.statute.is_prohibited);
-    for (const grp of nonProhibitedGroups) {
+    // Same clause-merge as Supdt builder: identical adjn_goods_clause → one block.
+    const _npMergedAc = new Map<string, { statute: Statute; items: any[] }>();
+    for (const grp of [...statuteGroups.values()].filter(g => !g.statute.is_prohibited)) {
+      const key = grp.statute.adjn_goods_clause || grp.statute.keyword;
+      if (!_npMergedAc.has(key)) _npMergedAc.set(key, { statute: grp.statute, items: [] });
+      _npMergedAc.get(key)!.items.push(...grp.items);
+    }
+
+    for (const grp of _npMergedAc.values()) {
       const relevant = grp.items.filter(i => !isDuty(i));
       if (relevant.length === 0 && grp.items.some(isDuty)) continue;
 
@@ -677,22 +701,24 @@ export function useRemarksGenerator() {
       const totalFaQty = allGroupItems.reduce((s: number, i: any) => s + Number(i.items_fa_qty || 0), 0);
       const hasFaQty = totalFaQty > 0 && allGroupItems.some(i => (i.items_fa_type || 'value') === 'qty');
       const totalFaVal = allGroupItems.reduce((s: number, i: any) => s + Number(i.items_fa || 0), 0);
-      const desc = (allGroupItems[0].items_desc || 'goods').trim();
       const uqc = uqcLabel(allGroupItems[0].items_uqc || 'NOS');
+      const descLabel = allGroupItems.length === 1
+        ? (allGroupItems[0].items_desc || 'goods').trim()
+        : 'the aforesaid goods';
       const totalVal = allGroupItems.reduce((s: number, i: any) => s + Number(i.items_value || 0), 0);
 
       if (hasFaQty && totalFaQty > 0) {
         const excess = Math.max(0, totalQty - totalFaQty);
         parts.push(
-          `Out of the total ${fmtQty(totalQty)} ${uqc} of ${desc} found in the baggage, a free allowance of ${fmtQty(totalFaQty)} ${uqc} is admissible under the Baggage Rules, 2016. ` +
+          `Out of the total ${fmtQty(totalQty)} ${uqc} of ${descLabel} found in the baggage, a free allowance of ${fmtQty(totalFaQty)} ${uqc} is admissible under the Baggage Rules, 2016. ` +
           (excess > 0
-            ? `The remaining ${fmtQty(excess)} ${uqc} of ${desc}, valued at Rs. ${Math.round(totalVal * excess / totalQty).toLocaleString('en-IN')}/-, is in excess of the permissible limit and is non-bonafide in nature.`
+            ? `The remaining ${fmtQty(excess)} ${uqc} of ${descLabel}, valued at Rs. ${Math.round(totalVal * excess / totalQty).toLocaleString('en-IN')}/-, is in excess of the permissible limit and is non-bonafide in nature.`
             : '')
         );
       } else if (totalFaVal > 0) {
         const excessVal = Math.max(0, totalVal - totalFaVal);
         parts.push(
-          `Out of the total value of Rs. ${Math.round(totalVal).toLocaleString('en-IN')}/- of ${desc}, a free allowance of Rs. ${Math.round(totalFaVal).toLocaleString('en-IN')}/- is admissible under the Baggage Rules, 2016. ` +
+          `Out of the total value of Rs. ${Math.round(totalVal).toLocaleString('en-IN')}/- of ${descLabel}, a free allowance of Rs. ${Math.round(totalFaVal).toLocaleString('en-IN')}/- is admissible under the Baggage Rules, 2016. ` +
           (excessVal > 0
             ? `The balance value of Rs. ${Math.round(excessVal).toLocaleString('en-IN')}/- is dutiable.`
             : `The goods are fully within the free allowance.`)
