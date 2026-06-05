@@ -1,8 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Gavel, AlertCircle, RefreshCw } from 'lucide-react';
+import { Gavel, AlertCircle, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import api from '@/lib/api';
+
+const PER_PAGE = 20;
 
 const fmtDate = (d: string | null | undefined): string => {
   if (!d) return '—';
@@ -14,15 +16,18 @@ const fmtDate = (d: string | null | undefined): string => {
 export default function OfflineAdjudicationList() {
   const navigate = useNavigate();
   const [cases, setCases] = useState<any[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const fetchCases = useCallback(async () => {
+  const fetchCases = useCallback(async (p: number) => {
     setLoading(true);
     setErrorMsg('');
     try {
-      const res = await api.get('/os/offline-pending');
-      setCases(Array.isArray(res.data) ? res.data : (res.data?.items ?? []));
+      const res = await api.get('/os/offline-pending', { params: { page: p, per_page: PER_PAGE } });
+      setCases(res.data.items ?? []);
+      setTotal(res.data.total ?? 0);
     } catch (err: any) {
       const status = err.response?.status;
       if (!err.response) {
@@ -40,9 +45,16 @@ export default function OfflineAdjudicationList() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchCases();
-  }, [fetchCases]);
+  useEffect(() => { fetchCases(1); }, [fetchCases]);
+
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+    fetchCases(newPage);
+  };
+
+  const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
+  const start = (page - 1) * PER_PAGE + 1;
+  const end = Math.min(page * PER_PAGE, total);
 
   return (
     <div className="space-y-6 flex flex-col max-w-7xl mx-auto pt-2 pb-12">
@@ -53,13 +65,13 @@ export default function OfflineAdjudicationList() {
           <p className="text-amber-200 text-sm mt-0.5">
             {loading
               ? 'Loading...'
-              : cases.length > 0
-              ? `${cases.length} case(s) awaiting officer details`
+              : total > 0
+              ? `${total} case(s) awaiting officer details`
               : 'No pending offline cases found.'}
           </p>
         </div>
         <button
-          onClick={fetchCases}
+          onClick={() => { setPage(1); fetchCases(1); }}
           className="flex items-center gap-2 bg-amber-700 hover:bg-amber-600 border border-amber-500 px-4 py-2 rounded-lg text-sm transition-colors"
         >
           <RefreshCw size={15} className={loading ? 'animate-spin' : ''} /> Refresh
@@ -148,10 +160,54 @@ export default function OfflineAdjudicationList() {
           </table>
         </div>
 
-        {/* Footer count */}
-        {!loading && cases.length > 0 && (
-          <div className="bg-slate-50 border-t border-slate-200 p-4 text-sm text-slate-500 font-medium">
-            Showing {cases.length} case{cases.length !== 1 ? 's' : ''} pending completion
+        {/* Footer: count + pagination */}
+        {!loading && total > 0 && (
+          <div className="bg-slate-50 border-t border-slate-200 px-4 py-3 flex items-center justify-between text-sm text-slate-500">
+            <span className="font-medium">
+              Showing {start}–{end} of {total} case{total !== 1 ? 's' : ''}
+            </span>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handlePageChange(page - 1)}
+                  disabled={page === 1}
+                  className="p-1.5 rounded hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
+                  .reduce<(number | '...')[]>((acc, p, i, arr) => {
+                    if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push('...');
+                    acc.push(p);
+                    return acc;
+                  }, [])
+                  .map((p, i) =>
+                    p === '...' ? (
+                      <span key={`ellipsis-${i}`} className="px-1 text-slate-400">…</span>
+                    ) : (
+                      <button
+                        key={p}
+                        onClick={() => handlePageChange(p as number)}
+                        className={`min-w-[2rem] px-2 py-1 rounded text-xs font-semibold transition-colors ${
+                          page === p
+                            ? 'bg-amber-700 text-white'
+                            : 'hover:bg-slate-200 text-slate-600'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+                <button
+                  onClick={() => handlePageChange(page + 1)}
+                  disabled={page === totalPages}
+                  className="p-1.5 rounded hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

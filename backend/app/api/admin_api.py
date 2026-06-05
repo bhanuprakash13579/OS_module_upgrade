@@ -352,8 +352,8 @@ class _TrialDaysPayload(BaseModel):
 
 @router.post("/trial/set-days", dependencies=[Depends(require_admin)])
 def set_trial_days(payload: _TrialDaysPayload, db: Session = Depends(get_db)):
-    """Configure how many days the trial lasts (1–3650). Does not reset the
-    start date — the configured length is applied to the existing window."""
+    """Set trial duration and restart the window from today (1–3650 days).
+    Resets trial_start_date to today so days_remaining equals the configured value."""
     days = int(payload.trial_days)
     if days < 1 or days > 3650:
         raise HTTPException(status_code=400,
@@ -363,9 +363,11 @@ def set_trial_days(payload: _TrialDaysPayload, db: Session = Depends(get_db)):
         flags = FeatureFlags(id=1, apis_enabled=False)
         db.add(flags)
     flags.trial_days = days
+    flags.trial_start_date = str(date.today())
+    flags.trial_disabled = False
     db.commit()
-    return {"trial_days": days,
-            "message": f"Trial duration set to {days} day{'s' if days != 1 else ''}"}
+    return {"trial_days": days, "trial_start_date": str(date.today()),
+            "message": f"Trial set to {days} day{'s' if days != 1 else ''} from today"}
 
 
 # ── Network Access Control (IP/MAC Whitelist) ─────────────────────────────────

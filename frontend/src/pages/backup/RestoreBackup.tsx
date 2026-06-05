@@ -327,7 +327,7 @@ export default function RestoreBackup() {
       const res = await api.post('/admin/trial/set-days', { trial_days: days },
                                   { headers: adminHeaders(adminToken) });
       await reloadTrial();
-      setTrialMsg(res.data?.message || `Trial duration set to ${days} day${days === 1 ? '' : 's'}.`);
+      setTrialMsg(res.data?.message || `Trial set to ${days} day${days === 1 ? '' : 's'} from today.`);
     } catch (err: any) {
       setTrialMsg(err.response?.data?.detail || 'Failed to update trial duration.');
     } finally { setTrialLoading(false); }
@@ -1370,7 +1370,7 @@ export default function RestoreBackup() {
                   Save Duration
                 </button>
                 <span className="text-[10.5px] text-slate-500">
-                  Applies to the active trial window — does not reset the start date.
+                  Restarts the trial from today with this many days remaining.
                 </span>
               </div>
             </div>

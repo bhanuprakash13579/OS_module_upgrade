@@ -862,20 +862,24 @@ def get_sidebar_counts(
 
 
 # ── Adjudication: Pending Offline Adjudication List ──────────────────────────
-@router.get("/offline-pending", response_model=List[schemas.CopsMasterOut])
+@router.get("/offline-pending")
 def get_offline_pending(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_adjn_user)
+    current_user: User = Depends(get_adjn_user),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
 ):
     """Cases registered as offline adjudication but officer details not yet captured."""
-    records = db.query(CopsMaster).filter(
+    base_q = db.query(CopsMaster).filter(
         CopsMaster.entry_deleted == "N",
         CopsMaster.is_offline_adjudication == 'Y',
         CopsMaster.adj_offr_name.is_(None),
-    ).order_by(CopsMaster.os_year.desc(), cast(CopsMaster.os_no, SAInteger).desc()).limit(200).all()
+    ).order_by(CopsMaster.os_year.desc(), cast(CopsMaster.os_no, SAInteger).desc())
+    total = base_q.count()
+    records = base_q.offset((page - 1) * per_page).limit(per_page).all()
     for r in records:
         r.items = []
-    return records
+    return {"items": records, "total": total, "page": page, "per_page": per_page}
 
 
 # ── Adjudication: Complete Offline Adjudication ───────────────────────────────
@@ -1502,36 +1506,106 @@ def print_os_pdf(
         all_subs = sorted(set(fixed_subs) | set(opt_subs))
         confiscation_full_ref = f"Section {sec_no}{_fmt_subs(all_subs)} of the Customs Act, 1962"
 
-    # ── Prev. offence + other PP offences (mirrors updated frontend logic) ────
-    all_other_records = db.query(CopsMaster).filter(
-        func.lower(CopsMaster.pax_name) == func.lower(os_obj.pax_name or ""),
-        CopsMaster.entry_deleted == "N",
-        ~((CopsMaster.os_no == os_no) & (CopsMaster.os_year == os_year))
-    ).limit(50).all()
+    # ── Prev. offence + other PP offences ────────────────────────────────────
+    from app.services.apis_match import _name_score as _ns
 
-    current_os_date = os_obj.os_date  # date object
+    # Placeholder values that are not real passport numbers.
+    # We do NOT validate format (all countries' formats are accepted).
+    _PP_PLACEHOLDERS = {
+        "NA", "N/A", "N.A", "N.A.", "NIL", "NONE", "NILL", "NULL",
+        "UNKNOWN", "NOT APPLICABLE", "NOTAPPLICABLE",
+        "NOT AVAILABLE", "NOTAVAILABLE", "0", "00", "000", "0000", "00000000",
+    }
+    def _is_real_passport(pp: str | None) -> bool:
+        if not pp or not pp.strip():
+            return False
+        s = pp.strip().upper()
+        if s in _PP_PLACEHOLDERS:
+            return False
+        if s.startswith(("UNCLAIM", "CARGO", "FREIGHT")):
+            return False
+        return True
 
-    # Same passport, before current OS date → "Prev. Offence in Above PP No(s)."
-    same_pp_prior = [
-        r for r in all_other_records
-        if r.passport_no == os_obj.passport_no
-        and r.os_date is not None
-        and r.os_date < current_os_date
-    ]
-    same_pp_prior.sort(key=lambda r: r.os_date, reverse=True)  # newest first
+    _FUZZY_THRESHOLD = 0.90
+    _DISPLAY_CAP = 20
+    current_os_date = os_obj.os_date
+    pax_name_lower = (os_obj.pax_name or "").strip().lower()
+    is_unclaimed = pax_name_lower.startswith("unclaimed")
+    current_pp = os_obj.passport_no
+
+    # ── "Prev. Offence in Above PP No(s). as per COPS" ───────────────────────
+    # Exact match on the current passport number only.
+    # If the recorded passport is a placeholder (NA, N/A, UNCLAIMED…) → NIL.
+    same_pp_prior = []
+    same_pp_total = 0
+    if _is_real_passport(current_pp) and current_os_date:
+        _base_q = db.query(CopsMaster).filter(
+            CopsMaster.passport_no == current_pp,
+            CopsMaster.entry_deleted == "N",
+            ~((CopsMaster.os_no == os_no) & (CopsMaster.os_year == os_year)),
+            CopsMaster.os_date < current_os_date,
+        ).order_by(CopsMaster.os_date.desc())
+        same_pp_total = _base_q.count()
+        same_pp_prior = _base_q.limit(_DISPLAY_CAP).all()
 
     if same_pp_prior:
         os_list = ", ".join(f"{r.os_no}/{r.os_year}" for r in same_pp_prior)
-        prev_offence_display = f"{len(same_pp_prior)} ({os_list})"
+        overflow = same_pp_total - len(same_pp_prior)
+        suffix = f", and {overflow} more" if overflow > 0 else ""
+        prev_offence_display = f"{same_pp_total} ({os_list}{suffix})"
     else:
-        # Fall back to legacy DB field
-        prev_offence_display = (os_obj.previous_visits or "NIL").strip()
+        prev_offence_display = "NIL"
 
-    # Different passport, same pax name → "Offences of Other PPs(if any)"
-    other_pp_records = [r for r in all_other_records if r.passport_no != os_obj.passport_no]
-    other_pp_offences = ", ".join(
-        f"{r.passport_no} (OS {r.os_no}/{r.os_year})" for r in other_pp_records
-    ) if other_pp_records else "NIL"
+    # ── "Offences of Other PPs(if any)" ─────────────────────────────────────
+    # Find the same person on a DIFFERENT passport via DOB+name matching.
+    # Records whose passport_no == current_pp are explicitly excluded so there
+    # is zero overlap with the "Prev. Offence" field above.
+    # Rules:
+    #   • DOB present → exact DOB match + name token-overlap ≥ 90%
+    #   • DOB absent  → 100% exact name match (case-insensitive)
+    if is_unclaimed or not pax_name_lower:
+        other_pp_offences = "NIL"
+    else:
+        _excl_self = ~((CopsMaster.os_no == os_no) & (CopsMaster.os_year == os_year))
+
+        # Build filter list conditionally — avoids passing a bare Python True to SQLAlchemy
+        def _other_pp_filters(*base):
+            f = list(base)
+            if current_pp:
+                f.append(CopsMaster.passport_no != current_pp)
+            return f
+
+        if os_obj.pax_date_of_birth:
+            _candidates = db.query(CopsMaster).filter(
+                *_other_pp_filters(
+                    CopsMaster.pax_date_of_birth == os_obj.pax_date_of_birth,
+                    CopsMaster.entry_deleted == "N",
+                    _excl_self,
+                )
+            ).limit(500).all()
+            other_pp_all = [
+                r for r in _candidates
+                if _ns(pax_name_lower, (r.pax_name or "").lower()) >= _FUZZY_THRESHOLD
+            ]
+        else:
+            other_pp_all = db.query(CopsMaster).filter(
+                *_other_pp_filters(
+                    func.lower(CopsMaster.pax_name) == pax_name_lower,
+                    CopsMaster.entry_deleted == "N",
+                    _excl_self,
+                )
+            ).limit(500).all()
+
+        other_pp_total = len(other_pp_all)
+        other_pp_shown = other_pp_all[:_DISPLAY_CAP]
+        if other_pp_shown:
+            parts = [f"{r.passport_no} (OS {r.os_no}/{r.os_year})" for r in other_pp_shown]
+            overflow = other_pp_total - len(other_pp_shown)
+            if overflow > 0:
+                parts.append(f"and {overflow} more")
+            other_pp_offences = ", ".join(parts)
+        else:
+            other_pp_offences = "NIL"
 
     pax_address = ", ".join(filter(None, [os_obj.pax_address1, os_obj.pax_address2, os_obj.pax_address3]))
     template_vars = dict(

@@ -45,55 +45,116 @@ export default function OSPrintView() {
           const fetchedData = response.data.items[0];
           setData(fetchedData);
 
-          // Fetch versioned config and prior offences in parallel — independent requests
-          const [pitResult, ppResult] = await Promise.allSettled([
+          // Token-overlap name score — mirrors backend _name_score logic.
+          const nameScore = (a: string, b: string): number => {
+            const tok = (s: string) => new Set(
+              s.toUpperCase().replace(/[^A-Z ]/g, ' ').split(/\s+/).filter(t => t.length >= 2)
+            );
+            const t1 = tok(a); const t2 = tok(b);
+            if (!t1.size || !t2.size) return 0;
+            return [...t1].filter(t => t2.has(t)).length / Math.min(t1.size, t2.size);
+          };
+
+          // Returns false for placeholder values — all valid country passport formats are accepted.
+          const PP_PLACEHOLDERS = new Set([
+            'NA', 'N/A', 'N.A', 'N.A.', 'NIL', 'NONE', 'NILL', 'NULL',
+            'UNKNOWN', 'NOT APPLICABLE', 'NOTAPPLICABLE',
+            'NOT AVAILABLE', 'NOTAVAILABLE', '0', '00', '000', '0000', '00000000',
+          ]);
+          const isRealPassport = (pp: string | null | undefined): boolean => {
+            if (!pp || !pp.trim()) return false;
+            const s = pp.trim().toUpperCase();
+            if (PP_PLACEHOLDERS.has(s)) return false;
+            if (s.startsWith('UNCLAIM') || s.startsWith('CARGO') || s.startsWith('FREIGHT')) return false;
+            return true;
+          };
+
+          const DISPLAY_CAP = 20;
+          const currentOsDate = new Date(fetchedData.os_date);
+          const paxNameLower = (fetchedData.pax_name || '').trim().toLowerCase();
+          const isUnclaimed = paxNameLower.startsWith('unclaimed');
+          const currentPp = fetchedData.passport_no as string | null | undefined;
+          const ppIsReal = isRealPassport(currentPp);
+
+          // Two independent searches — passport-based for "Prev. Offence",
+          // name-based for "Other PPs". Fired in parallel.
+          const [pitResult, ppByPassportResult, ppByNameResult] = await Promise.allSettled([
             api.get('/admin/config/pit', { params: { ref_date: fetchedData.os_date } }),
-            api.post('/os-query/search', { pax_name: fetchedData.pax_name, page: 1, limit: 50 }),
+            // "Prev. Offence": only search when passport is a real passport number
+            ppIsReal
+              ? api.post('/os-query/search', { passport_no: currentPp, page: 1, limit: 100 })
+              : Promise.resolve(null),
+            // "Other PPs": search by name (only for real passengers, not unclaimed goods)
+            (!isUnclaimed && paxNameLower)
+              ? api.post('/os-query/search', { pax_name: fetchedData.pax_name, page: 1, limit: 100 })
+              : Promise.resolve(null),
           ]);
 
-          setPitConfig(pitResult.status === 'fulfilled' ? pitResult.value.data : null);
+          setPitConfig(pitResult.status === 'fulfilled' ? pitResult.value?.data ?? null : null);
 
-          if (ppResult.status === 'fulfilled') {
-            try {
-              const ppData = ppResult.value.data;
-              // Exclude the current OS record itself
-              const allOther = ppData.items.filter((item: any) =>
-                item.os_no !== fetchedData.os_no || item.os_year !== fetchedData.os_year
-              );
-
-              // Same passport + strictly before current OS date → "Prev. Offence in Above PP No(s)."
-              const currentOsDate = new Date(fetchedData.os_date);
-              const samePassportPrior = allOther.filter((o: any) =>
-                o.passport_no === fetchedData.passport_no &&
+          // ── "Prev. Offence in Above PP No(s). as per COPS" ──────────────────
+          // Exact match on the current passport number, cases before current OS date.
+          // The os-query search uses ilike so we filter for exact match client-side.
+          try {
+            const ppData = ppByPassportResult.status === 'fulfilled' ? ppByPassportResult.value?.data : null;
+            const ppItems: any[] = ppData?.items ?? [];
+            const samePassportPrior = ppItems
+              .filter((o: any) =>
+                (o.os_no !== fetchedData.os_no || o.os_year !== fetchedData.os_year) &&
+                o.passport_no === currentPp &&          // exact match — ilike may return partial hits
                 new Date(o.os_date) < currentOsDate
-              );
-              if (samePassportPrior.length > 0) {
-                const osList = samePassportPrior
-                  .sort((a: any, b: any) => new Date(b.os_date).getTime() - new Date(a.os_date).getTime())
-                  .map((o: any) => `${o.os_no}/${o.os_year}`)
-                  .join(', ');
-                setPrevSamePpOffences(`${samePassportPrior.length} (${osList})`);
-              } else {
-                setPrevSamePpOffences('NIL');
-              }
+              )
+              .sort((a: any, b: any) => new Date(b.os_date).getTime() - new Date(a.os_date).getTime());
 
-              // Different passport, same pax name → "Offences of Other PPs(if any)"
-              const otherPassport = allOther.filter((o: any) =>
-                o.passport_no !== fetchedData.passport_no
-              );
+            if (samePassportPrior.length > 0) {
+              const shown = samePassportPrior.slice(0, DISPLAY_CAP);
+              const osList = shown.map((o: any) => `${o.os_no}/${o.os_year}`).join(', ');
+              const overflow = samePassportPrior.length - shown.length;
+              const suffix = overflow > 0 ? `, and ${overflow} more` : '';
+              setPrevSamePpOffences(`${samePassportPrior.length} (${osList}${suffix})`);
+            } else {
+              setPrevSamePpOffences('NIL');
+            }
+          } catch {
+            setPrevSamePpOffences('NIL');
+          }
+
+          // ── "Offences of Other PPs(if any)" ─────────────────────────────────
+          // Same person, DIFFERENT passport — via DOB+name matching.
+          // Records sharing the current PP are explicitly excluded to ensure
+          // zero overlap with the "Prev. Offence" field above.
+          // Rules:
+          //   • DOB present → exact DOB match + name token-overlap ≥ 90%
+          //   • DOB absent  → 100% exact name match (case-insensitive)
+          try {
+            if (isUnclaimed || !paxNameLower) {
+              setOtherPpOffences('NIL');
+            } else {
+              const nameData = ppByNameResult.status === 'fulfilled' ? ppByNameResult.value?.data : null;
+              const nameItems: any[] = nameData?.items ?? [];
+              const ourDob = fetchedData.pax_date_of_birth || null;
+              const otherPassport = nameItems.filter((o: any) => {
+                if (o.os_no === fetchedData.os_no && o.os_year === fetchedData.os_year) return false;
+                // Exclude same passport — those belong to "Prev. Offence"
+                if (currentPp && o.passport_no === currentPp) return false;
+                if (ourDob) {
+                  if (!o.pax_date_of_birth || o.pax_date_of_birth !== ourDob) return false;
+                  return nameScore(fetchedData.pax_name || '', o.pax_name || '') >= 0.90;
+                } else {
+                  return (o.pax_name || '').trim().toLowerCase() === paxNameLower;
+                }
+              });
               if (otherPassport.length > 0) {
-                setOtherPpOffences(
-                  otherPassport.map((o: any) => `${o.passport_no} (OS ${o.os_no}/${o.os_year})`).join(', ')
-                );
+                const shown = otherPassport.slice(0, DISPLAY_CAP);
+                const parts = shown.map((o: any) => `${o.passport_no} (OS ${o.os_no}/${o.os_year})`);
+                const overflow = otherPassport.length - shown.length;
+                if (overflow > 0) parts.push(`and ${overflow} more`);
+                setOtherPpOffences(parts.join(', '));
               } else {
                 setOtherPpOffences('NIL');
               }
-            } catch {
-              setPrevSamePpOffences('NIL');
-              setOtherPpOffences('NIL');
             }
-          } else {
-            setPrevSamePpOffences('NIL');
+          } catch {
             setOtherPpOffences('NIL');
           }
         }
@@ -340,11 +401,8 @@ export default function OSPrintView() {
     ? [...confsSlNos, ...rfSlNos].sort((a: number, b: number) => a - b)
     : confsSlNos;
 
-  // Calculate prev offences count
-  // "Prev. Offence in Above PP No(s).": live COPS data takes priority over legacy DB field
-  const prevOffenceCountDisplay = prevSamePpOffences !== 'NIL'
-    ? prevSamePpOffences
-    : (data.previous_visits || 'NIL');
+  // "Prev. Offence in Above PP No(s). as per COPS" — only live COPS DB data, never the legacy free-text field.
+  const prevOffenceCountDisplay = prevSamePpOffences;
 
   // Summary Table Calculations
   const FA_ELIGIBLE_CATS = ['UNDER DUTY', 'UNDER OS', 'RF', 'REF'];

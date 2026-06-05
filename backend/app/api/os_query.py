@@ -748,6 +748,7 @@ def search_os_cases(
             "date_of_departure": case.date_of_departure,
             "stay_abroad_days": case.stay_abroad_days,
             "residence_at": case.residence_at,
+            "pax_date_of_birth": case.pax_date_of_birth,
             "previous_visits": case.previous_visits,
             "confiscated_value": case.confiscated_value or 0.0,
             "redeemed_value": case.redeemed_value or 0.0,
