@@ -209,11 +209,15 @@ export default function OSPrintView() {
     return parts.slice(0, -1).join(', ') + ' & ' + parts[parts.length - 1];
   };
   const confiscationRef: string = (() => {
+    // A case adjudicated through the form persists the officer's exact selection
+    // (fixed + chosen optionals) in adjn_section_ref — always honour it verbatim.
     if (data.adjn_section_ref) return data.adjn_section_ref;
+    // Fallback (offline / legacy / pre-adjudication cases): use ONLY the fixed
+    // subsections. Optional subsections (e.g. (i), (o)) are opt-in by design and
+    // must never be auto-included without an explicit officer selection.
     const secNo   = isExportCase ? pitText('confiscation_section_export',        '113') : pitText('confiscation_section_import',        '111');
     const fixCsv  = isExportCase ? pitText('confiscation_fixed_subs_export',     '')    : pitText('confiscation_fixed_subs_import',     'd,l,m');
-    const optCsv  = isExportCase ? pitText('confiscation_optional_subs_export',  '')    : pitText('confiscation_optional_subs_import',  'i,o');
-    const allSubs = [..._parseCsv(fixCsv), ..._parseCsv(optCsv)].sort();
+    const allSubs = [..._parseCsv(fixCsv)].sort();
     return `Section ${secNo}${_fmtSubs(allSubs)} of the Customs Act, 1962`;
   })();
 

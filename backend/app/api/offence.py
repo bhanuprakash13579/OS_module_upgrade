@@ -926,6 +926,8 @@ def complete_offline_adjudication(
     case.re_export_value = data.re_export_value
     if data.adjn_offr_remarks:
         case.adjn_offr_remarks = data.adjn_offr_remarks
+    if data.adjn_section_ref:
+        case.adjn_section_ref = data.adjn_section_ref.strip()
     if data.close_case:
         case.closure_ind = 'Y'
     case.total_payable = float(case.total_duty_amount or 0.0) + data.rf_amount + data.pp_amount + data.ref_amount
@@ -975,6 +977,8 @@ def add_outcome(
     case.re_export_value = data.re_export_value
     if data.adjn_offr_remarks:
         case.adjn_offr_remarks = data.adjn_offr_remarks
+    if data.adjn_section_ref:
+        case.adjn_section_ref = data.adjn_section_ref.strip()
     if data.close_case:
         case.closure_ind = 'Y'
     case.total_payable = float(case.total_duty_amount or 0.0) + data.rf_amount + data.pp_amount + data.ref_amount
@@ -1489,8 +1493,12 @@ def print_os_pdf(
 
     saved_section_ref = (os_obj.adjn_section_ref or "").strip()
     if saved_section_ref:
+        # Officer's exact selection (fixed + chosen optionals) saved at adjudication.
         confiscation_full_ref = saved_section_ref
     else:
+        # Fallback (offline / legacy / pre-adjudication): ONLY fixed subsections.
+        # Optional subsections are opt-in and must not be auto-included here —
+        # mirrors the frontend OSPrintView fallback logic.
         sec_no = _ptc(
             "confiscation_section_export" if is_export else "confiscation_section_import",
             "113" if is_export else "111",
@@ -1499,11 +1507,7 @@ def print_os_pdf(
             "confiscation_fixed_subs_export" if is_export else "confiscation_fixed_subs_import",
             "" if is_export else "d,l,m",
         )
-        opt_subs = _ptc_csv(
-            "confiscation_optional_subs_export" if is_export else "confiscation_optional_subs_import",
-            "" if is_export else "i,o",
-        )
-        all_subs = sorted(set(fixed_subs) | set(opt_subs))
+        all_subs = sorted(set(fixed_subs))
         confiscation_full_ref = f"Section {sec_no}{_fmt_subs(all_subs)} of the Customs Act, 1962"
 
     # ── Prev. offence + other PP offences ────────────────────────────────────

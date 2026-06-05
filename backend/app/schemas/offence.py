@@ -219,6 +219,7 @@ class OfflineAdjudicationComplete(BaseModel):
     redeemed_value: float = 0.0
     re_export_value: float = 0.0
     adjn_offr_remarks: Optional[str] = None
+    adjn_section_ref: Optional[str] = None   # Officer-selected confiscation section (fixed + chosen optionals)
     close_case: bool = False
 
     @field_validator('adjn_offr_remarks')
