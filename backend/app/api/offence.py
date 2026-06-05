@@ -1530,7 +1530,13 @@ def print_os_pdf(
     _DISPLAY_CAP = 20
     current_os_date = os_obj.os_date
     pax_name_lower = (os_obj.pax_name or "").strip().lower()
-    is_unclaimed = pax_name_lower.startswith("unclaimed")
+    # Treat generic placeholder names as "no real identity" — skip name-based Other-PP lookup.
+    _NAME_PLACEHOLDERS = {"na", "n/a", "n.a", "n.a.", "nil", "nill", "none", "unknown",
+                          "not available", "not known", "notknown"}
+    is_unclaimed = (
+        pax_name_lower.startswith(("unclaimed", "cargo", "freight")) or
+        pax_name_lower in _NAME_PLACEHOLDERS
+    )
     current_pp = os_obj.passport_no
 
     # ── "Prev. Offence in Above PP No(s). as per COPS" ───────────────────────

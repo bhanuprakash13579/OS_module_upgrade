@@ -72,7 +72,18 @@ export default function OSPrintView() {
           const DISPLAY_CAP = 20;
           const currentOsDate = new Date(fetchedData.os_date);
           const paxNameLower = (fetchedData.pax_name || '').trim().toLowerCase();
-          const isUnclaimed = paxNameLower.startsWith('unclaimed');
+          // Placeholder / unidentified pax names — skip name-based Other-PP lookup entirely
+          // to avoid matching all "UNCLAIMED", "NA", "UNKNOWN" etc. cases against each other.
+          const PAX_NAME_PLACEHOLDERS = new Set([
+            'na', 'n/a', 'n.a', 'n.a.', 'nil', 'nill', 'none', 'unknown',
+            'not available', 'not known', 'notknown',
+          ]);
+          const isUnclaimed = (
+            paxNameLower.startsWith('unclaimed') ||
+            paxNameLower.startsWith('cargo') ||
+            paxNameLower.startsWith('freight') ||
+            PAX_NAME_PLACEHOLDERS.has(paxNameLower)
+          );
           const currentPp = fetchedData.passport_no as string | null | undefined;
           const ppIsReal = isRealPassport(currentPp);
 
