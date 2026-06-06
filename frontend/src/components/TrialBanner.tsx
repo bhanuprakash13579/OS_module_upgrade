@@ -1,4 +1,5 @@
-import { Clock, AlertTriangle, XCircle, ExternalLink, Mail, Settings } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Clock, AlertTriangle, XCircle, ExternalLink, Mail } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTrialStatus } from '@/hooks/useTrialStatus';
 
@@ -17,6 +18,24 @@ export default function TrialBanner() {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Hidden admin access — same secret gesture as the module-selection page:
+  // 4 quick clicks (within 1.5 s) on an invisible corner spot open the admin panel.
+  // No visible button is shown, so the admin route is never exposed on the
+  // trial-expired block screen.
+  const [secretClicks, setSecretClicks] = useState(0);
+  useEffect(() => {
+    if (!secretClicks) return;
+    const t = setTimeout(() => setSecretClicks(0), 1500);
+    return () => clearTimeout(t);
+  }, [secretClicks]);
+  const handleSecretClick = () => {
+    setSecretClicks(c => {
+      const next = c + 1;
+      if (next >= 4) { navigate('/restore-backup'); return 0; }
+      return next;
+    });
+  };
+
   if (isLoading || trial_disabled) return null;
 
   // Never show the trial overlay on the admin panel itself — admins must be
@@ -24,13 +43,21 @@ export default function TrialBanner() {
   if (location.pathname.startsWith('/restore-backup')) return null;
 
   // ── Expired: full-screen block ─────────────────────────────────────────────
-  // The admin panel route (/restore-backup) is mounted outside <AppLayout>
-  // so this banner does not render there — meaning the admin can always reach
-  // it. The "Open Admin Panel" button below is a one-click bypass for users
-  // who happen to land on a page where the banner did render.
+  // The admin panel route (/restore-backup) is mounted outside <AppLayout> so
+  // this banner does not render there. There is NO visible admin button — the
+  // only way in from this screen is the hidden 4-click corner spot below, so a
+  // casual user cannot reach the admin login just by reading the screen.
   if (expired) {
     return (
       <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/90 backdrop-blur-sm print:hidden p-4">
+        {/* Hidden admin access — invisible 4-click corner spot (no visual clue).
+            Mirrors the secret trigger on the module-selection screen. */}
+        <div
+          onClick={handleSecretClick}
+          className="absolute bottom-6 left-0 w-16 h-16 z-[10000]"
+          style={{ cursor: 'default' }}
+        />
+
         <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center space-y-5">
           <XCircle size={56} className="text-red-500 mx-auto" />
           <h2 className="text-2xl font-bold text-slate-800">Trial Period Ended</h2>
@@ -57,18 +84,6 @@ export default function TrialBanner() {
               contact@gsicorp.in
             </button>
           </div>
-
-          {/* Admin escape hatch — go to admin panel to reset / extend / activate */}
-          <button
-            onClick={() => navigate('/restore-backup')}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-slate-800 text-white text-sm font-semibold hover:bg-slate-700"
-          >
-            <Settings size={15} />
-            Open Admin Panel
-          </button>
-          <p className="text-[10px] text-slate-400 leading-snug">
-            Admins can reset the trial, change its duration, or activate a permanent license from the Admin Panel.
-          </p>
         </div>
       </div>
     );
