@@ -870,13 +870,17 @@ def get_offline_pending(
     per_page: int = Query(20, ge=1, le=100),
 ):
     """Cases registered as offline adjudication but officer details not yet captured."""
-    base_q = db.query(CopsMaster).filter(
+    _offline_filters = [
         CopsMaster.entry_deleted == "N",
         CopsMaster.is_offline_adjudication == 'Y',
         CopsMaster.adj_offr_name.is_(None),
-    ).order_by(CopsMaster.os_year.desc(), cast(CopsMaster.os_no, SAInteger).desc())
-    total = base_q.count()
-    records = base_q.offset((page - 1) * per_page).limit(per_page).all()
+    ]
+    total = db.query(func.count()).select_from(CopsMaster).filter(*_offline_filters).scalar()
+    records = (
+        db.query(CopsMaster).filter(*_offline_filters)
+        .order_by(CopsMaster.os_year.desc(), cast(CopsMaster.os_no, SAInteger).desc())
+        .offset((page - 1) * per_page).limit(per_page).all()
+    )
     for r in records:
         r.items = []
     return {"items": records, "total": total, "page": page, "per_page": per_page}

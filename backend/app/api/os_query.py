@@ -384,6 +384,17 @@ def _build_item_desc(items: list) -> str:
     return ", ".join(filter(None, parts))
 
 
+def _build_qty_summary(items: list) -> str:
+    """Build 'qty unit' strings for all items, comma-separated (quantity column only)."""
+    parts = []
+    for item in items:
+        qty = item.items_qty or 0
+        uqc = (item.items_uqc or '').strip()
+        qty_str = f"{qty:g}" if qty else "0"
+        parts.append(f"{qty_str} {uqc}".strip())
+    return ", ".join(filter(None, parts))
+
+
 def _parse_br_entries(json_str: str | None) -> tuple[str, str]:
     """Parse post_adj_br_entries JSON → (br_numbers_str, br_dates_str)."""
     if not json_str:
@@ -612,11 +623,13 @@ def search_os_cases(
         q = q.filter(CopsMaster.pax_name.ilike(f"%{query.pax_name}%"))
         
     if query.passport_no:
-        # Check both current passport and legacy/old passport fields
+        # Current passport: prefix match so the b-tree index is used.
+        # Officers type passports from the first char; OSPrintView sends full numbers.
+        # Legacy old_passport_no: keep substring match for historical data compatibility.
         pno = query.passport_no
         q = q.filter(
             or_(
-                CopsMaster.passport_no.ilike(f"%{pno}%"),
+                CopsMaster.passport_no.ilike(f"{pno}%"),
                 CopsMaster.old_passport_no.ilike(f"%{pno}%")
             )
         )
@@ -940,7 +953,7 @@ def get_monthly_report(
             address=address,
             item_description=item_desc or None,
             tags=tags or None,
-            quantity=item_desc or None,
+            quantity=_build_qty_summary(items) or None,
             value_in_rs=value_in_rs,
             rf_ref=rf_ref,
             penalty=penalty,

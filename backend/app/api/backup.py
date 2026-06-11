@@ -685,9 +685,31 @@ _REPORT_MASTER_COLS: Set[str] = {
 _REPORT_ITEM_COLS: Set[str] = {
     "items_desc", "items_qty", "items_uqc", "items_value", "items_fa",
     "items_duty", "items_duty_type", "items_category", "items_sub_category",
-    "items_release_category", "value_per_piece", "cumulative_duty_rate",
+    "items_release_category", "confiscation_type",
+    "value_per_piece", "cumulative_duty_rate",
 }
 
+# confiscation_type is computed from items_release_category — not a real DB column.
+_COMPUTED_ITEM_COLS: Set[str] = {"confiscation_type"}
+
+_RC_LABELS = {
+    "CONFS":      "Absolute Confiscation",
+    "RF":         "Confiscation",
+    "REF":        "Re-Export",
+    "UNDER OS":   "Under OS (Seized)",
+    "UNDER DUTY": "Dutiable",
+}
+
+def _item_col_val(item, col: str) -> str:
+    if col == "confiscation_type":
+        rc = (getattr(item, "items_release_category", "") or "").strip().upper()
+        return _RC_LABELS.get(rc, rc or "—")
+    return _val(getattr(item, col, None))
+
+
+class OsListItem(BaseModel):
+    os_no: str
+    os_year: int
 
 class CustomReportRequest(BaseModel):
     master_cols: List[str]
@@ -695,7 +717,7 @@ class CustomReportRequest(BaseModel):
     from_date: Optional[date] = None
     to_date: Optional[date] = None
     case_type: Optional[str] = None
-    # Row-level filters
+    # Row-level filters (used when os_list is absent)
     os_no: Optional[str] = None
     os_year: Optional[int] = None
     adj_offr_name: Optional[str] = None
@@ -703,6 +725,8 @@ class CustomReportRequest(BaseModel):
     pax_name: Optional[str] = None
     passport_no: Optional[str] = None
     item_desc: Optional[str] = None
+    # Excel-upload batch: if provided, only these (os_no, os_year) pairs are returned
+    os_list: Optional[List[OsListItem]] = None
 
 
 @router.post("/custom-report")
@@ -715,40 +739,58 @@ def custom_report(
     Build a custom report by selecting any combination of cops_master and
     cops_items columns.
 
-    If item columns are included, the result is expanded (one row per item).
-    Master columns are repeated on every item row for the same OS case.
-    If a case has no items, it still appears once with empty item fields.
+    If item columns are included, the result is one row per OS case with
+    item values newline-stacked in item cells (readable in both the preview
+    table and CSV download).
+
+    Pass `os_list` (array of {os_no, os_year} objects) to query only those
+    specific cases — uploaded from an Excel/CSV file.  When os_list is
+    provided, date/filter params are ignored.
     """
     invalid = (set(body.master_cols) - _REPORT_MASTER_COLS) | (set(body.item_cols) - _REPORT_ITEM_COLS)
     if invalid:
         raise HTTPException(status_code=400, detail=f"Unknown columns: {sorted(invalid)}")
     if not body.master_cols and not body.item_cols:
         raise HTTPException(status_code=400, detail="Select at least one column.")
+    if body.os_list is not None and len(body.os_list) > 2000:
+        raise HTTPException(status_code=400, detail="os_list cannot exceed 2000 items per request.")
 
     q = db.query(CopsMaster).filter(CopsMaster.entry_deleted == "N")
-    if body.from_date and body.to_date:
-        q = q.filter(CopsMaster.os_date >= body.from_date, CopsMaster.os_date <= body.to_date)
-    if body.case_type:
-        if (body.case_type or "").strip().upper() == "EXPORT CASE":
-            q = q.filter(func.upper(CopsMaster.case_type) == "EXPORT CASE")
-        else:
-            q = q.filter(or_(CopsMaster.case_type.is_(None), func.upper(CopsMaster.case_type) != "EXPORT CASE"))
-    if body.os_no:
-        q = q.filter(CopsMaster.os_no == body.os_no)
-    if body.os_year:
-        q = q.filter(CopsMaster.os_year == body.os_year)
-    if body.adj_offr_name:
-        q = q.filter(CopsMaster.adj_offr_name.ilike(f"%{body.adj_offr_name}%"))
-    if body.flight_no:
-        q = q.filter(CopsMaster.flight_no.ilike(f"%{body.flight_no}%"))
-    if body.pax_name:
-        q = q.filter(CopsMaster.pax_name.ilike(f"%{body.pax_name}%"))
-    if body.passport_no:
-        q = q.filter(CopsMaster.passport_no.ilike(f"%{body.passport_no}%"))
-    if body.item_desc:
-        q = q.join(CopsItems, and_(CopsItems.os_no == CopsMaster.os_no,
-                                   CopsItems.os_year == CopsMaster.os_year)) \
-             .filter(CopsItems.items_desc.ilike(f"%{body.item_desc}%")).distinct()
+
+    if body.os_list is not None:
+        # Excel-upload mode: match exactly these (os_no, os_year) pairs
+        if not body.os_list:
+            return {"columns": body.master_cols + body.item_cols, "rows": [], "total": 0}
+        pair_conditions = [
+            and_(CopsMaster.os_no == item.os_no, CopsMaster.os_year == item.os_year)
+            for item in body.os_list
+        ]
+        q = q.filter(or_(*pair_conditions))
+    else:
+        # Filter-based mode
+        if body.from_date and body.to_date:
+            q = q.filter(CopsMaster.os_date >= body.from_date, CopsMaster.os_date <= body.to_date)
+        if body.case_type:
+            if (body.case_type or "").strip().upper() == "EXPORT CASE":
+                q = q.filter(func.upper(CopsMaster.case_type) == "EXPORT CASE")
+            else:
+                q = q.filter(or_(CopsMaster.case_type.is_(None), func.upper(CopsMaster.case_type) != "EXPORT CASE"))
+        if body.os_no:
+            q = q.filter(CopsMaster.os_no == body.os_no)
+        if body.os_year:
+            q = q.filter(CopsMaster.os_year == body.os_year)
+        if body.adj_offr_name:
+            q = q.filter(CopsMaster.adj_offr_name.ilike(f"%{body.adj_offr_name}%"))
+        if body.flight_no:
+            q = q.filter(CopsMaster.flight_no.ilike(f"%{body.flight_no}%"))
+        if body.pax_name:
+            q = q.filter(CopsMaster.pax_name.ilike(f"%{body.pax_name}%"))
+        if body.passport_no:
+            q = q.filter(CopsMaster.passport_no.ilike(f"%{body.passport_no}%"))
+        if body.item_desc:
+            q = q.join(CopsItems, and_(CopsItems.os_no == CopsMaster.os_no,
+                                       CopsItems.os_year == CopsMaster.os_year)) \
+                 .filter(CopsItems.items_desc.ilike(f"%{body.item_desc}%")).distinct()
 
     masters: List[CopsMaster] = q.order_by(CopsMaster.os_year, CopsMaster.os_no).limit(10000).all()
 
@@ -780,13 +822,23 @@ def custom_report(
             m_items = items_map.get((m.os_no, m.os_year, m.location_code or ""), [])
             row = dict(master_data)
             for col in body.item_cols:
-                vals = [_val(getattr(item, col, None)) for item in m_items]
+                vals = [_item_col_val(item, col) for item in m_items]
                 row[col] = "\n".join(v for v in vals if v)
             rows.append(row)
         else:
             rows.append(master_data)
 
-    return {"columns": all_cols, "rows": rows, "total": len(rows)}
+    # When os_list was provided, include a "not_found" list for the caller.
+    not_found: list[dict] = []
+    if body.os_list is not None:
+        found_pairs = {(m.os_no, m.os_year) for m in masters}
+        not_found = [
+            {"os_no": item.os_no, "os_year": item.os_year}
+            for item in body.os_list
+            if (item.os_no, item.os_year) not in found_pairs
+        ]
+
+    return {"columns": all_cols, "rows": rows, "total": len(rows), "not_found": not_found}
 
 
 # ── Custom Report: BR / DR ────────────────────────────────────────────────────

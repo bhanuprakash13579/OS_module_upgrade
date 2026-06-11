@@ -178,12 +178,16 @@ export default function OSPrintView() {
     if (os_no && os_year) fetchRecord();
   }, [os_no, os_year]);
 
-  // Pre-generate the PDF in the background as soon as the record loads
+  // Pre-generate the PDF in the background as soon as the record loads.
+  // On failure clear the ref so the next download attempt starts a fresh request
+  // rather than re-awaiting an already-rejected promise.
   useEffect(() => {
     if (data && os_no && os_year) {
-      pdfPromiseRef.current = api
+      const req = api
         .get(`/os/${os_no}/${os_year}/print-pdf`, { responseType: 'arraybuffer' })
         .then((r) => r.data);
+      req.catch(() => { pdfPromiseRef.current = null; });
+      pdfPromiseRef.current = req;
     }
   }, [data, os_no, os_year]);
 
@@ -312,9 +316,14 @@ export default function OSPrintView() {
         showDownloadToast(`PDF saved to ${savePath}`);
       }
     } catch {
-      // Fallback: browser download (non-Tauri / web mode)
+      // Fallback: browser download (non-Tauri / web mode).
+      // Always start a fresh request — pdfReady may be a rejected promise
+      // if the background pre-generation failed, and re-awaiting a rejected
+      // promise always throws immediately without retrying the network call.
       try {
-        const pdfData = await pdfReady;
+        const pdfData = await api
+          .get(`/os/${os_no}/${os_year}/print-pdf`, { responseType: 'arraybuffer' })
+          .then((r) => r.data);
         const blob = new Blob([pdfData], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');

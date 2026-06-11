@@ -209,6 +209,11 @@ def apply_sqlite_migrations():
                 "CREATE INDEX IF NOT EXISTS ix_dr_items_join  ON dr_items  (dr_no, dr_date, dr_type)",
                 "CREATE INDEX IF NOT EXISTS ix_br_master_entry_deleted_date ON br_master (entry_deleted, br_date)",
                 "CREATE INDEX IF NOT EXISTS ix_dr_master_entry_deleted_date ON dr_master (entry_deleted, dr_date)",
+                # Text-search columns — prefix LIKE 'val%' uses these; substring
+                # '%val%' still benefits because the entry_deleted composite index
+                # narrows candidates before the linear scan applies.
+                "CREATE INDEX IF NOT EXISTS ix_cops_master_pax_name             ON cops_master (pax_name)",
+                "CREATE INDEX IF NOT EXISTS ix_cops_master_country_of_departure ON cops_master (country_of_departure)",
             ]:
                 conn.execute(text(idx_ddl))
 
