@@ -589,6 +589,7 @@ export default function OffenceForm() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [itemErrors, setItemErrors] = useState<Record<number, Record<string, string>>>({});
   const osNoCheckTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [osNoStatus, setOsNoStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
 
   const setItemFieldError = useCallback((idx: number, field: string, message: string) => {
     setItemErrors(prev => ({
@@ -882,6 +883,35 @@ export default function OffenceForm() {
 
   const submitData = async (draftValue: string) => {
     setErrorMsg('');
+
+    // Block immediately if the debounced check already found a conflict.
+    // Also re-check live for cases where the user submits faster than the debounce.
+    if (!isEditing && formData.os_no && /^\d+$/.test(formData.os_no)) {
+      if (osNoStatus === 'taken') {
+        const yr = formData.os_date ? new Date(formData.os_date).getFullYear() : new Date().getFullYear();
+        setFieldErrors({ os_no: `O.S. No. ${formData.os_no}/${yr} is already taken!` });
+        setErrorMsg('O.S. No. already taken — please use a different number.');
+        document.getElementById('field-os_no')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      // If still checking or idle (user submitted before debounce fired) — do a fresh check now
+      if (osNoStatus === 'checking' || osNoStatus === 'idle') {
+        try {
+          const yr = formData.os_date ? new Date(formData.os_date).getFullYear() : new Date().getFullYear();
+          setOsNoStatus('checking');
+          const { data: checkResult } = await api.get(`/os/check-os-no/${formData.os_no}/${yr}`);
+          if (checkResult.exists) {
+            setOsNoStatus('taken');
+            setFieldErrors({ os_no: `O.S. No. ${formData.os_no}/${yr} is already taken!` });
+            setErrorMsg('O.S. No. already taken — please use a different number.');
+            document.getElementById('field-os_no')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return;
+          }
+          setOsNoStatus('available');
+        } catch { /* network error — proceed, backend will enforce */ }
+      }
+    }
+
     setFieldErrors({});
     setItemErrors({});
 
@@ -1071,6 +1101,12 @@ export default function OffenceForm() {
         } else if (typeof errMsg === 'object') {
             errMsg = JSON.stringify(errMsg);
         }
+        // 409 Conflict = OS number race condition — surface it on the field, not just the banner
+        if (err.response?.status === 409 || (typeof errMsg === 'string' && errMsg.toLowerCase().includes('already'))) {
+            setOsNoStatus('taken');
+            setFieldErrors(prev => ({ ...prev, os_no: errMsg }));
+            document.getElementById('field-os_no')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
         setErrorMsg(errMsg);
     } finally {
         setIsSubmitting(false);
@@ -1221,6 +1257,7 @@ export default function OffenceForm() {
                                   setFormData(prev => ({ ...prev, os_no: sanitized }));
 
                                   if (!sanitized) {
+                                    setOsNoStatus('idle');
                                     setFieldError('os_no', 'O.S. No. is required.');
                                     return;
                                   }
@@ -1232,19 +1269,35 @@ export default function OffenceForm() {
 
                                   // Debounced uniqueness check — waits 500ms after user stops typing
                                   if (!isEditing) {
+                                    setOsNoStatus('idle');
                                     clearTimeout(osNoCheckTimer.current);
                                     osNoCheckTimer.current = setTimeout(async () => {
                                       try {
                                         const yr = formData.os_date ? new Date(formData.os_date).getFullYear() : new Date().getFullYear();
+                                        setOsNoStatus('checking');
                                         const { data: result } = await api.get(`/os/check-os-no/${sanitized}/${yr}`);
-                                        if (result.exists) setFieldError('os_no', `O.S. No. ${sanitized}/${yr} already exists!`);
-                                      } catch { /* ignore network errors */ }
+                                        if (result.exists) {
+                                          setOsNoStatus('taken');
+                                          setFieldError('os_no', `O.S. No. ${sanitized}/${yr} is already taken!`);
+                                        } else {
+                                          setOsNoStatus('available');
+                                        }
+                                      } catch { setOsNoStatus('idle'); }
                                     }, 500);
                                   }
                                 }}
                             />
                             {fieldErrors.os_no && (
                               <p className="mt-1 text-xs font-semibold text-red-600">{fieldErrors.os_no}</p>
+                            )}
+                            {!fieldErrors.os_no && !isEditing && osNoStatus === 'checking' && (
+                              <p className="mt-1 text-xs text-slate-500 flex items-center gap-1">
+                                <span className="inline-block w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                                Checking…
+                              </p>
+                            )}
+                            {!fieldErrors.os_no && !isEditing && osNoStatus === 'available' && (
+                              <p className="mt-1 text-xs font-semibold text-green-600">✓ Available</p>
                             )}
                         </div>
                         <div>

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from typing import List
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_, and_, cast, Integer as SAInteger, exists, not_, text
+from sqlalchemy.exc import IntegrityError
 from collections import defaultdict
 
 logger = logging.getLogger(__name__)
@@ -326,7 +327,16 @@ def create_os(
     )
 
     db.add(os_obj)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        # Two clients passed the app-level uniqueness check simultaneously;
+        # the partial UNIQUE index on (os_no, os_year) caught the race.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"O.S. No. {os_no}/{os_year} was just registered by another user. Please use a different number.",
+        )
     db.refresh(os_obj)
 
     for c_item in data.items:

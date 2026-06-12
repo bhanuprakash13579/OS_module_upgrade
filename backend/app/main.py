@@ -214,6 +214,12 @@ def apply_sqlite_migrations():
                 # narrows candidates before the linear scan applies.
                 "CREATE INDEX IF NOT EXISTS ix_cops_master_pax_name             ON cops_master (pax_name)",
                 "CREATE INDEX IF NOT EXISTS ix_cops_master_country_of_departure ON cops_master (country_of_departure)",
+                # Partial UNIQUE index — enforces (os_no, os_year) uniqueness at DB
+                # level for non-deleted cases. Catches concurrent-insert races that
+                # slip past the application-level check-then-insert.
+                # SQLite supports WHERE clauses on indexes (partial indexes).
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_cops_master_os_no_year_active "
+                "ON cops_master (os_no, os_year) WHERE entry_deleted = 'N'",
             ]:
                 conn.execute(text(idx_ddl))
 
