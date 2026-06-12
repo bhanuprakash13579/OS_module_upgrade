@@ -591,6 +591,58 @@ export default function OffenceForm() {
   const osNoCheckTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [osNoStatus, setOsNoStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
 
+  // ── Local-draft auto-save (new cases only) ──────────────────────────────────
+  const DRAFT_KEY = 'cops_new_case_draft';
+  const draftSaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [draftRestoredAt, setDraftRestoredAt] = useState<number | null>(null); // non-null = banner visible
+
+  // On mount: offer to restore draft if one exists and the form is still empty
+  useEffect(() => {
+    if (isEditing) return;
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (saved?.formData?.os_no || saved?.supdtsRemarks) {
+        setDraftRestoredAt(saved.savedAt ?? Date.now());
+      }
+    } catch { localStorage.removeItem(DRAFT_KEY); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Auto-save silently 1.5 s after any change (new cases only)
+  useEffect(() => {
+    if (isEditing) return;
+    // Don't bother saving a completely blank form
+    const hasContent = formData.os_no || formData.pax_name || supdtsRemarks || items.some(i => i.items_desc);
+    if (!hasContent) return;
+    clearTimeout(draftSaveTimer.current);
+    draftSaveTimer.current = setTimeout(() => {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ savedAt: Date.now(), formData, items, supdtsRemarks }));
+      } catch { /* storage full — silently ignore */ }
+    }, 1500);
+    return () => clearTimeout(draftSaveTimer.current);
+  }, [formData, items, supdtsRemarks, isEditing]);
+
+  const clearDraft = () => {
+    clearTimeout(draftSaveTimer.current);
+    localStorage.removeItem(DRAFT_KEY);
+    setDraftRestoredAt(null);
+  };
+
+  const restoreDraft = () => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (saved.formData) setFormData(prev => ({ ...prev, ...saved.formData }));
+      if (saved.items?.length) setItems(saved.items);
+      if (saved.supdtsRemarks) setSupdtsRemarks(saved.supdtsRemarks);
+    } catch { /* ignore */ }
+    setDraftRestoredAt(null); // hide banner after restoring
+  };
+
   const setItemFieldError = useCallback((idx: number, field: string, message: string) => {
     setItemErrors(prev => ({
       ...prev,
@@ -1092,6 +1144,7 @@ export default function OffenceForm() {
             ? api.put(`/os/${osNo}/${osYear}`, finalPayload)
             : api.post('/os/', finalPayload));
 
+        clearDraft();
         navigate(goBackPath);
 
     } catch(err: any) {
@@ -1157,6 +1210,32 @@ export default function OffenceForm() {
 
   return (
     <div className="space-y-4 w-full pb-20">
+      {/* Draft restore banner — shown once on load if unsaved work exists */}
+      {draftRestoredAt !== null && !isEditing && (
+        <div className="flex items-center justify-between gap-3 bg-amber-50 border border-amber-300 rounded-lg px-4 py-2.5 text-sm text-amber-800">
+          <span>
+            You have unsaved work from{' '}
+            {(() => {
+              const mins = Math.round((Date.now() - draftRestoredAt) / 60000);
+              return mins < 1 ? 'just now' : `${mins} minute${mins === 1 ? '' : 's'} ago`;
+            })()}.
+          </span>
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={restoreDraft}
+              className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded text-xs font-semibold"
+            >
+              Restore
+            </button>
+            <button
+              onClick={clearDraft}
+              className="px-3 py-1 bg-white hover:bg-amber-100 border border-amber-300 text-amber-700 rounded text-xs font-semibold"
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
       {/* Header Panel */}
       <div className="flex justify-between items-center bg-white px-4 py-3 border-b border-slate-200 rounded-xl border">
         <div className="flex items-center space-x-4">
