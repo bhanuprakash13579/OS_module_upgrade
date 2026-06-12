@@ -8,7 +8,11 @@ import * as XLSX from 'xlsx';
 
 // ── Excel import helpers ──────────────────────────────────────────────────────
 
-type ParsedItem = { items_desc: string; items_qty: number; items_uqc: string; items_value: number; items_duty_type: string };
+type ParsedItem = { _key?: string; items_desc: string; items_qty: number; items_uqc: string; items_value: number; items_duty_type: string };
+
+// Monotonic counter for stable item keys — avoids key={idx} reuse on add/remove
+let _itemKeySeq = 0;
+const _mkItemKey = () => `itm-${++_itemKeySeq}`;
 
 /** Parse "2.5 KGS" or "1 NOS" → { qty, uqc } */
 function parseQtyUqc(raw: string): { qty: number; uqc: string } {
@@ -414,8 +418,8 @@ interface ItemEditPanelProps {
 }
 const ItemEditPanel = memo(function ItemEditPanel({ initialItems, totalValue, penalty, onConfirm, onCancel }: ItemEditPanelProps) {
   const seed = initialItems.length > 0
-    ? initialItems
-    : [{ items_desc: '', items_qty: 1, items_uqc: 'NOS', items_value: 0, items_duty_type: 'Miscellaneous-22' }];
+    ? initialItems.map(itm => itm._key ? itm : { ...itm, _key: _mkItemKey() })
+    : [{ _key: _mkItemKey(), items_desc: '', items_qty: 1, items_uqc: 'NOS', items_value: 0, items_duty_type: 'Miscellaneous-22' }];
   const [editItems, setEditItems] = useState<ParsedItem[]>(seed);
 
   const updateItem = useCallback((idx: number, field: string, value: any) => {
@@ -504,7 +508,7 @@ const ItemEditPanel = memo(function ItemEditPanel({ initialItems, totalValue, pe
           <tbody className="divide-y divide-slate-100 bg-white">
             {editItems.map((itm, idx) => (
               <SimpleItemRow
-                key={idx}
+                key={itm._key ?? String(idx)}
                 itm={itm}
                 idx={idx}
                 rowErrors={undefined}
@@ -519,7 +523,7 @@ const ItemEditPanel = memo(function ItemEditPanel({ initialItems, totalValue, pe
       </div>
       <div className="flex items-center gap-2 mt-2 flex-wrap">
         <button type="button"
-          onClick={() => setEditItems(prev => [...prev, { items_desc: '', items_qty: 1, items_uqc: 'NOS', items_value: 0, items_duty_type: 'Miscellaneous-22' }])}
+          onClick={() => setEditItems(prev => [...prev, { _key: _mkItemKey(), items_desc: '', items_qty: 1, items_uqc: 'NOS', items_value: 0, items_duty_type: 'Miscellaneous-22' }])}
           className="text-xs px-2 py-1 border border-blue-300 text-blue-700 rounded hover:bg-blue-50 font-medium">
           + Add Item
         </button>
@@ -599,6 +603,7 @@ export default function OfflineAdjudicationForm() {
   });
 
   const [items, setItems] = useState<any[]>([{
+    _key: _mkItemKey(),
     items_desc: '',
     items_qty: 1,
     items_uqc: 'NOS',
@@ -654,6 +659,7 @@ export default function OfflineAdjudicationForm() {
         });
         if (d.items && d.items.length > 0) {
           setItems(d.items.map((itm: any) => ({
+            _key: _mkItemKey(),
             items_desc: itm.items_desc || '',
             items_qty: itm.items_qty ?? 1,
             items_uqc: itm.items_uqc || 'NOS',
@@ -907,7 +913,7 @@ export default function OfflineAdjudicationForm() {
       pax_date_of_birth: '', passport_date: '', pp_issue_place: '', father_name: '',
       residence_at: '', old_passport_no: '', case_type: 'Non-Bonafide', shift: 'Day', supdts_remarks: '',
     });
-    setItems([{ items_desc: '', items_qty: 1, items_uqc: 'NOS', items_value: 0, items_duty_type: 'Miscellaneous-22' }]);
+    setItems([{ _key: _mkItemKey(), items_desc: '', items_qty: 1, items_uqc: 'NOS', items_value: 0, items_duty_type: 'Miscellaneous-22' }]);
     setFieldErrors({});
     setItemErrors({});
     setErrorMsg('');
@@ -1376,7 +1382,7 @@ export default function OfflineAdjudicationForm() {
             <button
               type="button"
               onClick={() => setItems(prev => [...prev, {
-                items_desc: '', items_qty: 1, items_uqc: 'NOS', items_value: 0, items_duty_type: 'Miscellaneous-22'
+                _key: _mkItemKey(), items_desc: '', items_qty: 1, items_uqc: 'NOS', items_value: 0, items_duty_type: 'Miscellaneous-22'
               }])}
               className="text-xs px-3 py-1.5 bg-white text-orange-700 hover:bg-orange-50 border border-orange-200 rounded font-bold flex items-center transition-colors uppercase tracking-wider"
             >
@@ -1408,7 +1414,7 @@ export default function OfflineAdjudicationForm() {
                 ) : (
                   items.map((itm, idx) => (
                     <SimpleItemRow
-                      key={idx}
+                      key={itm._key ?? String(idx)}
                       itm={itm}
                       idx={idx}
                       rowErrors={itemErrors[idx]}

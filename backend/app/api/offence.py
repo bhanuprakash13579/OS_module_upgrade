@@ -359,7 +359,8 @@ def create_os(
     db.refresh(os_obj)
     os_obj.items = db.query(CopsItems).filter(
         CopsItems.os_no == os_no,
-        CopsItems.os_year == os_year
+        CopsItems.os_year == os_year,
+        CopsItems.entry_deleted == "N"
     ).all()
     return os_obj
 
@@ -687,28 +688,34 @@ def create_offline_adjudication(
         **data.model_dump(exclude={"items", "os_no", "os_year", "os_date", "is_offline_adjudication"})
     )
     db.add(os_obj)
-    db.commit()
-    db.refresh(os_obj)
-
-    for c_item in data.items:
-        item_value = float(c_item.items_value or 0.0)
-        fa = _eff_fa(item_value, c_item)
-        rate = float(c_item.cumulative_duty_rate or 0.0)
-        duty = round(max(0.0, (item_value - fa)) * rate / 100.0, 2)
-        db_item = CopsItems(
-            os_no=os_no,
-            os_date=os_obj.os_date,
-            os_year=os_year,
-            items_duty=duty,
-            **c_item.model_dump(exclude={"items_duty"})
+    try:
+        db.flush()  # send INSERT for header; UNIQUE constraint fires here on duplicate
+        for c_item in data.items:
+            item_value = float(c_item.items_value or 0.0)
+            fa = _eff_fa(item_value, c_item)
+            rate = float(c_item.cumulative_duty_rate or 0.0)
+            duty = round(max(0.0, (item_value - fa)) * rate / 100.0, 2)
+            db_item = CopsItems(
+                os_no=os_no,
+                os_date=os_obj.os_date,
+                os_year=os_year,
+                items_duty=duty,
+                **c_item.model_dump(exclude={"items_duty"})
+            )
+            db.add(db_item)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"O.S. No. {os_no}/{os_year} was just registered by another user. Please use a different number.",
         )
-        db.add(db_item)
 
-    db.commit()
     db.refresh(os_obj)
     os_obj.items = db.query(CopsItems).filter(
         CopsItems.os_no == os_no,
-        CopsItems.os_year == os_year
+        CopsItems.os_year == os_year,
+        CopsItems.entry_deleted == "N"
     ).all()
     return os_obj
 
@@ -1022,7 +1029,8 @@ def get_os(
 
     os_obj.items = db.query(CopsItems).filter(
         CopsItems.os_no == os_no,
-        CopsItems.os_year == os_year
+        CopsItems.os_year == os_year,
+        CopsItems.entry_deleted == "N"
     ).all()
     return os_obj
 
@@ -1092,6 +1100,11 @@ def update_os(
         os_obj.ref_amount = 0.0
         os_obj.total_payable = 0.0
         os_obj.closure_ind = None
+        # Also clear post-adjudication receipt links so they don't persist stale
+        # references if the case is re-adjudicated with different payment details.
+        os_obj.post_adj_br_entries = None
+        os_obj.post_adj_dr_no = None
+        os_obj.post_adj_dr_date = None
     elif os_obj.os_printed == 'Y':
         # Not adjudicated but already printed — block modification
         raise HTTPException(
@@ -1160,7 +1173,9 @@ def update_os(
     db.commit()
     db.refresh(os_obj)
     os_obj.items = db.query(CopsItems).filter(
-        CopsItems.os_no == os_no, CopsItems.os_year == os_year
+        CopsItems.os_no == os_no,
+        CopsItems.os_year == os_year,
+        CopsItems.entry_deleted == "N"
     ).all()
     return os_obj
 
