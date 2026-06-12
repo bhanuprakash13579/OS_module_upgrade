@@ -725,6 +725,10 @@ def health_check():
 
 @app.get("/")
 def root():
+    # When frontend dist is available, redirect browser to the SPA entry point.
+    if _frontend_dist():
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/modules", status_code=302)
     return {"message": "COPS Customs Application API"}
 
 
