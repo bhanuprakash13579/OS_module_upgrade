@@ -214,14 +214,31 @@ def apply_sqlite_migrations():
                 # narrows candidates before the linear scan applies.
                 "CREATE INDEX IF NOT EXISTS ix_cops_master_pax_name             ON cops_master (pax_name)",
                 "CREATE INDEX IF NOT EXISTS ix_cops_master_country_of_departure ON cops_master (country_of_departure)",
-                # Partial UNIQUE index — enforces (os_no, os_year) uniqueness at DB
-                # level for non-deleted cases. Catches concurrent-insert races that
-                # slip past the application-level check-then-insert.
-                # SQLite supports WHERE clauses on indexes (partial indexes).
-                "CREATE UNIQUE INDEX IF NOT EXISTS uq_cops_master_os_no_year_active "
-                "ON cops_master (os_no, os_year) WHERE entry_deleted = 'N'",
             ]:
                 conn.execute(text(idx_ddl))
+
+            # Partial UNIQUE index on (os_no, os_year) for active cases.
+            # Must be applied AFTER all regular indexes so this block can do a
+            # pre-flight duplicate check and log clearly instead of silently failing.
+            _dup_rows = conn.execute(text(
+                "SELECT os_no, os_year, COUNT(*) AS cnt "
+                "FROM cops_master WHERE entry_deleted = 'N' "
+                "GROUP BY os_no, os_year HAVING cnt > 1"
+            )).fetchall()
+            if _dup_rows:
+                _dup_summary = ", ".join(f"{r[0]}/{r[1]}(x{r[2]})" for r in _dup_rows[:10])
+                logger.critical(
+                    "UNIQUE index on (os_no, os_year) cannot be created — "
+                    "duplicate active cases found: %s%s. "
+                    "Resolve duplicates via the admin panel or DB tool, then restart.",
+                    _dup_summary,
+                    " …and more" if len(_dup_rows) > 10 else "",
+                )
+            else:
+                conn.execute(text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_cops_master_os_no_year_active "
+                    "ON cops_master (os_no, os_year) WHERE entry_deleted = 'N'"
+                ))
 
             conn.commit()
         except Exception as e:
@@ -555,11 +572,12 @@ def _seed_print_template_config():
 
 def _load_state_from_db():
     """
-    Populate app.state from environment + DB.
+    Populate app.state (app/state.py) from environment + DB.
     prod_mode is set by the COPS_ENV environment variable (code/deploy-time decision).
-    The IP whitelist is admin-configurable at runtime via the DB.
+    The IP whitelist and trial state are admin-configurable at runtime via the DB.
     """
     from app.models.security import AllowedDevice
+    from app.models.config import FeatureFlags
 
     # Mode is code-only — set COPS_ENV=production to enable
     state.prod_mode = settings.COPS_ENV.strip().lower() == "production"
@@ -570,8 +588,23 @@ def _load_state_from_db():
         state.allowed_ips = {d.ip_address for d in devices if d.ip_address}
         mode_label = "PRODUCTION" if state.prod_mode else "DEVELOPMENT"
         logger.info("App mode: %s | Whitelisted IPs: %d", mode_label, len(state.allowed_ips))
+
+        # Load trial state so middleware can enforce expiry without a per-request DB query
+        flags = db.query(FeatureFlags).first()
+        if flags and not getattr(flags, "trial_disabled", True):
+            try:
+                from datetime import date as _date
+                start = _date.fromisoformat(flags.trial_start_date)
+                trial_days = int(flags.trial_days or 30)
+                days_elapsed = (_date.today() - start).days
+                state.trial_expired = days_elapsed > trial_days
+            except Exception:
+                state.trial_expired = False
+        else:
+            state.trial_expired = False  # disabled = no expiry enforcement
     except Exception as e:
         logger.warning("State load error: %s", e)
+        state.trial_expired = False
     finally:
         db.close()
 
@@ -694,6 +727,15 @@ async def security_middleware(request: Request, call_next):
         return JSONResponse(
             status_code=403,
             content={"detail": "Delete is not allowed from a slave terminal. Only the master terminal can delete records."}
+        )
+
+    # 6. Trial expiry — block all data-write operations when trial has ended.
+    #    GET (read) and OPTIONS are allowed so the UI can still load and show
+    #    the expired screen. Admin endpoints already exited at step 2.
+    if getattr(state, "trial_expired", False) and request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "Trial period has ended. Data writes are disabled. Contact gsicorp.in to renew."}
         )
 
     return await call_next(request)

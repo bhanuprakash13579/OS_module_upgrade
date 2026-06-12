@@ -16,3 +16,7 @@ prod_mode: bool = False
 # In-memory set of allowed IP addresses (refreshed from DB on every CRUD op)
 # 127.0.0.1 and ::1 are always allowed in code — not stored here.
 allowed_ips: set[str] = set()
+
+# True when the trial period has ended — all data writes are blocked at the
+# middleware level. Loaded on startup; updated live when admin resets/disables trial.
+trial_expired: bool = False

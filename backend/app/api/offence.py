@@ -327,17 +327,16 @@ def create_os(
     )
 
     db.add(os_obj)
+    # flush() assigns the DB-generated id without committing — keeps header + items
+    # in a single atomic transaction so a failure on items never orphans the header.
     try:
-        db.commit()
+        db.flush()
     except IntegrityError:
         db.rollback()
-        # Two clients passed the app-level uniqueness check simultaneously;
-        # the partial UNIQUE index on (os_no, os_year) caught the race.
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"O.S. No. {os_no}/{os_year} was just registered by another user. Please use a different number.",
         )
-    db.refresh(os_obj)
 
     for c_item in data.items:
         item_value = float(c_item.items_value or 0.0)
@@ -800,7 +799,8 @@ def bulk_import_offline_adjudication(
             imported += 1
         except Exception as e:
             db.rollback()
-            failed.append({"os_no": os_no, "os_year": os_year, "error": str(e)})
+            logger.warning("Bulk import failed for OS %s/%s: %s", os_no, os_year, e)
+            failed.append({"os_no": os_no, "os_year": os_year, "error": "Import failed — check OS number and data fields."})
 
     return {"imported": imported, "skipped": skipped, "failed": failed, "total": len(rows)}
 
@@ -1095,6 +1095,15 @@ def update_os(
         raise HTTPException(
             status_code=400,
             detail="Print Out Has Already Been Taken for The Entered O.S.No. Cannot Modify its details !"
+        )
+
+    # Guard: changing os_date to a different year would orphan all items (they
+    # are tagged with the original os_year). Reject such edits with a clear message.
+    if data.os_date and data.os_date.year != os_year:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"O.S. date cannot be changed to a different year. "
+                   f"This case is registered under year {os_year}.",
         )
 
     # Update master fields (do not allow changing O.S. No / Year via payload)

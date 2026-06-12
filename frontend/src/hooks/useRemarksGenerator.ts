@@ -426,7 +426,7 @@ export function useRemarksGenerator() {
       const text = buildAdjnRemark(items, context, allDutyOnly, confsItems, rfItems, refItems, dutyItems, statuteGroups, ctx);
       return truncate(text, limit);
     } catch (error: any) {
-      console.error('Remark generation error:', error);
+      if (import.meta.env.DEV) console.error('Remark generation error:', error);
       return '';
     }
   };

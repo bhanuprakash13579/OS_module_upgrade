@@ -98,10 +98,8 @@ def create_br(data: schemas.BrMasterCreate, db: Session = Depends(get_db), curre
     )
     
     db.add(br_obj)
-    db.commit()
-    db.refresh(br_obj)
-    
-    # Insert items
+    db.flush()  # get br_obj.id without committing; keeps header+items in one transaction
+
     for c_item in compiled_items:
         db_item = BrItems(
             br_no=br_no,
@@ -113,8 +111,9 @@ def create_br(data: schemas.BrMasterCreate, db: Session = Depends(get_db), curre
             **c_item
         )
         db.add(db_item)
-        
+
     db.commit()
+    db.refresh(br_obj)
     return br_obj
 
 

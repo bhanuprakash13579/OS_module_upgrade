@@ -66,9 +66,8 @@ def create_dr(data: schemas.DrMasterCreate, db: Session = Depends(get_db), curre
     )
     
     db.add(dr_obj)
-    db.commit()
-    db.refresh(dr_obj)
-    
+    db.flush()  # get dr_obj.id without committing; keeps header+items in one transaction
+
     for c_item in data.items:
         db_item = DrItems(
             dr_no=dr_no,
@@ -77,8 +76,9 @@ def create_dr(data: schemas.DrMasterCreate, db: Session = Depends(get_db), curre
             **c_item.model_dump()
         )
         db.add(db_item)
-        
+
     db.commit()
+    db.refresh(dr_obj)
     return dr_obj
 
 

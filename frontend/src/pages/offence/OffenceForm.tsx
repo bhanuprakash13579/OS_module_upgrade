@@ -6,6 +6,7 @@ import DatePicker from '@/components/DatePicker';
 import PassportScanner from '@/components/PassportScanner';
 import api from '@/lib/api';
 import { useRemarksGenerator, detectContextualQuestions, ContextualAnswers, ContextualQuestion } from '@/hooks/useRemarksGenerator';
+import { useAuth } from '@/contexts/AuthContext';
 
 // ── Static seed list for item-description autocomplete ───────────────────────
 // Merged at runtime with DB-fetched suggestions (most-frequent first).
@@ -510,6 +511,7 @@ export default function OffenceForm() {
 
   const isEditing = !!osNo;
   const isViewOnly = location.pathname.endsWith('/view');
+  const { user } = useAuth();
   // When the form is opened from inside the adjudication module (edit-sdo route),
   // navigate back to the adjudication case form instead of the SDO list.
   const isInAdjModule = location.pathname.startsWith('/adjudication');
@@ -592,7 +594,9 @@ export default function OffenceForm() {
   const [osNoStatus, setOsNoStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
 
   // ── Local-draft auto-save (new cases only) ──────────────────────────────────
-  const DRAFT_KEY = 'cops_new_case_draft';
+  // Key is scoped by username so two officers on the same machine in different
+  // tabs never overwrite each other's in-progress work.
+  const DRAFT_KEY = `cops_new_case_draft_${user?.user_id ?? 'anon'}`;
   const draftSaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [draftRestoredAt, setDraftRestoredAt] = useState<number | null>(null); // non-null = banner visible
 
@@ -1384,7 +1388,28 @@ export default function OffenceForm() {
                             <DatePicker
                                 id="field-os_date"
                                 value={formData.os_date}
-                                onChange={isoDate => setFormData({ ...formData, os_date: isoDate })}
+                                onChange={isoDate => {
+                                  setFormData({ ...formData, os_date: isoDate });
+                                  // Year may have changed — the previous availability result is no longer valid
+                                  if (!isEditing && formData.os_no && /^\d+$/.test(formData.os_no)) {
+                                    setOsNoStatus('idle');
+                                    clearFieldError('os_no');
+                                    clearTimeout(osNoCheckTimer.current);
+                                    osNoCheckTimer.current = setTimeout(async () => {
+                                      try {
+                                        const yr = isoDate ? new Date(isoDate).getFullYear() : new Date().getFullYear();
+                                        setOsNoStatus('checking');
+                                        const { data: result } = await api.get(`/os/check-os-no/${formData.os_no}/${yr}`);
+                                        if (result.exists) {
+                                          setOsNoStatus('taken');
+                                          setFieldError('os_no', `O.S. No. ${formData.os_no}/${yr} is already taken!`);
+                                        } else {
+                                          setOsNoStatus('available');
+                                        }
+                                      } catch { setOsNoStatus('idle'); }
+                                    }, 400);
+                                  }
+                                }}
                                 inputClassName="w-full px-3 py-2 bg-slate-50 border border-slate-300 focus:ring-brand-500 rounded focus:ring-2 text-sm"
                                 error={!!fieldErrors.os_date}
                             />
