@@ -177,6 +177,7 @@ if settings.DATABASE_URL.startswith("sqlite"):
             # Explicitly state page size 4096 since the DB was migrated from a stock SQLite database
             conn.execute("PRAGMA cipher_page_size = 4096")
             conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA busy_timeout=5000")        # wait up to 5 s if another writer holds the lock
             conn.execute("PRAGMA foreign_keys=ON")
             conn.execute("PRAGMA synchronous=NORMAL")
             conn.execute("PRAGMA cache_size=-32000")
@@ -222,6 +223,7 @@ if settings.DATABASE_URL.startswith("sqlite"):
         def set_sqlite_pragma(dbapi_connection, connection_record):
             cursor = dbapi_connection.cursor()
             cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA busy_timeout=5000")      # wait up to 5 s if another writer holds the lock
             cursor.execute("PRAGMA foreign_keys=ON")
             cursor.execute("PRAGMA synchronous=NORMAL")
             cursor.execute("PRAGMA cache_size=-32000")
