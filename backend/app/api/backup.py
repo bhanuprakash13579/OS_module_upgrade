@@ -707,9 +707,19 @@ def _item_col_val(item, col: str) -> str:
     return _val(getattr(item, col, None))
 
 
+def _name_score(a: str, b: str) -> float:
+    """Token-overlap name similarity (0..1). Mirrors frontend nameScore()."""
+    if not a or not b:
+        return 0.0
+    ta = set(a.upper().split())
+    tb = set(b.upper().split())
+    return len(ta & tb) / max(len(ta), len(tb), 1)
+
+
 class OsListItem(BaseModel):
     os_no: str
-    os_year: int
+    os_year: Optional[int] = None   # null = year unknown; backend resolves via pax_name
+    pax_name: Optional[str] = None
 
 class CustomReportRequest(BaseModel):
     master_cols: List[str]
@@ -758,12 +768,58 @@ def custom_report(
     q = db.query(CopsMaster).filter(CopsMaster.entry_deleted == "N")
 
     if body.os_list is not None:
-        # Excel-upload mode: match exactly these (os_no, os_year) pairs
         if not body.os_list:
-            return {"columns": body.master_cols + body.item_cols, "rows": [], "total": 0}
+            return {"columns": body.master_cols + body.item_cols, "rows": [], "total": 0,
+                    "not_found": [], "resolved_by_name": []}
+
+        # ── Resolve items whose year is unknown via passenger name matching ──────
+        exact_pairs: list[tuple[str, int]] = [
+            (item.os_no, item.os_year) for item in body.os_list if item.os_year is not None
+        ]
+        fuzzy_items = [item for item in body.os_list if item.os_year is None]
+        resolved_by_name: list[dict] = []
+        unresolved: list[dict] = []
+
+        if fuzzy_items:
+            fuzzy_nos = list({item.os_no for item in fuzzy_items})
+            candidates = (
+                db.query(CopsMaster.os_no, CopsMaster.os_year, CopsMaster.pax_name)
+                .filter(CopsMaster.entry_deleted == "N", CopsMaster.os_no.in_(fuzzy_nos))
+                .all()
+            )
+            from collections import defaultdict as _dd
+            cands_map: dict = _dd(list)
+            for c in candidates:
+                cands_map[c.os_no].append(c)
+
+            for item in fuzzy_items:
+                cands = cands_map.get(item.os_no, [])
+                if not cands:
+                    unresolved.append({"os_no": item.os_no, "os_year": None, "reason": "not_found"})
+                elif len(cands) == 1:
+                    exact_pairs.append((item.os_no, cands[0].os_year))
+                    resolved_by_name.append({"os_no": item.os_no, "resolved_year": cands[0].os_year,
+                                             "matched_name": cands[0].pax_name or "", "method": "unique"})
+                elif item.pax_name:
+                    best = max(cands, key=lambda c: _name_score(item.pax_name, c.pax_name or ""))
+                    score = _name_score(item.pax_name, best.pax_name or "")
+                    if score >= 0.3:
+                        exact_pairs.append((item.os_no, best.os_year))
+                        resolved_by_name.append({"os_no": item.os_no, "resolved_year": best.os_year,
+                                                  "matched_name": best.pax_name or "",
+                                                  "score": round(score, 2), "method": "name_match"})
+                    else:
+                        unresolved.append({"os_no": item.os_no, "os_year": None, "reason": "low_confidence"})
+                else:
+                    unresolved.append({"os_no": item.os_no, "os_year": None, "reason": "ambiguous"})
+
+        if not exact_pairs:
+            return {"columns": body.master_cols + body.item_cols, "rows": [], "total": 0,
+                    "not_found": unresolved, "resolved_by_name": resolved_by_name}
+
         pair_conditions = [
-            and_(CopsMaster.os_no == item.os_no, CopsMaster.os_year == item.os_year)
-            for item in body.os_list
+            and_(CopsMaster.os_no == no, CopsMaster.os_year == yr)
+            for no, yr in exact_pairs
         ]
         q = q.filter(or_(*pair_conditions))
     else:
@@ -828,17 +884,19 @@ def custom_report(
         else:
             rows.append(master_data)
 
-    # When os_list was provided, include a "not_found" list for the caller.
-    not_found: list[dict] = []
+    # When os_list was provided, compute not_found = unresolved + exact pairs that weren't in DB.
     if body.os_list is not None:
         found_pairs = {(m.os_no, m.os_year) for m in masters}
-        not_found = [
-            {"os_no": item.os_no, "os_year": item.os_year}
-            for item in body.os_list
-            if (item.os_no, item.os_year) not in found_pairs
+        db_not_found = [
+            {"os_no": no, "os_year": yr, "reason": "not_found"}
+            for no, yr in exact_pairs
+            if (no, yr) not in found_pairs
         ]
+        return {"columns": all_cols, "rows": rows, "total": len(rows),
+                "not_found": unresolved + db_not_found,
+                "resolved_by_name": resolved_by_name}
 
-    return {"columns": all_cols, "rows": rows, "total": len(rows), "not_found": not_found}
+    return {"columns": all_cols, "rows": rows, "total": len(rows), "not_found": [], "resolved_by_name": []}
 
 
 # ── Custom Report: BR / DR ────────────────────────────────────────────────────
