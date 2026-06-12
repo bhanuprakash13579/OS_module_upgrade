@@ -39,9 +39,8 @@ def create_wh(data: schemas.WhMasterCreate, db: Session = Depends(get_db), curre
         passport_no=dr.passport_no
     )
     db.add(wh_obj)
-    db.commit()
-    db.refresh(wh_obj)
-    
+    db.flush()  # send INSERT for header without committing; keeps header+items atomic
+
     for c_item in data.items:
         db_item = WhItems(
             wh_no=wh_no,
@@ -52,8 +51,9 @@ def create_wh(data: schemas.WhMasterCreate, db: Session = Depends(get_db), curre
             **c_item.model_dump()
         )
         db.add(db_item)
-        
+
     db.commit()
+    db.refresh(wh_obj)
     return wh_obj
 
 @router.post("/valuables")
@@ -77,8 +77,8 @@ def create_valuables(data: schemas.ValuablesMasterCreate, db: Session = Depends(
         closure_ind="N"
     )
     db.add(wh_obj)
-    db.commit()
-    
+    db.flush()  # send INSERT for header without committing; keeps header+items atomic
+
     for c_item in data.items:
         db_item = ValuablesItems(
             wh_no=wh_no,
@@ -89,6 +89,6 @@ def create_valuables(data: schemas.ValuablesMasterCreate, db: Session = Depends(
             **c_item.model_dump()
         )
         db.add(db_item)
-        
+
     db.commit()
     return {"message": "Valuables stored successfully", "wh_no": wh_no}

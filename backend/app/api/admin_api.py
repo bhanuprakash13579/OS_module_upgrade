@@ -47,7 +47,6 @@ from app.models.masters import (
 )
 from app.models.baggage import BrMaster, BrItems
 from app.api.masters import bust_all_master_caches
-import app.state as _app_state
 from app.models.detention import DrMaster, DrItems
 from app.models.fuel import FuelMaster
 from app.models.offence import OsMaster, ItemTrans
@@ -328,7 +327,8 @@ def reset_trial(db: Session = Depends(get_db)):
     flags.trial_start_date = str(date.today())
     flags.trial_disabled = False
     db.commit()
-    _app_state.trial_expired = False  # unblock writes immediately
+    state.trial_start_date = flags.trial_start_date
+    state.trial_disabled = False
     days = int(flags.trial_days or 30)
     return {"trial_start_date": flags.trial_start_date, "trial_disabled": False,
             "trial_days": days,
@@ -344,7 +344,7 @@ def disable_trial(db: Session = Depends(get_db)):
         db.add(flags)
     flags.trial_disabled = True
     db.commit()
-    _app_state.trial_expired = False  # permanent install — never block writes
+    state.trial_disabled = True
     return {"trial_disabled": True,
             "message": "Trial disabled — installation is now permanent"}
 
@@ -369,7 +369,9 @@ def set_trial_days(payload: _TrialDaysPayload, db: Session = Depends(get_db)):
     flags.trial_start_date = str(date.today())
     flags.trial_disabled = False
     db.commit()
-    _app_state.trial_expired = False  # fresh window — unblock writes
+    state.trial_start_date = flags.trial_start_date
+    state.trial_days = days
+    state.trial_disabled = False
     return {"trial_days": days, "trial_start_date": str(date.today()),
             "message": f"Trial set to {days} day{'s' if days != 1 else ''} from today"}
 

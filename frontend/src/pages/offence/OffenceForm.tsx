@@ -56,6 +56,10 @@ const DUTY_TYPE_OPTIONS = DUTY_TYPES.map(type => (
   <option key={type} value={type}>{type}</option>
 ));
 
+// Monotonic counter for stable item keys — avoids key={idx} reuse on add/remove
+let _itemKeySeq = 0;
+const _mkItemKey = () => `itm-${++_itemKeySeq}`;
+
 // Module-level constants — defined once, never reallocated per render
 
 // Maps MRZ ISO 3-letter country codes → display nationality names.
@@ -564,6 +568,7 @@ export default function OffenceForm() {
   });
 
   const [items, setItems] = useState<any[]>([{
+      _key: _mkItemKey(),
       items_desc: '',
       items_qty: 1,
       items_uqc: 'NOS',
@@ -591,6 +596,9 @@ export default function OffenceForm() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [itemErrors, setItemErrors] = useState<Record<number, Record<string, string>>>({});
   const osNoCheckTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // submitDataRef: always points to the current render's submitData so the
+  // stable Ctrl+S event listener never calls a stale closure.
+  const submitDataRef = useRef<(draftValue: string) => void>(() => {});
   const [osNoStatus, setOsNoStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
 
   // ── Local-draft auto-save (new cases only) ──────────────────────────────────
@@ -600,9 +608,11 @@ export default function OffenceForm() {
   const draftSaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [draftRestoredAt, setDraftRestoredAt] = useState<number | null>(null); // non-null = banner visible
 
-  // On mount: offer to restore draft if one exists and the form is still empty
+  // Offer to restore draft once auth has resolved (user_id in deps so it re-runs
+  // when the AuthContext finishes loading after mount).
   useEffect(() => {
     if (isEditing) return;
+    if (!user?.user_id) return; // wait until auth resolves — DRAFT_KEY is 'anon' until then
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
       if (!raw) return;
@@ -612,7 +622,7 @@ export default function OffenceForm() {
       }
     } catch { localStorage.removeItem(DRAFT_KEY); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user?.user_id, isEditing]);
 
   // Auto-save silently 1.5 s after any change (new cases only)
   useEffect(() => {
@@ -627,7 +637,7 @@ export default function OffenceForm() {
       } catch { /* storage full — silently ignore */ }
     }, 1500);
     return () => clearTimeout(draftSaveTimer.current);
-  }, [formData, items, supdtsRemarks, isEditing]);
+  }, [DRAFT_KEY, formData, items, supdtsRemarks, isEditing]);
 
   const clearDraft = () => {
     clearTimeout(draftSaveTimer.current);
@@ -806,17 +816,20 @@ export default function OffenceForm() {
   // Abort all pending classify calls on unmount
   useEffect(() => () => { Object.values(classifyAbortRefs.current).forEach(c => c.abort()); }, []);
 
-  // Ctrl+S / Cmd+S → save as draft without leaving the page
+  // Ctrl+S / Cmd+S → save as draft without leaving the page.
+  // The listener is registered once (empty deps) and stays stable across renders.
+  // It calls submitDataRef.current so it always invokes the latest submitData,
+  // never a stale closure from the first render.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
-        submitData('Y');
+        submitDataRef.current('Y');
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const onDescBlur = useCallback(async (idx: number, desc: string) => {
     if (!desc || desc.trim().length < 3) return;
@@ -1170,6 +1183,11 @@ export default function OffenceForm() {
     }
   };
 
+  // Keep submitDataRef in sync with the current render's submitData so the
+  // stable Ctrl+S listener always calls the latest version (no stale closure).
+  // No deps = runs after every render, negligible cost.
+  useEffect(() => { submitDataRef.current = submitData; });
+
   const handleScan = useCallback((scanData: any) => {
     if (scanData.type === 'PASSPORT') {
         let mappedNationality = scanData.nationality?.toUpperCase();
@@ -1395,14 +1413,16 @@ export default function OffenceForm() {
                                     setOsNoStatus('idle');
                                     clearFieldError('os_no');
                                     clearTimeout(osNoCheckTimer.current);
+                                    // Capture os_no NOW (before the async gap) to avoid stale closure
+                                    const _osNo = formData.os_no;
                                     osNoCheckTimer.current = setTimeout(async () => {
                                       try {
                                         const yr = isoDate ? new Date(isoDate).getFullYear() : new Date().getFullYear();
                                         setOsNoStatus('checking');
-                                        const { data: result } = await api.get(`/os/check-os-no/${formData.os_no}/${yr}`);
+                                        const { data: result } = await api.get(`/os/check-os-no/${_osNo}/${yr}`);
                                         if (result.exists) {
                                           setOsNoStatus('taken');
-                                          setFieldError('os_no', `O.S. No. ${formData.os_no}/${yr} is already taken!`);
+                                          setFieldError('os_no', `O.S. No. ${_osNo}/${yr} is already taken!`);
                                         } else {
                                           setOsNoStatus('available');
                                         }
@@ -1666,7 +1686,7 @@ export default function OffenceForm() {
                     <FileText className="mr-2 text-orange-500" size={16} /> Seized Goods Registration
                 </h2>
                 <button 
-                   onClick={(e) => { e.preventDefault(); setItems([...items, { items_desc: '', items_qty: 1, items_uqc: 'NOS', value_per_piece: 0, items_value: 0, items_fa: 0, items_fa_type: 'value', items_fa_qty: 0, items_fa_uqc: 'NOS', cumulative_duty_rate: 35, items_duty: 0, items_release_category: '', items_duty_type: 'Miscellaneous-22'}]); }}
+                   onClick={(e) => { e.preventDefault(); setItems([...items, { _key: _mkItemKey(), items_desc: '', items_qty: 1, items_uqc: 'NOS', value_per_piece: 0, items_value: 0, items_fa: 0, items_fa_type: 'value', items_fa_qty: 0, items_fa_uqc: 'NOS', cumulative_duty_rate: 35, items_duty: 0, items_release_category: '', items_duty_type: 'Miscellaneous-22'}]); }}
                    className="text-xs px-3 py-1.5 bg-white text-orange-700 hover:bg-orange-50 border border-orange-200 rounded font-bold flex items-center transition-colors uppercase tracking-wider">
                     <Plus size={14} className="mr-1" /> Add Item
                 </button>
@@ -1698,7 +1718,7 @@ export default function OffenceForm() {
                         ) : (
                             items.map((itm, idx) => (
                                 <ItemRow
-                                    key={idx}
+                                    key={itm._key ?? String(idx)}
                                     itm={itm}
                                     idx={idx}
                                     rowErrors={itemErrors[idx]}

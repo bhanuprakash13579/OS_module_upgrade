@@ -327,33 +327,35 @@ def create_os(
     )
 
     db.add(os_obj)
-    # flush() assigns the DB-generated id without committing — keeps header + items
-    # in a single atomic transaction so a failure on items never orphans the header.
     try:
+        # flush() sends the INSERT for the header; UNIQUE constraint fires here on
+        # race condition (another user just claimed the same os_no/os_year).
+        # Wrapping commit too catches any deferred constraint that SQLAlchemy emits
+        # at transaction-end rather than at flush time.
         db.flush()
+
+        for c_item in data.items:
+            item_value = float(c_item.items_value or 0.0)
+            fa = _eff_fa(item_value, c_item)
+            rate = float(c_item.cumulative_duty_rate or 0.0)
+            duty = round(max(0.0, (item_value - fa)) * rate / 100.0, 2)
+
+            db_item = CopsItems(
+                os_no=os_no,
+                os_date=os_obj.os_date,
+                os_year=os_year,
+                items_duty=duty,
+                **c_item.model_dump(exclude={"items_duty"})
+            )
+            db.add(db_item)
+
+        db.commit()
     except IntegrityError:
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"O.S. No. {os_no}/{os_year} was just registered by another user. Please use a different number.",
         )
-
-    for c_item in data.items:
-        item_value = float(c_item.items_value or 0.0)
-        fa = _eff_fa(item_value, c_item)
-        rate = float(c_item.cumulative_duty_rate or 0.0)
-        duty = round(max(0.0, (item_value - fa)) * rate / 100.0, 2)
-
-        db_item = CopsItems(
-            os_no=os_no,
-            os_date=os_obj.os_date,
-            os_year=os_year,
-            items_duty=duty,
-            **c_item.model_dump(exclude={"items_duty"})
-        )
-        db.add(db_item)
-
-    db.commit()
     db.refresh(os_obj)
     os_obj.items = db.query(CopsItems).filter(
         CopsItems.os_no == os_no,

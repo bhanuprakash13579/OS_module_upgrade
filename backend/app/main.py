@@ -19,6 +19,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError as _IntegrityError, OperationalError as _OperationalError
 
 from app.config import settings
 from app.database import engine, Base, SessionLocal
@@ -589,22 +590,18 @@ def _load_state_from_db():
         mode_label = "PRODUCTION" if state.prod_mode else "DEVELOPMENT"
         logger.info("App mode: %s | Whitelisted IPs: %d", mode_label, len(state.allowed_ips))
 
-        # Load trial state so middleware can enforce expiry without a per-request DB query
+        # Load trial config so middleware can compute expiry dynamically each request.
+        # Storing the raw values (not a pre-computed boolean) means midnight transitions
+        # are detected without requiring a server restart.
         flags = db.query(FeatureFlags).first()
-        if flags and not getattr(flags, "trial_disabled", True):
-            try:
-                from datetime import date as _date
-                start = _date.fromisoformat(flags.trial_start_date)
-                trial_days = int(flags.trial_days or 30)
-                days_elapsed = (_date.today() - start).days
-                state.trial_expired = days_elapsed > trial_days
-            except Exception:
-                state.trial_expired = False
+        if flags:
+            state.trial_disabled = bool(getattr(flags, "trial_disabled", True))
+            state.trial_start_date = getattr(flags, "trial_start_date", None)
+            state.trial_days = int(getattr(flags, "trial_days", 30) or 30)
         else:
-            state.trial_expired = False  # disabled = no expiry enforcement
+            state.trial_disabled = True
     except Exception as e:
         logger.warning("State load error: %s", e)
-        state.trial_expired = False
     finally:
         db.close()
 
@@ -730,13 +727,22 @@ async def security_middleware(request: Request, call_next):
         )
 
     # 6. Trial expiry — block all data-write operations when trial has ended.
-    #    GET (read) and OPTIONS are allowed so the UI can still load and show
-    #    the expired screen. Admin endpoints already exited at step 2.
-    if getattr(state, "trial_expired", False) and request.method in ("POST", "PUT", "PATCH", "DELETE"):
-        return JSONResponse(
-            status_code=403,
-            content={"detail": "Trial period has ended. Data writes are disabled. Contact gsicorp.in to renew."}
-        )
+    #    Computed fresh on every request so midnight expiry is detected immediately
+    #    without a server restart. Admin endpoints already exited at step 2.
+    if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        _trial_expired = False
+        if not getattr(state, "trial_disabled", True):
+            try:
+                from datetime import date as _d
+                _start = _d.fromisoformat(state.trial_start_date)
+                _trial_expired = (_d.today() - _start).days > state.trial_days
+            except Exception:
+                pass
+        if _trial_expired:
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Trial period has ended. Data writes are disabled. Contact gsicorp.in to renew."}
+            )
 
     return await call_next(request)
 
@@ -758,6 +764,26 @@ app.add_middleware(
 )
 # GZip added last = outermost. Compresses responses ≥ 1 KB (60-80% smaller payloads).
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+
+# ── Global DB Exception Handlers ─────────────────────────────────
+# These catch any IntegrityError / OperationalError that escapes an individual
+# route (e.g. the 28+ db.commit() calls across admin, statutes, masters, revenue,
+# sync that are not individually wrapped in try/except).
+@app.exception_handler(_IntegrityError)
+async def _integrity_error_handler(request: Request, exc: _IntegrityError):
+    return JSONResponse(
+        status_code=409,
+        content={"detail": "A record with the same key already exists. Refresh and try again."},
+    )
+
+@app.exception_handler(_OperationalError)
+async def _operational_error_handler(request: Request, exc: _OperationalError):
+    logger.error("DB operational error on %s %s: %s", request.method, request.url.path, exc)
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Database is temporarily unavailable. Please try again in a moment."},
+    )
 
 
 # ── Health Check ─────────────────────────────────────────────────

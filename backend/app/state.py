@@ -17,6 +17,9 @@ prod_mode: bool = False
 # 127.0.0.1 and ::1 are always allowed in code — not stored here.
 allowed_ips: set[str] = set()
 
-# True when the trial period has ended — all data writes are blocked at the
-# middleware level. Loaded on startup; updated live when admin resets/disables trial.
-trial_expired: bool = False
+# Trial configuration — loaded from DB at startup, updated live by admin endpoints.
+# trial_expired is computed dynamically at each request using these values so that
+# midnight expiry is detected without needing a server restart.
+trial_disabled: bool = True          # True = no trial enforcement (permanent install)
+trial_start_date: str | None = None  # ISO date string "YYYY-MM-DD"
+trial_days: int = 30
