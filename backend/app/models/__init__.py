@@ -40,6 +40,12 @@ from app.models.appeal import AppealMaster, AppealItems
 # Revenue (3 tables)
 from app.models.revenue import Revenue, RevChallans, ChallanMaster
 
+# Duty Collection Report (8 tables)
+from app.models.duty_report import (
+    DrTariff, DrItemType, DrSession, DrEntry, DrDrEntry, DrOsEntry, DrSettings,
+    DrFormulaRule
+)
+
 # Audit/Tracking (22 tables)
 from app.models.audit import (
     CopsMasterDeleted, CopsItemsDeleted,
@@ -94,6 +100,9 @@ __all__ = [
     "AppealMaster", "AppealItems",
     # Revenue
     "Revenue", "RevChallans", "ChallanMaster",
+    # Duty Collection Report
+    "DrTariff", "DrItemType", "DrSession", "DrEntry", "DrDrEntry", "DrOsEntry", "DrSettings",
+    "DrFormulaRule",
     # Audit
     "CopsMasterDeleted", "CopsItemsDeleted",
     "CopsMasterTemp", "CopsItemsTemp",

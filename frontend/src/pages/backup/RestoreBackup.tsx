@@ -95,6 +95,7 @@ export default function RestoreBackup() {
 
   // Feature flags
   const [apisEnabled, setApisEnabled] = useState(false);
+  const [revenueEnabled, setRevenueEnabled] = useState(false);
   const [flagsLoading, setFlagsLoading] = useState(false);
   const [flagsMsg, setFlagsMsg] = useState('');
 
@@ -190,7 +191,10 @@ export default function RestoreBackup() {
       .then(r => setDeviceInfo(r.data)).catch(() => {});
     loadUsers();
     api.get('/admin/features', { headers: adminHeaders(adminToken) })
-      .then(r => setApisEnabled(!!r.data.apis_enabled)).catch(() => {});
+      .then(r => {
+        setApisEnabled(!!r.data.apis_enabled);
+        setRevenueEnabled(!!r.data.revenue_enabled);
+      }).catch(() => {});
     api.get('/admin/mode', { headers: adminHeaders(adminToken) })
       .then(r => { setProdMode(!!r.data.prod_mode); })
       .catch(() => {});
@@ -265,9 +269,27 @@ export default function RestoreBackup() {
     setFlagsLoading(true);
     setFlagsMsg('');
     try {
-      const res = await api.post('/admin/features', { apis_enabled: enable }, { headers: adminHeaders(adminToken) });
+      const res = await api.post('/admin/features',
+        { apis_enabled: enable, revenue_enabled: revenueEnabled },
+        { headers: adminHeaders(adminToken) });
       setApisEnabled(!!res.data.apis_enabled);
       setFlagsMsg(enable ? 'COPS ↔ APIS module enabled.' : 'COPS ↔ APIS module disabled.');
+    } catch (err: any) {
+      setFlagsMsg(err.response?.data?.detail || 'Failed to update feature flag.');
+    } finally {
+      setFlagsLoading(false);
+    }
+  };
+
+  const toggleRevenue = async (enable: boolean) => {
+    setFlagsLoading(true);
+    setFlagsMsg('');
+    try {
+      const res = await api.post('/admin/features',
+        { apis_enabled: apisEnabled, revenue_enabled: enable },
+        { headers: adminHeaders(adminToken) });
+      setRevenueEnabled(!!res.data.revenue_enabled);
+      setFlagsMsg(enable ? 'Revenue Report module enabled.' : 'Revenue Report module disabled.');
     } catch (err: any) {
       setFlagsMsg(err.response?.data?.detail || 'Failed to update feature flag.');
     } finally {
@@ -680,7 +702,12 @@ export default function RestoreBackup() {
         parts.push(`DR: ${d.dr_inserted} inserted (${d.dr_skipped} skipped), ${d.dr_items_inserted ?? 0} items`);
       if ((d.users_inserted ?? 0) > 0)
         parts.push(`Users: ${d.users_inserted} added`);
-      setRestoreResult(parts.length ? `Restored — ${parts.join(' | ')}` : 'Restore complete (no new records found).');
+      const dcrCount = (d.dcr_tariffs_inserted ?? 0) + (d.dcr_sessions_inserted ?? 0) + (d.dcr_entries_inserted ?? 0);
+      if (dcrCount > 0)
+        parts.push(`DCR: ${d.dcr_sessions_inserted ?? 0} sessions, ${d.dcr_entries_inserted ?? 0} entries, ${d.dcr_tariffs_inserted ?? 0} tariffs`);
+      let resultMsg = parts.length ? `Restored — ${parts.join(' | ')}` : 'Restore complete (no new records found).';
+      if (d.dcr_restore_warning) resultMsg += `\nDCR warning: ${d.dcr_restore_warning}`;
+      setRestoreResult(resultMsg);
       setRestoreFile(null);
       if (restoreRef.current) restoreRef.current.value = '';
     } catch (err: any) {
@@ -1303,6 +1330,23 @@ export default function RestoreBackup() {
                   apisEnabled ? 'bg-violet-600 hover:bg-violet-700 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
                 }`}>
                 {apisEnabled ? <><ToggleRight size={16} /> Enabled</> : <><ToggleLeft size={16} /> Disabled</>}
+              </button>
+            </div>
+            <div className="flex items-center justify-between bg-slate-50 rounded-xl border border-slate-200 px-4 py-3">
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${revenueEnabled ? 'bg-teal-100' : 'bg-slate-100'}`}>
+                  <Settings size={16} className={revenueEnabled ? 'text-teal-600' : 'text-slate-400'} />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-slate-700">Revenue Report</p>
+                  <p className="text-xs text-slate-500">Duty collection report — digital replacement for the Excel DCR workflow</p>
+                </div>
+              </div>
+              <button type="button" disabled={flagsLoading} onClick={() => toggleRevenue(!revenueEnabled)}
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors disabled:opacity-60 ${
+                  revenueEnabled ? 'bg-teal-600 hover:bg-teal-700 text-white' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                }`}>
+                {revenueEnabled ? <><ToggleRight size={16} /> Enabled</> : <><ToggleLeft size={16} /> Disabled</>}
               </button>
             </div>
             {flagsMsg && <p className={`text-xs ${flagsMsg.includes('Failed') ? 'text-red-600' : 'text-emerald-700'}`}>{flagsMsg}</p>}

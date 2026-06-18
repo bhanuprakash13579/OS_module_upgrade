@@ -14,6 +14,7 @@ const SDOModule = lazy(() => import('./pages/sdo'));
 const AdjudicationModule = lazy(() => import('./pages/adjudication'));
 const QueryModule = lazy(() => import('./pages/query'));
 const ApisModule = lazy(() => import('./pages/apis'));
+const RevenueModule = lazy(() => import('./pages/revenue'));
 const RestoreBackup = lazy(() => import('./pages/backup/RestoreBackup'));
 
 // Minimal fallback shown while a lazy module chunk is loading (first navigation only)
@@ -117,6 +118,7 @@ function QueryRoute({ children }: { children: React.ReactNode }) {
 
 // Module-level cache — feature flags don't change during a session
 let _apisEnabledCache: boolean | null = null;
+let _revenueEnabledCache: boolean | null = null;
 
 // APIS guard (SDO and Adjn roles + feature flag must be enabled)
 function ApisRoute({ children }: { children: React.ReactNode }) {
@@ -134,6 +136,24 @@ function ApisRoute({ children }: { children: React.ReactNode }) {
   if (!enabled) return <Navigate to="/modules" replace />;
   if (!isAuthenticated) return <Navigate to="/login/apis" replace />;
   if (!canAccessApis()) return <Navigate to="/login/apis" replace />;
+  return <>{children}</>;
+}
+
+// Revenue guard — same pattern as ApisRoute
+function RevenueRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth();
+  const [enabled, setEnabled] = useState<boolean | null>(_revenueEnabledCache);
+
+  useEffect(() => {
+    if (_revenueEnabledCache !== null) return;
+    api.get('/features')
+      .then(r => { _revenueEnabledCache = !!r.data.revenue_enabled; setEnabled(_revenueEnabledCache); })
+      .catch(() => { _revenueEnabledCache = false; setEnabled(false); });
+  }, []);
+
+  if (enabled === null) return <div className="min-h-screen bg-slate-900" />;
+  if (!enabled) return <Navigate to="/modules" replace />;
+  if (!isAuthenticated) return <Navigate to="/login/sdo" replace />;
   return <>{children}</>;
 }
 
@@ -184,6 +204,16 @@ function AppRoutes() {
           <ApisRoute>
             <ApisModule />
           </ApisRoute>
+        }
+      />
+
+      {/* Revenue Report Module — any authenticated user, feature flag must be enabled */}
+      <Route
+        path="/revenue/*"
+        element={
+          <RevenueRoute>
+            <RevenueModule />
+          </RevenueRoute>
         }
       />
 

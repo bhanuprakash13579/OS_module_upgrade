@@ -54,6 +54,16 @@ from app.models.warehouse import WhMaster, WhItems, WhRelease, WhLocationChange,
 from app.models.mhb import MahazarMaster, MahazarItems, MhbMaster, MhbItems
 from app.models.appeal import AppealMaster, AppealItems
 from app.models.revenue import Revenue, RevChallans, ChallanMaster
+from app.models.duty_report import (
+    DrTariff    as DcrTariff,
+    DrItemType  as DcrItemType,
+    DrSession   as DcrSession,
+    DrEntry     as DcrEntry,
+    DrDrEntry   as DcrDrEntry,
+    DrOsEntry   as DcrOsEntry,
+    DrSettings  as DcrSettings,
+    DrFormulaRule as DcrFormulaRule,
+)
 import app.state as state
 from app.api.backup import (
     _MASTER_COLS, _ITEMS_COLS, _val, _parse_date, _flt,
@@ -195,6 +205,7 @@ router = APIRouter()
 
 class FeatureFlagUpdate(BaseModel):
     apis_enabled: bool
+    revenue_enabled: bool = False
 
 
 class AllowedDeviceCreate(BaseModel):
@@ -283,8 +294,11 @@ def get_feature_flags(db: Session = Depends(get_db)):
     """Return current feature flag values."""
     flags = db.query(FeatureFlags).first()
     if not flags:
-        return {"apis_enabled": False}
-    return {"apis_enabled": bool(flags.apis_enabled)}
+        return {"apis_enabled": False, "revenue_enabled": False}
+    return {
+        "apis_enabled": bool(flags.apis_enabled),
+        "revenue_enabled": bool(getattr(flags, "revenue_enabled", False)),
+    }
 
 
 @router.post("/features", dependencies=[Depends(require_admin)])
@@ -292,12 +306,17 @@ def set_feature_flags(body: FeatureFlagUpdate, db: Session = Depends(get_db)):
     """Enable or disable optional modules."""
     flags = db.query(FeatureFlags).first()
     if not flags:
-        flags = FeatureFlags(apis_enabled=body.apis_enabled)
+        flags = FeatureFlags(apis_enabled=body.apis_enabled,
+                             revenue_enabled=body.revenue_enabled)
         db.add(flags)
     else:
         flags.apis_enabled = body.apis_enabled
+        flags.revenue_enabled = body.revenue_enabled
     db.commit()
-    return {"apis_enabled": bool(flags.apis_enabled)}
+    return {
+        "apis_enabled": bool(flags.apis_enabled),
+        "revenue_enabled": bool(flags.revenue_enabled),
+    }
 
 
 def _refresh_whitelist(db: Session):
@@ -561,28 +580,27 @@ def admin_export_full(db: Session = Depends(get_db), _=Depends(require_admin)):
     Full database export — ALL OS cases and items, no date filter.
     Returns a ZIP containing cops_master.csv and cops_items.csv.
     """
-    masters = (
-        db.query(CopsMaster)
-        .order_by(CopsMaster.os_date, CopsMaster.os_no)
-        .all()
-    )
-    items = (
-        db.query(CopsItems)
-        .order_by(CopsItems.os_date, CopsItems.os_no, CopsItems.items_sno)
-        .all()
-    )
+    def _sc(cols):
+        return ", ".join(c.lstrip("_") for c in cols)
+
+    master_rows = db.execute(text(
+        f"SELECT {_sc(_MASTER_COLS)} FROM cops_master ORDER BY os_date, os_no"
+    )).fetchall()
+    items_rows = db.execute(text(
+        f"SELECT {_sc(_ITEMS_COLS)} FROM cops_items ORDER BY os_date, os_no, items_sno"
+    )).fetchall()
 
     master_buf = io.StringIO()
     mw = csv.writer(master_buf)
     mw.writerow(_MASTER_COLS)
-    for m in masters:
-        mw.writerow([_val(getattr(m, col, None)) for col in _MASTER_COLS])
+    for row in master_rows:
+        mw.writerow([_val(v) for v in row])
 
     items_buf = io.StringIO()
     iw = csv.writer(items_buf)
     iw.writerow(_ITEMS_COLS)
-    for it in items:
-        iw.writerow([_val(getattr(it, col, None)) for col in _ITEMS_COLS])
+    for row in items_rows:
+        iw.writerow([_val(v) for v in row])
 
     _STATUTE_COLS = ["keyword", "display_name", "is_prohibited",
                      "supdt_goods_clause", "adjn_goods_clause", "legal_reference"]
@@ -628,7 +646,7 @@ def admin_export_full(db: Session = Depends(get_db), _=Depends(require_admin)):
         siaw.writerow([_val(getattr(r, col, None)) for col in _SIA_COLS])
 
     # ── feature_flags (single-row settings) ───────────────────────────────────
-    _FF_COLS = ["apis_enabled", "session_timeout_minutes"]
+    _FF_COLS = ["apis_enabled", "revenue_enabled", "session_timeout_minutes"]
     ff_row = db.query(FeatureFlags).filter(FeatureFlags.id == 1).first()
     ff_buf = io.StringIO()
     ffw = csv.writer(ff_buf)
@@ -665,63 +683,147 @@ def admin_export_full(db: Session = Depends(get_db), _=Depends(require_admin)):
     for u in users:
         uw.writerow([_val(getattr(u, col, None)) for col in _USER_COLS])
 
-    zip_buf = io.BytesIO()
-    if _PYZIPPER_AVAILABLE:
-        _pwd = get_zip_password()
-        _log.info("ZIP backup: AES-256 encrypted, password length=%d chars", len(_pwd))
-        zf_ctx = _pyzipper.AESZipFile(
-            zip_buf, mode="w",
-            compression=_pyzipper.ZIP_DEFLATED,
-            compresslevel=1,               # fastest deflate — ~3-4× faster
-            encryption=_pyzipper.WZ_AES,
-        )
-        zf_ctx.setpassword(_pwd)
-    else:
-        _log.warning("ZIP backup: pyzipper NOT available — backup is UNENCRYPTED plain ZIP")
-        zf_ctx = zipfile.ZipFile(zip_buf, mode="w", compression=zipfile.ZIP_DEFLATED,
-                                compresslevel=1)
+    # ── Write ZIP to temp file (avoid holding entire backup in RAM) ──────────
+    _zip_fd, _zip_path = tempfile.mkstemp(suffix=".zip")
+    try:
+        os.close(_zip_fd)
+        if _PYZIPPER_AVAILABLE:
+            _pwd = get_zip_password()
+            _log.info("ZIP backup: AES-256 encrypted, password length=%d chars", len(_pwd))
+            zf_ctx = _pyzipper.AESZipFile(
+                _zip_path, mode="w",
+                compression=_pyzipper.ZIP_DEFLATED,
+                compresslevel=1,
+                encryption=_pyzipper.WZ_AES,
+            )
+            zf_ctx.setpassword(_pwd)
+        else:
+            _log.warning("ZIP backup: pyzipper NOT available — backup is UNENCRYPTED plain ZIP")
+            zf_ctx = zipfile.ZipFile(_zip_path, mode="w", compression=zipfile.ZIP_DEFLATED,
+                                     compresslevel=1)
 
-    with zf_ctx as zf:
-        zf.writestr("cops_master.csv", master_buf.getvalue())
-        zf.writestr("cops_items.csv", items_buf.getvalue())
-        zf.writestr("legal_statutes.csv", statutes_buf.getvalue())
-        zf.writestr("print_template_config.csv", ptc_buf.getvalue())
-        zf.writestr("baggage_rules_config.csv", brc_buf.getvalue())
-        zf.writestr("special_item_allowances.csv", sia_buf.getvalue())
-        zf.writestr("feature_flags.csv", ff_buf.getvalue())
-        zf.writestr("shift_timing_master.csv", stm_buf.getvalue())
-        zf.writestr("margin_master.csv", mm_buf.getvalue())
-        zf.writestr("users.csv", users_buf.getvalue())
-        # Export all registered tables
-        for csv_name, model, _unique_cols, order_cols in _TABLE_REGISTRY:
-            cols = _model_cols(model)
-            order_attrs = [getattr(model, c) for c in order_cols]
-            rows = db.query(model).order_by(*order_attrs).all()
-            buf = io.StringIO()
-            w = csv.writer(buf)
-            w.writerow(cols)
-            for r in rows:
-                w.writerow([_val(getattr(r, col, None)) for col in cols])
-            zf.writestr(csv_name, buf.getvalue())
-    content_length = zip_buf.tell()
-    zip_buf.seek(0)
+        with zf_ctx as zf:
+            zf.writestr("cops_master.csv", master_buf.getvalue())
+            zf.writestr("cops_items.csv", items_buf.getvalue())
+            zf.writestr("legal_statutes.csv", statutes_buf.getvalue())
+            zf.writestr("print_template_config.csv", ptc_buf.getvalue())
+            zf.writestr("baggage_rules_config.csv", brc_buf.getvalue())
+            zf.writestr("special_item_allowances.csv", sia_buf.getvalue())
+            zf.writestr("feature_flags.csv", ff_buf.getvalue())
+            zf.writestr("shift_timing_master.csv", stm_buf.getvalue())
+            zf.writestr("margin_master.csv", mm_buf.getvalue())
+            zf.writestr("users.csv", users_buf.getvalue())
 
-    def _iter_bytes(b: io.BytesIO, chunk: int = 1024 * 1024):
-        while True:
-            data = b.read(chunk)
-            if not data:
-                break
-            yield data
+            # ── All registered tables — skip any that are not yet migrated ──
+            for csv_name, model, _unique_cols, order_cols in _TABLE_REGISTRY:
+                try:
+                    cols  = _model_cols(model)
+                    tbl   = model.__tablename__
+                    sel   = ", ".join(cols)
+                    oby   = ", ".join(order_cols)
+                    trows = db.execute(text(f"SELECT {sel} FROM {tbl} ORDER BY {oby}")).fetchall()
+                    buf   = io.StringIO()
+                    w     = csv.writer(buf)
+                    w.writerow(cols)
+                    for r in trows:
+                        w.writerow([_val(v) for v in r])
+                    zf.writestr(csv_name, buf.getvalue())
+                except Exception as _tbl_err:
+                    _log.warning(
+                        "Skipping %s in backup (table may not exist yet): %s",
+                        csv_name, _tbl_err,
+                    )
+
+            # ── DCR (Duty Collection Report / Revenue Report) module backup ─
+            try:
+                def _dcr_csv_str(cols, rows) -> str:
+                    b = io.StringIO(); w2 = csv.writer(b); w2.writerow(cols)
+                    for r in rows:
+                        w2.writerow([_val(getattr(r, c, None)) for c in cols])
+                    return b.getvalue()
+
+                zf.writestr("dcr_tariffs.csv", _dcr_csv_str(
+                    _model_cols(DcrTariff),
+                    db.query(DcrTariff).order_by(DcrTariff.effective_from).all(),
+                ))
+                zf.writestr("dcr_item_types.csv", _dcr_csv_str(
+                    _model_cols(DcrItemType),
+                    db.query(DcrItemType).order_by(DcrItemType.name).all(),
+                ))
+                zf.writestr("dcr_formula_rules.csv", _dcr_csv_str(
+                    _model_cols(DcrFormulaRule),
+                    db.query(DcrFormulaRule).order_by(DcrFormulaRule.sort_order).all(),
+                ))
+                zf.writestr("dcr_settings.csv", _dcr_csv_str(
+                    _model_cols(DcrSettings),
+                    db.query(DcrSettings).all(),
+                ))
+
+                # Sessions: include tariff effective_from so restore can remap tariff FK
+                _sess_all = db.query(DcrSession).order_by(DcrSession.report_date, DcrSession.id).all()
+                _sess_map: dict = {s.id: s for s in _sess_all}
+                _tariff_eff_cache: dict = {}
+                for s in _sess_all:
+                    if s.tariff_id and s.tariff_id not in _tariff_eff_cache:
+                        _t = db.get(DcrTariff, s.tariff_id)
+                        _tariff_eff_cache[s.tariff_id] = _val(_t.effective_from) if _t else ""
+                _sess_cols = _model_cols(DcrSession)
+                _sess_buf = io.StringIO(); _sw = csv.writer(_sess_buf)
+                _sw.writerow(_sess_cols + ["_tariff_eff"])
+                for s in _sess_all:
+                    _sw.writerow(
+                        [_val(getattr(s, c, None)) for c in _sess_cols] +
+                        [_tariff_eff_cache.get(s.tariff_id or -1, "")]
+                    )
+                zf.writestr("dcr_sessions.csv", _sess_buf.getvalue())
+
+                # Entry helper: adds session natural-key columns for restore remapping
+                def _entry_csv_str(model_cls) -> str:
+                    cols = _model_cols(model_cls)
+                    b = io.StringIO(); w2 = csv.writer(b)
+                    w2.writerow(cols + ["_sess_date", "_sess_shift", "_sess_batch"])
+                    for e in db.query(model_cls).order_by(
+                        model_cls.session_id, model_cls.sort_order
+                    ).all():
+                        _s = _sess_map.get(e.session_id)
+                        w2.writerow(
+                            [_val(getattr(e, c, None)) for c in cols] + [
+                                _val(_s.report_date) if _s else "",
+                                _s.shift          if _s else "",
+                                _s.batch_name or "" if _s else "",
+                            ]
+                        )
+                    return b.getvalue()
+
+                zf.writestr("dcr_entries.csv",    _entry_csv_str(DcrEntry))
+                zf.writestr("dcr_dr_entries.csv", _entry_csv_str(DcrDrEntry))
+                zf.writestr("dcr_os_entries.csv", _entry_csv_str(DcrOsEntry))
+
+            except Exception as _dcr_err:
+                _log.warning(
+                    "DCR backup skipped (tables may not be migrated yet): %s", _dcr_err
+                )
+
+    except Exception:
+        try:
+            os.unlink(_zip_path)
+        except OSError:
+            pass
+        raise
+
+    def _del_tmp(p: str):
+        try:
+            os.unlink(p)
+        except OSError:
+            pass
 
     filename = f"cops_full_backup_{date.today().isoformat()}.zip"
-    return StreamingResponse(
-        _iter_bytes(zip_buf),
+    return FileResponse(
+        _zip_path,
         media_type="application/zip",
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
-            "Content-Length": str(content_length),
-            "Content-Encoding": "identity",
-        },
+        filename=filename,
+        headers={"Content-Encoding": "identity"},
+        background=BackgroundTask(_del_tmp, _zip_path),
     )
 
 
@@ -1321,6 +1423,204 @@ def admin_restore_backup(
             dr_items_inserted += 1
         db.flush()
 
+    # ── DCR (Duty Collection Report) restore ─────────────────────────────────
+    dcr_tariffs_ins = dcr_sessions_ins = dcr_entries_ins = 0
+    _dcr_restore_warning: str | None = None
+    try:
+        # 1. Tariffs — natural key: effective_from
+        _dcr_tariff_eff_map: dict = {}  # "YYYY-MM-DD" → DB tariff id
+        if "dcr_tariffs.csv" in zf.namelist():
+            _existing_t = {
+                _val(t.effective_from): t.id
+                for t in db.query(DcrTariff).all()
+            }
+            for row in csv.DictReader(io.StringIO(zf.read("dcr_tariffs.csv").decode("utf-8-sig"))):
+                eff = (row.get("effective_from") or "").strip()
+                if not eff:
+                    continue
+                if eff in _existing_t:
+                    _dcr_tariff_eff_map[eff] = _existing_t[eff]
+                    continue
+                _eff_date = _coerce(eff, "date")
+                if _eff_date is None:
+                    continue
+                kwargs: dict = {"effective_from": _eff_date}
+                for col in _model_cols(DcrTariff):
+                    if col == "effective_from":
+                        continue
+                    raw = (row.get(col) or "").strip()
+                    if not raw:
+                        continue
+                    v = _coerce(raw, _col_type(DcrTariff, col))
+                    if v is not None:
+                        kwargs[col] = v
+                new_t = DcrTariff(**kwargs)
+                db.add(new_t)
+                db.flush()
+                _existing_t[eff] = new_t.id
+                _dcr_tariff_eff_map[eff] = new_t.id
+                dcr_tariffs_ins += 1
+            _dcr_tariff_eff_map.update({k: v for k, v in _existing_t.items()})
+
+        # 2. Item types — natural key: name
+        if "dcr_item_types.csv" in zf.namelist():
+            _existing_items = {n for n, in db.query(DcrItemType.name).all()}
+            for row in csv.DictReader(io.StringIO(zf.read("dcr_item_types.csv").decode("utf-8-sig"))):
+                name = (row.get("name") or "").strip()
+                if not name or name in _existing_items:
+                    continue
+                kwargs = {}
+                for col in _model_cols(DcrItemType):
+                    raw = (row.get(col) or "").strip()
+                    if not raw:
+                        continue
+                    v = _coerce(raw, _col_type(DcrItemType, col))
+                    if v is not None:
+                        kwargs[col] = v
+                db.add(DcrItemType(**kwargs))
+                _existing_items.add(name)
+
+        # 3. Formula rules — natural key: sort_order + target_column + condition_type
+        if "dcr_formula_rules.csv" in zf.namelist():
+            _existing_rules = {
+                (r.sort_order, r.target_column, r.condition_type)
+                for r in db.query(DcrFormulaRule).all()
+            }
+            for row in csv.DictReader(io.StringIO(zf.read("dcr_formula_rules.csv").decode("utf-8-sig"))):
+                so = _coerce((row.get("sort_order") or ""), "int")
+                tc = (row.get("target_column") or "").strip()
+                ct = (row.get("condition_type") or "").strip()
+                if so is None or not tc:
+                    continue
+                if (so, tc, ct) in _existing_rules:
+                    continue
+                kwargs = {}
+                for col in _model_cols(DcrFormulaRule):
+                    raw = (row.get(col) or "").strip()
+                    if not raw:
+                        continue
+                    v = _coerce(raw, _col_type(DcrFormulaRule, col))
+                    if v is not None:
+                        kwargs[col] = v
+                db.add(DcrFormulaRule(**kwargs))
+                _existing_rules.add((so, tc, ct))
+
+        # 3b. Settings — single-row table; restore only if table is empty
+        if "dcr_settings.csv" in zf.namelist():
+            _existing_settings = db.query(DcrSettings).first()
+            if _existing_settings is None:
+                for row in csv.DictReader(io.StringIO(zf.read("dcr_settings.csv").decode("utf-8-sig"))):
+                    kwargs = {}
+                    for col in _model_cols(DcrSettings):
+                        if col == "id":
+                            continue
+                        raw = (row.get(col) or "").strip()
+                        if not raw:
+                            continue
+                        v = _coerce(raw, _col_type(DcrSettings, col))
+                        if v is not None:
+                            kwargs[col] = v
+                    if kwargs:
+                        db.add(DcrSettings(**kwargs))
+                    break  # only process first row
+
+        db.flush()
+
+        # 4. Sessions — natural key: report_date + shift + batch_name
+        #    Use _tariff_eff from CSV to remap tariff FK to target DB's IDs.
+        _existing_sessions: dict = {
+            (_val(s.report_date), s.shift, s.batch_name or ""): s.id
+            for s in db.query(DcrSession).all()
+        }
+        if "dcr_sessions.csv" in zf.namelist():
+            for row in csv.DictReader(io.StringIO(zf.read("dcr_sessions.csv").decode("utf-8-sig"))):
+                rd = (row.get("report_date") or "").strip()
+                sh = (row.get("shift") or "").strip()
+                bn = (row.get("batch_name") or "").strip()
+                if not rd or not sh:
+                    continue
+                key = (rd, sh, bn)
+                if key in _existing_sessions:
+                    continue
+                _rd_date = _coerce(rd, "date")
+                if _rd_date is None:
+                    continue
+                _t_eff = (row.get("_tariff_eff") or "").strip()
+                _t_id = _dcr_tariff_eff_map.get(_t_eff) if _t_eff else None
+                kwargs = {
+                    "report_date": _rd_date,
+                    "shift": sh,
+                    "batch_name": bn or None,
+                    "tariff_id": _t_id,
+                }
+                for col in _model_cols(DcrSession):
+                    if col in ("report_date", "shift", "batch_name", "tariff_id"):
+                        continue
+                    raw = (row.get(col) or "").strip()
+                    if not raw:
+                        continue
+                    v = _coerce(raw, _col_type(DcrSession, col))
+                    if v is not None:
+                        kwargs[col] = v
+                new_s = DcrSession(**kwargs)
+                db.add(new_s)
+                db.flush()
+                _existing_sessions[key] = new_s.id
+                dcr_sessions_ins += 1
+
+        # Rebuild full natural_key → session_id map (includes newly inserted sessions)
+        _sess_nk_map: dict = {
+            (_val(s.report_date), s.shift, s.batch_name or ""): s.id
+            for s in db.query(DcrSession).all()
+        }
+
+        # 5. Entry sub-tables — natural key: session natural-key + sort_order
+        def _restore_dcr_entries(csv_name_in: str, model_cls) -> int:
+            if csv_name_in not in zf.namelist():
+                return 0
+            _existing_ent = {
+                (r[0], r[1])
+                for r in db.query(model_cls.session_id, model_cls.sort_order).all()
+            }
+            count = 0
+            cols = _model_cols(model_cls)
+            for row in csv.DictReader(io.StringIO(zf.read(csv_name_in).decode("utf-8-sig"))):
+                rd  = (row.get("_sess_date")  or "").strip()
+                sh  = (row.get("_sess_shift") or "").strip()
+                bn  = (row.get("_sess_batch") or "").strip()
+                so_raw = (row.get("sort_order") or "0").strip()
+                new_sid = _sess_nk_map.get((rd, sh, bn))
+                if not new_sid:
+                    continue
+                so = _coerce(so_raw, "int") or 0
+                if (new_sid, so) in _existing_ent:
+                    continue
+                kwargs = {"session_id": new_sid, "sort_order": so}
+                for col in cols:
+                    if col in ("session_id", "sort_order"):
+                        continue
+                    raw = (row.get(col) or "").strip()
+                    if not raw:
+                        continue
+                    v = _coerce(raw, _col_type(model_cls, col))
+                    if v is not None:
+                        kwargs[col] = v
+                db.add(model_cls(**kwargs))
+                _existing_ent.add((new_sid, so))
+                count += 1
+            return count
+
+        dcr_entries_ins += _restore_dcr_entries("dcr_entries.csv",    DcrEntry)
+        dcr_entries_ins += _restore_dcr_entries("dcr_dr_entries.csv", DcrDrEntry)
+        dcr_entries_ins += _restore_dcr_entries("dcr_os_entries.csv", DcrOsEntry)
+        db.flush()
+
+    except Exception as _dcr_restore_err:
+        _dcr_restore_warning = str(_dcr_restore_err)
+        _log.warning("DCR restore error (other data was still saved): %s", _dcr_restore_err)
+    else:
+        _dcr_restore_warning = None
+
     db.commit()
     post_import_optimise(db)
     # Close the zip before unlinking — required on Windows (open handles block delete)
@@ -1357,6 +1657,10 @@ def admin_restore_backup(
         "dr_skipped": dr_skipped,
         "dr_items_inserted": dr_items_inserted,
         "dr_items_skipped": dr_items_skipped,
+        "dcr_tariffs_inserted": dcr_tariffs_ins,
+        "dcr_sessions_inserted": dcr_sessions_ins,
+        "dcr_entries_inserted": dcr_entries_ins,
+        "dcr_restore_warning": _dcr_restore_warning,
         "tables": registry_counts,
     }
 

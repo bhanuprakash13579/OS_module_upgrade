@@ -121,6 +121,30 @@ def apply_sqlite_migrations():
                 conn.execute(text("ALTER TABLE feature_flags ADD COLUMN trial_disabled INTEGER DEFAULT 0"))
             if "trial_days" not in ff_cols:
                 conn.execute(text("ALTER TABLE feature_flags ADD COLUMN trial_days INTEGER DEFAULT 30"))
+            if "revenue_enabled" not in ff_cols:
+                conn.execute(text("ALTER TABLE feature_flags ADD COLUMN revenue_enabled BOOLEAN DEFAULT 0"))
+
+            # ── dr_entries: new columns for offline BR tracking + overrides ────
+            try:
+                dr_cols_res = conn.execute(text("PRAGMA table_info(dr_entries)"))
+                dr_cols = {row[1] for row in dr_cols_res.fetchall()}
+                if "is_offline_br" not in dr_cols:
+                    conn.execute(text("ALTER TABLE dr_entries ADD COLUMN is_offline_br BOOLEAN DEFAULT 0"))
+                if "overrides" not in dr_cols:
+                    conn.execute(text("ALTER TABLE dr_entries ADD COLUMN overrides TEXT"))
+            except Exception:
+                pass  # table may not exist yet (first run — create_all will handle it)
+
+            # ── dr_sessions: submitted_at / submitted_by columns ──────────────
+            try:
+                sess_cols_res = conn.execute(text("PRAGMA table_info(dr_sessions)"))
+                sess_cols = {row[1] for row in sess_cols_res.fetchall()}
+                if "submitted_at" not in sess_cols:
+                    conn.execute(text("ALTER TABLE dr_sessions ADD COLUMN submitted_at DATETIME"))
+                if "submitted_by" not in sess_cols:
+                    conn.execute(text("ALTER TABLE dr_sessions ADD COLUMN submitted_by VARCHAR(100)"))
+            except Exception:
+                pass
             # Auto-init trial_start_date for existing rows (idempotent)
             conn.execute(text(
                 "UPDATE feature_flags SET trial_start_date = date('now') WHERE trial_start_date IS NULL"
@@ -448,6 +472,7 @@ def seed_initial_data():
     # ── Seed legal statutes (idempotent: skip if keyword already exists) ──────
     _seed_legal_statutes()
     _seed_print_template_config()
+    _seed_duty_report_defaults()
 
 
 def _seed_legal_statutes():
@@ -567,6 +592,92 @@ def _seed_print_template_config():
     except Exception as e:
         db.rollback()
         logger.warning("Print template seed error: %s", e)
+    finally:
+        db.close()
+
+
+def _seed_duty_report_defaults():
+    """
+    Seeds initial duty tariff, system item types, settings, and formula rules.
+    Idempotent — only inserts when tables are empty.
+    """
+    from datetime import date as _date
+    from app.models.duty_report import DrTariff, DrItemType, DrSettings, DrFormulaRule
+
+    db = SessionLocal()
+    try:
+        if db.query(DrTariff).first() is None:
+            db.add(DrTariff(
+                effective_from=_date(2024, 2, 1),
+                label="Budget 2024-25 rates",
+                baggage_rate=0.35,
+                liquor_duty_rate=0.50,
+                aidc_liquor_rate=1.0,
+                gold_bcd_rate=0.35,
+                aidc_gold_rate=0.05,
+                gold_cons_bcd_rate=0.10,
+                aidc_gold_cons_rate=0.05,
+                silver_bcd_rate=0.35,
+                aidc_silver_rate=0.05,
+                silver_cons_rate=0.05,
+                aidc_silver_cons_rate=0.05,
+            ))
+
+        if db.query(DrItemType).first() is None:
+            _system_items = [
+                "GOLD", "GOLD(C)", "SILVER", "SILVER(C)", "LIQUOR",
+                "CIGARETTE", "USED TV", "I PHONE", "MOBILE PHONE",
+                "LAPTOP", "JEWELLERY", "WATCHES", "CAMERA", "FOREIGN CURRENCY",
+                "RE-EXPORT", "OTHER",
+            ]
+            for name in _system_items:
+                db.add(DrItemType(name=name, usage_count=0, is_system=True))
+
+        if db.query(DrSettings).filter(DrSettings.id == 1).first() is None:
+            db.add(DrSettings(id=1, greeting_recipients="Sir"))
+
+        # Seed default formula rules (mirrors original Excel formulas).
+        # Rules are sorted by sort_order; first match wins per column.
+        if db.query(DrFormulaRule).first() is None:
+            _SKIP = "GOLD,SILVER,LIQUOR,OTHER,CIGARETTE,GOLD(C),SILVER(C),RE-EXPORT,REEXPORT"
+            _default_rules = [
+                # Columns that are auto-computed (have formulas)
+                (0,  "baggage_duty",    "Baggage Duty",              "except", _SKIP,              "value * baggage_rate"),
+                (1,  "liquor_duty",     "Liquor Duty",               "only",   "LIQUOR",            "value * liquor_duty_rate"),
+                (2,  "aidc_on_liquor",  "AIDC on Liquor",            "only",   "LIQUOR",            "value * aidc_liquor_rate"),
+                (3,  "gold_duty_bcd",   "Gold Duty (BCD)",           "only",   "GOLD,SILVER",       "value * gold_bcd_rate"),
+                (4,  "aidc_gold_silver","AIDC on Gold/Silver",       "only",   "GOLD,SILVER",       "value * aidc_gold_rate"),
+                (5,  "gold_duty_cons",  "Gold Duty (Concessional)",  "only",   "GOLD(C)",           "value * gold_cons_bcd_rate"),
+                (6,  "aidc_gold_silver","AIDC on Gold(C)",           "only",   "GOLD(C)",           "value * aidc_gold_cons_rate"),
+                (7,  "silver_duty_cons","Silver Duty (Concessional)","only",   "SILVER(C)",         "value * silver_cons_rate"),
+                (8,  "aidc_gold_silver","AIDC on Silver(C)",         "only",   "SILVER(C)",         "value * aidc_silver_cons_rate"),
+                # Manual columns — no expression (empty = user enters manually).
+                # They appear in the formula editor so the user can add formulas later.
+                (9,  "cigarette_duty",  "Cigarettes Duty",           "all",    "",                  ""),
+                (10, "sw_sc",           "SW SC on Bagg/Lqr/Cig",    "all",    "",                  ""),
+                (11, "sws_on_gold",     "SWS on Gold",               "all",    "",                  ""),
+                (12, "sws_on_silver",   "SWS on Silver",             "all",    "",                  ""),
+                (13, "redemption_fine", "Redemption Fine",           "all",    "",                  ""),
+                (14, "reexport_fine",   "Re-Export Fine",            "all",    "",                  ""),
+                (15, "personal_penalty","Personal Penalty",          "all",    "",                  ""),
+                (16, "other_charges",   "Other Charges",             "all",    "",                  ""),
+                (17, "fuel_duty",       "Fuel Duty",                 "all",    "",                  ""),
+            ]
+            for sort, col, label, ctype, citems, expr in _default_rules:
+                db.add(DrFormulaRule(
+                    sort_order=sort,
+                    target_column=col,
+                    column_label=label,
+                    condition_type=ctype,
+                    condition_items=citems,
+                    expression=expr,
+                    is_active=True,
+                ))
+
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.warning("Duty report seed error: %s", e)
     finally:
         db.close()
 
@@ -817,7 +928,10 @@ def get_features():
     db = SessionLocal()
     try:
         flags = db.query(FeatureFlags).first()
-        return {"apis_enabled": bool(flags.apis_enabled) if flags else False}
+        return {
+            "apis_enabled": bool(flags.apis_enabled) if flags else False,
+            "revenue_enabled": bool(getattr(flags, "revenue_enabled", False)) if flags else False,
+        }
     finally:
         db.close()
 
@@ -876,6 +990,7 @@ from app.api import auth, masters, baggage, offence, detention
 from app.api import admin_api
 from app.api import os_query, backup
 from app.api import apis
+from app.api import duty_report as duty_report_api
 
 app.include_router(admin_api.router, prefix="/api/admin", tags=["System Admin"])
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
@@ -888,6 +1003,7 @@ app.include_router(detention.router, prefix="/api/dr", tags=["Detention Receipts
 app.include_router(os_query.router)
 app.include_router(backup.router, prefix="/api/backup", tags=["Backup & Restore"])
 app.include_router(apis.router, prefix="/api/apis", tags=["APIS Matching"])
+app.include_router(duty_report_api.router, prefix="/api/dcr", tags=["Duty Collection Report"])
 
 
 # ── Serve React frontend for LAN browser clients ─────────────────────────────

@@ -68,6 +68,7 @@ class FeatureFlags(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     apis_enabled = Column(Boolean, default=False, nullable=False)
+    revenue_enabled = Column(Boolean, default=False, nullable=False)
     session_timeout_minutes = Column(Integer, default=480, nullable=False)
     # Trial counter — trial_start_date set on first startup; trial_disabled=1 → permanent install
     # trial_days = configurable trial duration (defaults to 30 if not set)
