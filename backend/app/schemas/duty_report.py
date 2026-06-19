@@ -60,6 +60,7 @@ class DrSessionOut(BaseModel):
     report_date: date
     shift: str
     batch_name: Optional[str] = None
+    challan_no: Optional[str] = None   # bank deposit challan for offline BRs
     tariff_id: Optional[int] = None
     created_by: Optional[str] = None
     created_at: Optional[datetime] = None
@@ -67,6 +68,10 @@ class DrSessionOut(BaseModel):
     submitted_by: Optional[str] = None
     tariff: Optional[DrTariffOut] = None
     model_config = ConfigDict(from_attributes=True)
+
+
+class SetChallanRequest(BaseModel):
+    challan_no: str
 
 
 # ── Entries ───────────────────────────────────────────────────────────────────
@@ -95,6 +100,7 @@ class DrEntryIn(BaseModel):
     personal_penalty: float = 0
     other_charges: float = 0
     fuel_duty: float = 0
+    cess_on_cig: float = 0
     total_duty: float = 0
     flight_no: Optional[str] = None
     is_sbi_challan: bool = False

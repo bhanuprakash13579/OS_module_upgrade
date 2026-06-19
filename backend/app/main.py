@@ -132,6 +132,8 @@ def apply_sqlite_migrations():
                     conn.execute(text("ALTER TABLE dr_entries ADD COLUMN is_offline_br BOOLEAN DEFAULT 0"))
                 if "overrides" not in dr_cols:
                     conn.execute(text("ALTER TABLE dr_entries ADD COLUMN overrides TEXT"))
+                if "cess_on_cig" not in dr_cols:
+                    conn.execute(text("ALTER TABLE dr_entries ADD COLUMN cess_on_cig FLOAT DEFAULT 0"))
             except Exception:
                 pass  # table may not exist yet (first run — create_all will handle it)
 
@@ -143,6 +145,8 @@ def apply_sqlite_migrations():
                     conn.execute(text("ALTER TABLE dr_sessions ADD COLUMN submitted_at DATETIME"))
                 if "submitted_by" not in sess_cols:
                     conn.execute(text("ALTER TABLE dr_sessions ADD COLUMN submitted_by VARCHAR(100)"))
+                if "challan_no" not in sess_cols:
+                    conn.execute(text("ALTER TABLE dr_sessions ADD COLUMN challan_no VARCHAR(50)"))
             except Exception:
                 pass
             # Auto-init trial_start_date for existing rows (idempotent)
@@ -662,6 +666,7 @@ def _seed_duty_report_defaults():
                 (15, "personal_penalty","Personal Penalty",          "all",    "",                  ""),
                 (16, "other_charges",   "Other Charges",             "all",    "",                  ""),
                 (17, "fuel_duty",       "Fuel Duty",                 "all",    "",                  ""),
+                (18, "cess_on_cig",     "CESS on Cigarettes",        "all",    "",                  ""),
             ]
             for sort, col, label, ctype, citems, expr in _default_rules:
                 db.add(DrFormulaRule(
@@ -673,6 +678,18 @@ def _seed_duty_report_defaults():
                     expression=expr,
                     is_active=True,
                 ))
+
+        # Ensure cess_on_cig rule exists for existing installs (added v3.0.43)
+        if not db.query(DrFormulaRule).filter(DrFormulaRule.target_column == "cess_on_cig").first():
+            db.add(DrFormulaRule(
+                sort_order=18,
+                target_column="cess_on_cig",
+                column_label="CESS on Cigarettes",
+                condition_type="all",
+                condition_items="",
+                expression="",
+                is_active=True,
+            ))
 
         db.commit()
     except Exception as e:

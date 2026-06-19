@@ -21,6 +21,7 @@ const COMPUTABLE_COLS: { key: string; label: string }[] = [
   { key: 'baggage_duty',    label: 'Baggage Duty' },
   { key: 'liquor_duty',     label: 'Liquor Duty' },
   { key: 'cigarette_duty',  label: 'Cigarettes Duty' },
+  { key: 'cess_on_cig',    label: 'CESS on Cigarettes' },
   { key: 'sw_sc',           label: 'SW SC on Bagg/Lqr/Cig' },
   { key: 'gold_duty_bcd',   label: 'Gold Duty (BCD)' },
   { key: 'gold_duty_cons',  label: 'Gold Duty (Concessional BCD)' },

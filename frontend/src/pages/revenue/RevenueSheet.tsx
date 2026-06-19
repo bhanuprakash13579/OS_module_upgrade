@@ -10,8 +10,10 @@ import ItemCombobox from './ItemCombobox';
 import {
   DrEntry, DrDrEntry, DrOsEntry, DrSession, DrTariff, DrFormulaRule,
   blankEntry, blankDrEntry, blankOsEntry,
-  computeDuties, computeTotal, getAutoFields, fmtDate,
+  computeDuties, computeTotal, getAutoFields, fmtDate, nextUid,
 } from './revenueCalc';
+
+type EntryWithUid = DrEntry & { _uid: number };
 import { showDownloadToast } from '@/components/DownloadToast';
 
 interface ItemType { id: number; name: string; usage_count: number; is_system: boolean; }
@@ -35,6 +37,7 @@ const ENTRY_COLS = [
   { key: 'baggage_duty',     label: 'Bagg.Duty',  width: 80,  type: 'num',    manual: false },
   { key: 'liquor_duty',      label: 'Lqr.Duty',   width: 75,  type: 'num',    manual: false },
   { key: 'cigarette_duty',   label: 'Cig.Duty',   width: 70,  type: 'num',    manual: true  },
+  { key: 'cess_on_cig',      label: 'CESS CIG',   width: 70,  type: 'num',    manual: true  },
   { key: 'sw_sc',            label: 'SW SC',      width: 70,  type: 'num',    manual: true  },
   { key: 'gold_duty_bcd',    label: 'Gold BCD',   width: 75,  type: 'num',    manual: false },
   { key: 'gold_duty_cons',   label: 'Gold(C)',    width: 70,  type: 'num',    manual: false },
@@ -66,11 +69,12 @@ function safeParseOverrides(raw: string | null | undefined): string[] {
 
 export default function RevenueSheet({ session: initialSession, rules, onMessage, onConfig }: Props) {
   const [session, setSession] = useState<DrSession>(initialSession);
-  const [entries, setEntries] = useState<DrEntry[]>(
-    initialSession.entries.length > 0
+  const [entries, setEntries] = useState<EntryWithUid[]>(() => {
+    const src = initialSession.entries.length > 0
       ? initialSession.entries
-      : [blankEntry(0)]
-  );
+      : [blankEntry(0)];
+    return src.map(e => ({ ...e, _uid: nextUid() }));
+  });
   const [drEntries, setDrEntries] = useState<DrDrEntry[]>(
     initialSession.dr_entries.length > 0 ? initialSession.dr_entries : []
   );
@@ -84,6 +88,8 @@ export default function RevenueSheet({ session: initialSession, rules, onMessage
   const [showOs, setShowOs] = useState(osEntries.length > 0);
   const [submitConfirm, setSubmitConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [challanPrompt, setChallanPrompt] = useState(false);
+  const [challanInput, setChallanInput] = useState('');
   const tariff = session.tariff;
 
   // Gold weight validation — live, runs on every entry change
@@ -217,7 +223,7 @@ export default function RevenueSheet({ session: initialSession, rules, onMessage
   const addRow = useCallback((afterIdx?: number) => {
     setEntries(prev => {
       const next = [...prev];
-      const newEntry = blankEntry(next.length);
+      const newEntry: EntryWithUid = { ...blankEntry(next.length), _uid: nextUid() };
       if (afterIdx !== undefined) next.splice(afterIdx + 1, 0, newEntry);
       else next.push(newEntry);
       return next;
@@ -226,7 +232,26 @@ export default function RevenueSheet({ session: initialSession, rules, onMessage
   }, [scheduleAutoSave]);
 
   const deleteRow = useCallback((idx: number) => {
-    setEntries(prev => prev.length <= 1 ? [blankEntry(0)] : prev.filter((_, i) => i !== idx));
+    setEntries(prev =>
+      prev.length <= 1
+        ? [{ ...blankEntry(0), _uid: nextUid() }]
+        : prev.filter((_, i) => i !== idx)
+    );
+    scheduleAutoSave();
+  }, [scheduleAutoSave]);
+
+  const addSubItem = useCallback((afterIdx: number) => {
+    setEntries(prev => {
+      const next = [...prev];
+      const parent = next[afterIdx];
+      const sub: EntryWithUid = { ...blankEntry(next.length), _uid: nextUid() };
+      // Inherit BR linkage from parent — this is what creates the sub-row in Excel
+      sub.br_no = parent.br_no;
+      sub.flight_no = parent.flight_no;
+      sub.is_offline_br = parent.is_offline_br;
+      next.splice(afterIdx + 1, 0, sub);
+      return next;
+    });
     scheduleAutoSave();
   }, [scheduleAutoSave]);
 
@@ -248,12 +273,36 @@ export default function RevenueSheet({ session: initialSession, rules, onMessage
     }
   }, [entries, itemTypes]);
 
+  // Column index helpers for focus-after-insert
+  const COL_BR   = ENTRY_COLS.findIndex(c => c.key === 'br_no');
+  const COL_ITEM = ENTRY_COLS.findIndex(c => c.key === 'item_desc');
+
   // Keyboard navigation between cells
   const handleCellKeyDown = useCallback((
     e: React.KeyboardEvent,
     rowIdx: number,
     colIdx: number,
   ) => {
+    // Ctrl+Enter — add sub-item row (same BR/flight/offline), jump to Item column
+    if (e.key === 'Enter' && e.ctrlKey) {
+      e.preventDefault();
+      addSubItem(rowIdx);
+      setTimeout(() => {
+        const ref = cellRefs.current.get(`${rowIdx + 1}-${COL_ITEM}`);
+        (ref as HTMLElement | undefined)?.focus();
+      }, 50);
+      return;
+    }
+    // Insert key — add plain new row below, jump to BR No. column
+    if (e.key === 'Insert') {
+      e.preventDefault();
+      addRow(rowIdx);
+      setTimeout(() => {
+        const ref = cellRefs.current.get(`${rowIdx + 1}-${COL_BR}`);
+        (ref as HTMLElement | undefined)?.focus();
+      }, 50);
+      return;
+    }
     if (e.key === 'Tab') {
       e.preventDefault();
       const nextCol = e.shiftKey ? colIdx - 1 : colIdx + 1;
@@ -283,7 +332,7 @@ export default function RevenueSheet({ session: initialSession, rules, onMessage
       const ref = cellRefs.current.get(`${rowIdx - 1}-${colIdx}`);
       if (ref) { e.preventDefault(); (ref as HTMLElement).focus(); }
     }
-  }, [entries.length, addRow]);
+  }, [entries.length, addRow, addSubItem, COL_BR, COL_ITEM]);
 
   // Column totals
   const totals = useMemo(() => {
@@ -325,10 +374,7 @@ export default function RevenueSheet({ session: initialSession, rules, onMessage
     } catch { /* silent */ }
   }, [initialSession.id]);
 
-  const downloadAdc = async () => {
-    if (validationErrorsRef.current.size > 0) setShowValidationBanner(true);
-    const ok = await doSave();
-    if (!ok) return;
+  const _doAdcDownload = async () => {
     try {
       const res = await api.get(`/dcr/sessions/${initialSession.id}/download/adc`, {
         responseType: 'blob',
@@ -341,6 +387,39 @@ export default function RevenueSheet({ session: initialSession, rules, onMessage
       URL.revokeObjectURL(url);
       showDownloadToast(fname);
     } catch { /* silent */ }
+  };
+
+  const downloadAdc = async () => {
+    if (validationErrorsRef.current.size > 0) setShowValidationBanner(true);
+    const ok = await doSave();
+    if (!ok) return;
+    // If offline BRs exist and no challan saved yet, prompt before allowing download
+    const hasOffline = entries.some(e => e.is_offline_br);
+    if (hasOffline && !session.challan_no) {
+      setChallanInput('');
+      setChallanPrompt(true);
+      return;
+    }
+    await _doAdcDownload();
+  };
+
+  const handleChallanSave = async () => {
+    if (!challanInput.trim()) return;
+    try {
+      const res = await api.patch(`/dcr/sessions/${initialSession.id}/challan`, {
+        challan_no: challanInput.trim(),
+      });
+      setSession(res.data);
+      setChallanPrompt(false);
+      await _doAdcDownload();
+    } catch {
+      // PATCH failed — leave the modal open so the user knows the challan wasn't saved
+    }
+  };
+
+  const handleChallanSkip = async () => {
+    setChallanPrompt(false);
+    await _doAdcDownload();
   };
 
   const downloadRevenue = async () => {
@@ -421,13 +500,22 @@ export default function RevenueSheet({ session: initialSession, rules, onMessage
         </div>
       </div>
 
-      {/* Legend */}
-      <div className="flex items-center gap-4 px-4 py-1 bg-slate-50 border-b border-slate-200 text-[10px] text-slate-500 shrink-0">
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-sky-100 border border-sky-200 inline-block" /> Auto-computed</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-amber-100 border border-amber-200 inline-block" /> Overridden</span>
-        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-100 border border-red-200 inline-block" /> SBI Challan</span>
-        <span className="flex items-center gap-1 text-red-600 font-semibold"><AlertTriangle size={10} /> Gold(g)* — weight mandatory for GOLD / GOLD(C) items</span>
-        <span className="flex items-center gap-1"><span className="text-red-600 font-bold text-[10px]">BR</span> Offl. ☑ = Offline (manual) BR — shown in red</span>
+      {/* Legend + keyboard shortcuts */}
+      <div className="flex items-center gap-3 px-4 py-1 bg-slate-50 border-b border-slate-200 text-[10px] text-slate-500 shrink-0 flex-wrap">
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-sky-100 border border-sky-200 inline-block" /> Auto</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-amber-100 border border-amber-200 inline-block" /> Override</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-100 border border-red-200 inline-block" /> SBI</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-indigo-100 border border-indigo-200 inline-block" /> Sub-item</span>
+        <span className="flex items-center gap-1 text-red-600 font-semibold"><AlertTriangle size={10} /> Gold(g)* required</span>
+        <span className="flex-1" />
+        {/* Keyboard shortcuts — always visible, non-intrusive */}
+        <span className="flex items-center gap-2 text-[10px] text-slate-400 border-l border-slate-200 pl-3">
+          <span className="font-semibold text-slate-500">Shortcuts:</span>
+          <span><kbd className="bg-white border border-slate-300 rounded px-1 font-mono">Enter</kbd> next row</span>
+          <span><kbd className="bg-white border border-slate-300 rounded px-1 font-mono">Ctrl+Enter</kbd> sub-item (same BR) ↳</span>
+          <span><kbd className="bg-white border border-slate-300 rounded px-1 font-mono">Ins</kbd> new row below</span>
+          <span><kbd className="bg-white border border-slate-300 rounded px-1 font-mono">Tab</kbd> next cell</span>
+        </span>
       </div>
 
       {/* Validation banner — shown when Save/Download is clicked with pending errors */}
@@ -484,13 +572,20 @@ export default function RevenueSheet({ session: initialSession, rules, onMessage
           <tbody>
             {entries.map((entry, rowIdx) => {
               const isSbi = entry.is_sbi_challan;
-              const rowBg = isSbi ? 'bg-red-50' : rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50';
+              // Sub-row when BR No. matches the immediately preceding row (same BR, multiple items)
+              const isSubRow = rowIdx > 0 && !!entry.br_no && entry.br_no === entries[rowIdx - 1]?.br_no;
+              const rowKey = entry._uid ?? rowIdx;  // stable key avoids stale cellRefs on insert/delete
+              const rowBg = isSbi
+                ? 'bg-red-50'
+                : isSubRow
+                  ? 'bg-indigo-50/50'
+                  : rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50';
 
               return (
-                <tr key={rowIdx} className={`${rowBg} hover:bg-blue-50/50 group border-b border-slate-200`}>
-                  {/* Row number */}
+                <tr key={rowKey} className={`${rowBg} hover:bg-blue-50/50 group border-b border-slate-200${isSubRow ? ' border-l-[3px] border-l-indigo-300' : ''}`}>
+                  {/* Row number / sub-row indicator */}
                   <td className="text-center text-[10px] text-slate-400 px-1 border-r border-slate-200 w-8">
-                    {rowIdx + 1}
+                    {isSubRow ? <span className="text-indigo-400 font-bold">↳</span> : rowIdx + 1}
                   </td>
 
                   {ENTRY_COLS.map((col, colIdx) => {
@@ -605,14 +700,23 @@ export default function RevenueSheet({ session: initialSession, rules, onMessage
                     );
                   })}
 
-                  {/* Delete button */}
+                  {/* Row actions: sub-item + delete */}
                   <td className="w-8 border-r border-slate-200 text-center">
-                    <button
-                      onClick={() => deleteRow(rowIdx)}
-                      className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-0.5 transition-opacity"
-                    >
-                      <Trash2 size={12} />
-                    </button>
+                    <div className="flex flex-col items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => addSubItem(rowIdx)}
+                        title="Add sub-item (same BR, multiple items)"
+                        className="text-indigo-400 hover:text-indigo-600 p-0.5 text-[9px] font-bold leading-none"
+                      >
+                        ↳+
+                      </button>
+                      <button
+                        onClick={() => deleteRow(rowIdx)}
+                        className="text-red-400 hover:text-red-600 p-0.5"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -847,6 +951,43 @@ export default function RevenueSheet({ session: initialSession, rules, onMessage
           </span>
         )}
       </div>
+
+      {/* Challan prompt — shown when offline BRs exist but no challan set */}
+      {challanPrompt && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
+            <h3 className="text-base font-bold text-slate-800 mb-1">Enter Bank Challan Number</h3>
+            <p className="text-xs text-slate-500 mb-4">
+              This session has <strong>offline BRs</strong> — the SBI bank challan number is required to
+              link the deposit to this shift. Online BRs do not need a challan.
+            </p>
+            <input
+              autoFocus
+              type="text"
+              value={challanInput}
+              onChange={e => setChallanInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleChallanSave(); }}
+              placeholder="e.g. SBI/2024/001234"
+              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 mb-4"
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={handleChallanSkip}
+                className="px-3 py-2 text-xs text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg"
+              >
+                Skip (online-only)
+              </button>
+              <button
+                onClick={handleChallanSave}
+                disabled={!challanInput.trim()}
+                className="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50"
+              >
+                Save & Download
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Submit confirmation modal */}
       {submitConfirm && (

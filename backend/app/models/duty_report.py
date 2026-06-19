@@ -64,6 +64,7 @@ class DrSession(Base):
     shift = Column(String(10), nullable=False)       # 'DAY' or 'NIGHT'
     batch_name = Column(String(100), nullable=True)  # e.g. 'C Batch'
     tariff_id = Column(Integer, ForeignKey("dr_tariffs.id"), nullable=True)
+    challan_no = Column(String(50), nullable=True)    # SBI challan / bank receipt no.
     created_by = Column(String(100), nullable=True)
     created_at = Column(DateTime, server_default=func.now())
     submitted_at = Column(DateTime, nullable=True)   # set when user clicks Submit
@@ -109,6 +110,7 @@ class DrEntry(Base):
     personal_penalty = Column(Float, default=0)  # manual
     other_charges = Column(Float, default=0)     # manual
     fuel_duty = Column(Float, default=0)         # manual
+    cess_on_cig = Column(Float, default=0)       # manual: CESS on Cigarettes (col 26 in monthly register)
     total_duty = Column(Float, default=0)        # ROUND(SUM(G:V), 0)
     flight_no = Column(String(20), nullable=True)
     is_sbi_challan = Column(Boolean, default=False)  # red row = SBI Challan offline payment

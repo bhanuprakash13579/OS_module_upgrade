@@ -22,7 +22,7 @@ from app.models.duty_report import (
 from app.schemas.duty_report import (
     DrTariffCreate, DrTariffOut,
     DrItemTypeCreate, DrItemTypeOut,
-    DrSessionCreate, DrSessionOut,
+    DrSessionCreate, DrSessionOut, SetChallanRequest,
     DrEntryIn, DrEntryOut,
     DrDrEntryIn, DrDrEntryOut,
     DrOsEntryIn, DrOsEntryOut,
@@ -274,6 +274,18 @@ def update_session(session_id: int, body: DrSessionCreate, db: Session = Depends
     return sess
 
 
+@router.patch("/sessions/{session_id}/challan", response_model=DrSessionOut)
+def set_challan(session_id: int, body: SetChallanRequest, db: Session = Depends(get_db)):
+    """Save the bank deposit challan number for a session's offline BR collections."""
+    sess = db.query(DrSession).filter(DrSession.id == session_id).first()
+    if not sess:
+        raise HTTPException(status_code=404, detail="Session not found")
+    sess.challan_no = body.challan_no.strip()
+    db.commit()
+    db.refresh(sess)
+    return sess
+
+
 # ── Bulk entry save ───────────────────────────────────────────────────────────
 
 @router.put("/sessions/{session_id}/entries", response_model=SessionWithEntries)
@@ -427,7 +439,7 @@ def _build_revenue_sheet(ws, entries: list, dr_entries: list, os_entries: list,
         "AIDC on Gold/SILVER", "SWS ON SILVER",
         "Aidc on Liqr", "Redemption Fine", "Re-Export Fine",
         "Personal Penalty", "OTHER Charges", "FUEL DUTY",
-        "Total Duty", "Flight No"
+        "CESS on CIG", "Total Duty", "Flight No"
     ]
 
     for col_idx, h in enumerate(HEADERS, start=1):
@@ -440,10 +452,25 @@ def _build_revenue_sheet(ws, entries: list, dr_entries: list, os_entries: list,
     ws.row_dimensions[1].height = 42
 
     sl_counter = 1
+    prev_br = None
     for row_idx, entry in enumerate(entries, start=2):
+        # Sub-row detection: same BR number as the row immediately above
+        is_sub_row = bool(entry.br_no and entry.br_no == prev_br)
+        is_cancelled = "CANCEL" in (entry.item_desc or "").upper()
+
+        # SL No.: blank for sub-rows (same BR = continuation)
+        if is_sub_row:
+            sl_val = None
+        elif entry.sl_no is not None:
+            sl_val = entry.sl_no
+            sl_counter = max(sl_counter, entry.sl_no + 1)
+        else:
+            sl_val = sl_counter
+            sl_counter += 1
+
         fill = sbi_fill if entry.is_sbi_challan else None
         row_data = [
-            entry.sl_no if entry.sl_no is not None else sl_counter,
+            sl_val,
             entry.br_no,
             entry.os_ref,
             entry.item_desc,
@@ -465,19 +492,19 @@ def _build_revenue_sheet(ws, entries: list, dr_entries: list, os_entries: list,
             entry.personal_penalty or None,
             entry.other_charges or None,
             entry.fuel_duty or None,
+            entry.cess_on_cig or None,
             entry.total_duty or None,
             entry.flight_no,
         ]
-        if entry.sl_no is not None:
-            sl_counter = entry.sl_no + 1
-        else:
-            sl_counter += 1
+        prev_br = entry.br_no
 
         for col_idx, val in enumerate(row_data, start=1):
             cell = ws.cell(row=row_idx, column=col_idx, value=val)
             cell.border = border
-            # BR No. column (2) gets red bold font when offline BR
-            if col_idx == 2 and getattr(entry, "is_offline_br", False):
+            if is_cancelled:
+                # Strikethrough grey for cancelled entries
+                cell.font = Font(size=9, strike=True, color="888888")
+            elif col_idx == 2 and getattr(entry, "is_offline_br", False):
                 cell.font = Font(size=9, color="FF0000", bold=True)
             else:
                 cell.font = Font(size=9)
@@ -487,18 +514,30 @@ def _build_revenue_sheet(ws, entries: list, dr_entries: list, os_entries: list,
                 cell.fill = fill
         ws.row_dimensions[row_idx].height = 16
 
+    # Merge consecutive same-BR cells in column B (BR No.) to match physical register
+    _ei = 0
+    while _ei < len(entries):
+        _ej = _ei + 1
+        while _ej < len(entries) and entries[_ej].br_no and entries[_ej].br_no == entries[_ei].br_no:
+            _ej += 1
+        if _ej > _ei + 1:
+            r1, r2 = _ei + 2, _ej + 1   # entry[i] → row i+2 (header is row 1)
+            ws.merge_cells(start_row=r1, start_column=2, end_row=r2, end_column=2)
+            ws.cell(row=r1, column=2).alignment = Alignment(horizontal="left", vertical="center")
+        _ei = _ej
+
     data_last_row = len(entries) + 1
 
     # TOTAL row
     total_row = data_last_row + 1
-    for col_idx in range(1, 25):
+    for col_idx in range(1, 26):
         cell = ws.cell(row=total_row, column=col_idx)
         cell.border = border
         cell.fill = total_fill
         cell.font = Font(bold=True, size=9)
         cell.alignment = Alignment(vertical="center", horizontal="right" if col_idx >= 5 else "left")
     ws.cell(row=total_row, column=4).value = "TOTAL"
-    for col_idx in range(5, 24):
+    for col_idx in range(5, 25):
         col_letter = get_column_letter(col_idx)
         ws.cell(row=total_row, column=col_idx).value = f"=SUM({col_letter}2:{col_letter}{data_last_row})"
     ws.row_dimensions[total_row].height = 18
@@ -607,9 +646,29 @@ def _build_revenue_sheet(ws, entries: list, dr_entries: list, os_entries: list,
     if os_entries:
         ws.cell(row=os_last + 1, column=14).value = f"=SUM(N{summary_start+1}:N{os_last})"
 
+    # Offline vs Online BR split — helps officer verify bank challan amount
+    offline_total = round(sum(e.total_duty or 0 for e in entries if e.is_offline_br))
+    online_total  = round(sum(e.total_duty or 0 for e in entries if not e.is_offline_br))
+    split_start = max(totals_r, dr_last + 1, os_last + 1) + 2
+    split_fill  = PatternFill("solid", fgColor="EBF5FB")
+    for offset, (label, amount) in enumerate([
+        ("Offline BRs — Bank Challan", offline_total),
+        ("Online BRs — Portal", online_total),
+    ]):
+        r = split_start + offset
+        for col in (2, 24):   # col 2 = label, col 24 = Total Duty (aligns with duty totals)
+            c = ws.cell(row=r, column=col)
+            c.border = sub_border
+            c.fill = split_fill
+            c.font = Font(size=8, bold=(col == 2))
+            c.alignment = Alignment(horizontal="right" if col == 24 else "left", vertical="center")
+        ws.cell(row=r, column=2).value = label
+        ws.cell(row=r, column=24).value = amount
+        ws.row_dimensions[r].height = 14
+
     # Column widths — wider for better readability
     col_widths = [5, 14, 14, 24, 14, 10, 11, 11, 11, 11,
-                  11, 13, 13, 11, 13, 11, 11, 13, 13, 13, 13, 10, 12, 13]
+                  11, 13, 13, 11, 13, 11, 11, 13, 13, 13, 13, 10, 10, 12, 13]
     for i, w in enumerate(col_widths, start=1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
@@ -635,6 +694,7 @@ def _build_consolidated_sheet(ws, day_entries: list, night_entries: list):
         ("Baggage duty",                "baggage_duty"),
         ("Liquor Duty",                 "liquor_duty"),
         ("Cigarettes Duty",             "cigarette_duty"),
+        ("CESS on Cigarettes",          "cess_on_cig"),
         ("SW SC on Bagg/Lqr/Cig",      "sw_sc"),
         ("Gold Duty (BCD)",             "gold_duty_bcd"),
         ("Gold Duty (Cons.Rate BCD)",   "gold_duty_cons"),
@@ -926,6 +986,271 @@ def download_revenue_report(session_id: int, db: Session = Depends(get_db)):
 
     filename = f"{_fmt_date(sess.report_date)} REVENUE REPORT.xlsx"
 
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _build_monthly_revenue_sheet(ws, sessions_data: list):
+    """
+    Build the monthly revenue report sheet matching the sample format.
+    sessions_data: list of dicts {session, entries, os_entries}
+    Online BRs (is_offline_br=False) are shown in blue — not part of bank challan.
+    Offline BRs (is_offline_br=True) are in black — covered by session's challan_no.
+    """
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    thin = Side(style="thin")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    hdr_fill = PatternFill("solid", fgColor="D9E1F2")
+    sess_fill = PatternFill("solid", fgColor="E2EFDA")   # light green for challan rows
+    total_fill = PatternFill("solid", fgColor="FFF2CC")
+
+    # Column headers matching the sample exactly (A=1 … AE=31)
+    HDRS = [
+        "Sl. No.", "Challan No.", "Date",
+        "BR No.", "Item Description", "Quantity OF Gold/ Silver (in Gms)",
+        "Total Value\nBaggage", "Total Value\nGold /Silver",
+        "Baggage duty", "Liquor Duty", "Cig Duty",
+        "SW SC on Bagg / Lqr / Cig",
+        "Gold Duty (35%)", "Gold Duty (Cons.Rate)",
+        "Silver Duty (35%)", "Silver Duty (Cons.Rate)",
+        "SW SC on Gold Duty", "AIDC on Gold",
+        "SW SC on Silver Duty", "AIDC on Silver Duty",
+        "AIDC on Liqr", "RF", "Re-Export Fine",
+        "Personal Penalty", "MISC. CHARGES",
+        "CESS on CIG", "FUEL DUTY",
+        "TOTAL",   # col AB (28)
+        "DATES", "FORT 1/2", "REMARKS",
+    ]
+    for ci, h in enumerate(HDRS, 1):
+        c = ws.cell(row=1, column=ci, value=h)
+        c.font = Font(bold=True, size=8)
+        c.fill = hdr_fill
+        c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        c.border = border
+    ws.row_dimensions[1].height = 36
+
+    _GOLD_ITEMS   = {"GOLD", "GOLD(C)"}
+    _SILVER_ITEMS = {"SILVER", "SILVER(C)"}
+
+    cur_row = 2
+    sl_counter = 1
+
+    for sd in sessions_data:
+        sess    = sd["session"]
+        entries = sd["entries"]     # DrEntry list
+        os_entries = sd["os_entries"]  # DrOsEntry list (fuel duty etc.)
+
+        if not entries and not os_entries:
+            continue
+
+        shift_code = "D" if sess.shift == "DAY" else "N"
+        date_str = sess.report_date.strftime("%d.%m.%y") + f"({shift_code})"
+        challan_str = sess.challan_no or ""
+
+        first_row_of_session = cur_row
+        prev_br = None
+        session_header_written = False  # tracks whether challan/date row has been emitted yet
+
+        for entry in entries:
+            is_first = not session_header_written
+            is_sub_row = bool(entry.br_no and entry.br_no == prev_br)
+            # Only carry prev_br forward when the current row has a real BR number;
+            # a blank/spacer row must not make the next real BR look like a sub-row.
+            if entry.br_no:
+                prev_br = entry.br_no
+            desc_upper = (entry.item_desc or "").upper().strip()
+            is_gold   = desc_upper in _GOLD_ITEMS
+            is_silver = desc_upper in _SILVER_ITEMS
+
+            # A: Sl. No. — blank for sub-rows (same BR, multiple items)
+            if not is_sub_row:
+                ws.cell(row=cur_row, column=1, value=sl_counter).font = Font(size=8)
+            # B: Challan No. — only first row of session
+            ws.cell(row=cur_row, column=2, value=challan_str if is_first else "").font = Font(size=8, bold=is_first)
+            # C: Date — only first row of session
+            ws.cell(row=cur_row, column=3, value=date_str if is_first else "").font = Font(size=8, bold=is_first)
+
+            # D: BR No. — blue for online, black for offline
+            br_cell = ws.cell(row=cur_row, column=4, value=entry.br_no)
+            if entry.is_offline_br:
+                br_cell.font = Font(size=8, color="000000")
+            else:
+                br_cell.font = Font(size=8, color="0070C0", bold=True)  # blue = online
+
+            ws.cell(row=cur_row, column=5, value=entry.item_desc).font = Font(size=8)
+            ws.cell(row=cur_row, column=6, value=entry.gold_weight_gms or None).font = Font(size=8)
+            if is_gold or is_silver:
+                ws.cell(row=cur_row, column=7, value=None)
+                ws.cell(row=cur_row, column=8, value=entry.dutiable_value or None).font = Font(size=8)
+            else:
+                ws.cell(row=cur_row, column=7, value=entry.dutiable_value or None).font = Font(size=8)
+                ws.cell(row=cur_row, column=8, value=None)
+
+            ws.cell(row=cur_row, column=9,  value=entry.baggage_duty   or None).font = Font(size=8)
+            ws.cell(row=cur_row, column=10, value=entry.liquor_duty     or None).font = Font(size=8)
+            ws.cell(row=cur_row, column=11, value=entry.cigarette_duty  or None).font = Font(size=8)
+            ws.cell(row=cur_row, column=12, value=entry.sw_sc           or None).font = Font(size=8)
+            ws.cell(row=cur_row, column=13, value=entry.gold_duty_bcd   or None).font = Font(size=8)
+            ws.cell(row=cur_row, column=14, value=entry.gold_duty_cons  or None).font = Font(size=8)
+            ws.cell(row=cur_row, column=15, value=entry.silver_duty_cons or None).font = Font(size=8)
+            ws.cell(row=cur_row, column=16, value=None)  # silver BCD — not in model
+            ws.cell(row=cur_row, column=17, value=entry.sws_on_gold   or None).font = Font(size=8)
+            ws.cell(row=cur_row, column=18, value=entry.aidc_gold_silver if is_gold   else None).font = Font(size=8)
+            ws.cell(row=cur_row, column=19, value=entry.sws_on_silver or None).font = Font(size=8)
+            ws.cell(row=cur_row, column=20, value=entry.aidc_gold_silver if is_silver else None).font = Font(size=8)
+            ws.cell(row=cur_row, column=21, value=entry.aidc_on_liquor   or None).font = Font(size=8)
+            ws.cell(row=cur_row, column=22, value=entry.redemption_fine  or None).font = Font(size=8)
+            ws.cell(row=cur_row, column=23, value=entry.reexport_fine    or None).font = Font(size=8)
+            ws.cell(row=cur_row, column=24, value=entry.personal_penalty or None).font = Font(size=8)
+            ws.cell(row=cur_row, column=25, value=entry.other_charges    or None).font = Font(size=8)
+            ws.cell(row=cur_row, column=26, value=entry.cess_on_cig or None).font = Font(size=8)
+            ws.cell(row=cur_row, column=27, value=entry.fuel_duty or None).font = Font(size=8)
+            ws.cell(row=cur_row, column=28, value=round(entry.total_duty) if entry.total_duty else None).font = Font(size=8, bold=True)
+
+            for ci in range(1, 32):
+                c = ws.cell(row=cur_row, column=ci)
+                c.border = border
+                c.alignment = Alignment(vertical="center",
+                                        horizontal="right" if ci >= 6 else "left")
+                if is_first:
+                    c.fill = sess_fill
+            ws.row_dimensions[cur_row].height = 15
+            if not is_sub_row:
+                sl_counter += 1
+            session_header_written = True
+            cur_row += 1
+
+        # Merge consecutive same-BR cells in column D within this session block
+        _ei = 0
+        while _ei < len(entries):
+            _ej = _ei + 1
+            while (_ej < len(entries) and entries[_ej].br_no
+                   and entries[_ej].br_no == entries[_ei].br_no):
+                _ej += 1
+            if _ej > _ei + 1 and entries[_ei].br_no:
+                r1 = first_row_of_session + _ei
+                r2 = first_row_of_session + _ej - 1
+                ws.merge_cells(start_row=r1, start_column=4, end_row=r2, end_column=4)
+                ws.cell(row=r1, column=4).alignment = Alignment(
+                    horizontal="left", vertical="center")
+            _ei = _ej
+
+        # OS entries (e.g. FUEL DUTY) — each gets its own row with amount in col 27
+        for os_e in os_entries:
+            is_first = not session_header_written
+            ws.cell(row=cur_row, column=1, value=sl_counter).font = Font(size=8)
+            ws.cell(row=cur_row, column=2, value=challan_str if is_first else "").font = Font(size=8, bold=is_first)
+            ws.cell(row=cur_row, column=3, value=date_str if is_first else "").font = Font(size=8, bold=is_first)
+            ws.cell(row=cur_row, column=4, value=os_e.os_no).font = Font(size=8)
+            ws.cell(row=cur_row, column=5, value=os_e.item_desc).font = Font(size=8)
+            ws.cell(row=cur_row, column=27, value=os_e.amount or None).font = Font(size=8)
+            ws.cell(row=cur_row, column=28, value=round(os_e.amount) if os_e.amount else None).font = Font(size=8, bold=True)
+            for ci in range(1, 32):
+                ws.cell(row=cur_row, column=ci).border = border
+                ws.cell(row=cur_row, column=ci).alignment = Alignment(
+                    vertical="center", horizontal="right" if ci >= 6 else "left")
+            ws.row_dimensions[cur_row].height = 15
+            sl_counter += 1
+            session_header_written = True
+            cur_row += 1
+
+        # Per-session offline/online subtotal rows (helps officer verify challan amount)
+        offline_sess = round(sum(e.total_duty or 0 for e in entries if e.is_offline_br))
+        online_sess  = round(sum(e.total_duty or 0 for e in entries if not e.is_offline_br))
+        sub_fill = PatternFill("solid", fgColor="EBF5FB")
+        challan_label = challan_str if challan_str else "No Challan"
+        for offset, (label, amt) in enumerate([
+            (f"↳ Offline [{challan_label}]", offline_sess),
+            ("↳ Online [Portal]", online_sess),
+        ]):
+            r = cur_row + offset
+            for ci in range(1, 29):
+                c = ws.cell(row=r, column=ci)
+                c.border = border
+                c.fill = sub_fill
+                c.alignment = Alignment(vertical="center",
+                                        horizontal="right" if ci >= 6 else "left")
+                c.font = Font(size=7, italic=True, bold=(ci == 5))
+            ws.cell(row=r, column=5).value = label
+            ws.cell(row=r, column=28).value = amt if amt else None
+            ws.row_dimensions[r].height = 11
+        cur_row += 2
+
+    # Grand total row
+    if cur_row > 2:
+        data_end = cur_row - 1
+        for ci in range(1, 32):
+            c = ws.cell(row=cur_row, column=ci)
+            c.font = Font(bold=True, size=8)
+            c.fill = total_fill
+            c.border = border
+            c.alignment = Alignment(vertical="center", horizontal="right" if ci >= 6 else "left")
+        ws.cell(row=cur_row, column=5).value = "GRAND TOTAL"
+        ws.cell(row=cur_row, column=5).alignment = Alignment(horizontal="right", vertical="center")
+        # Sum numeric duty columns
+        for ci in range(9, 29):
+            col_letter = get_column_letter(ci)
+            ws.cell(row=cur_row, column=ci).value = f"=SUM({col_letter}2:{col_letter}{data_end})"
+        ws.row_dimensions[cur_row].height = 18
+
+    # Column widths
+    widths = [5, 10, 12, 10, 24, 8, 10, 10, 10, 10, 8, 10,
+              10, 10, 10, 10, 10, 10, 10, 10, 10, 8, 10, 10,
+              10, 8, 10, 10, 10, 8, 12]
+    for i, w in enumerate(widths, 1):
+        ws.column_dimensions[get_column_letter(i)].width = w
+    ws.freeze_panes = "D2"
+
+
+@router.get("/download/monthly-revenue")
+def download_monthly_revenue(year: int, month: int, db: Session = Depends(get_db)):
+    """
+    Download the month-end Revenue Report Excel covering all sessions in the given month.
+    Matches the format of the physical register / sample Excel exactly.
+    """
+    import openpyxl
+    import calendar
+
+    if not (1 <= month <= 12) or year < 2000:
+        raise HTTPException(status_code=400, detail="Invalid year or month")
+
+    from datetime import date as _date
+    month_start = _date(year, month, 1)
+    month_end   = _date(year, month, calendar.monthrange(year, month)[1])
+
+    sessions = (
+        db.query(DrSession)
+        .filter(DrSession.report_date >= month_start, DrSession.report_date <= month_end)
+        .order_by(DrSession.report_date, DrSession.shift)
+        .all()
+    )
+
+    sessions_data = []
+    for sess in sessions:
+        entries = db.query(DrEntry).filter(
+            DrEntry.session_id == sess.id
+        ).order_by(DrEntry.sort_order).all()
+        os_entries = db.query(DrOsEntry).filter(
+            DrOsEntry.session_id == sess.id
+        ).order_by(DrOsEntry.sort_order).all()
+        sessions_data.append({"session": sess, "entries": entries, "os_entries": os_entries})
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    import calendar as _cal
+    month_name = _cal.month_name[month]
+    ws.title = f"{month_name[:3]} {year}"
+    _build_monthly_revenue_sheet(ws, sessions_data)
+
+    filename = f"{month_name} {year} - Monthly Revenue Report.xlsx"
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)

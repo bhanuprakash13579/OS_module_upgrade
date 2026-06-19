@@ -72,6 +72,7 @@ export interface DrEntry {
   personal_penalty: number;
   other_charges: number;
   fuel_duty: number;
+  cess_on_cig: number;
   total_duty: number;
   flight_no: string;
   is_sbi_challan: boolean;
@@ -102,6 +103,7 @@ export interface DrSession {
   report_date: string;
   shift: 'DAY' | 'NIGHT';
   batch_name: string | null;
+  challan_no: string | null;   // bank deposit challan for offline BR collections
   tariff_id: number | null;
   created_by: string | null;
   created_at: string | null;
@@ -296,7 +298,7 @@ export function computeDuties(
 /** Compute total from all duty column values (mirrors Excel ROUND(SUM(G:V),0)) */
 export function computeTotal(entry: Partial<DrEntry>): number {
   const fields: (keyof DrEntry)[] = [
-    'baggage_duty', 'liquor_duty', 'cigarette_duty', 'sw_sc',
+    'baggage_duty', 'liquor_duty', 'cigarette_duty', 'cess_on_cig', 'sw_sc',
     'gold_duty_bcd', 'gold_duty_cons', 'silver_duty_cons',
     'sws_on_gold', 'aidc_gold_silver', 'sws_on_silver', 'aidc_on_liquor',
     'redemption_fine', 'reexport_fine', 'personal_penalty',
@@ -404,6 +406,10 @@ export function buildMessage(
 
 // ── Blank row factories ───────────────────────────────────────────────────────
 
+let _uidSeq = 1;
+/** Monotonic client-side ID — used as React key only; never sent to the server. */
+export function nextUid(): number { return _uidSeq++; }
+
 export function blankEntry(sortOrder: number): DrEntry {
   return {
     sort_order: sortOrder,
@@ -429,6 +435,7 @@ export function blankEntry(sortOrder: number): DrEntry {
     personal_penalty: 0,
     other_charges: 0,
     fuel_duty: 0,
+    cess_on_cig: 0,
     total_duty: 0,
     flight_no: '',
     is_sbi_challan: false,
