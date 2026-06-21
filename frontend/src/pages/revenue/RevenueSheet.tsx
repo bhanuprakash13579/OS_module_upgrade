@@ -33,7 +33,7 @@ const ENTRY_COLS = [
   { key: 'os_ref',           label: 'OS No.',     width: 90,  type: 'text',   manual: true  },
   { key: 'item_desc',        label: 'Item',       width: 130, type: 'combo',  manual: true  },
   { key: 'dutiable_value',   label: 'Value',      width: 80,  type: 'num',    manual: true  },
-  { key: 'gold_weight_gms',  label: 'Gold(g)',    width: 60,  type: 'num',    manual: true  },
+  { key: 'gold_weight_gms',  label: 'Wt(g)',      width: 60,  type: 'num',    manual: true  },
   { key: 'baggage_duty',     label: 'Bagg.Duty',  width: 80,  type: 'num',    manual: false },
   { key: 'liquor_duty',      label: 'Lqr.Duty',   width: 75,  type: 'num',    manual: false },
   { key: 'cigarette_duty',   label: 'Cig.Duty',   width: 70,  type: 'num',    manual: true  },
@@ -53,7 +53,7 @@ const ENTRY_COLS = [
   { key: 'fuel_duty',        label: 'Fuel',       width: 60,  type: 'num',    manual: true  },
   { key: 'total_duty',       label: 'TOTAL',      width: 80,  type: 'num',    manual: false },
   { key: 'flight_no',        label: 'Flight',     width: 75,  type: 'text',   manual: true  },
-  { key: 'is_sbi_challan',   label: 'SBI',        width: 40,  type: 'bool',   manual: true  },
+  { key: 'is_sbi_challan',   label: 'SBI✓',       width: 44,  type: 'bool',   manual: true  },
 ] as const;
 
 type EntryKey = (typeof ENTRY_COLS)[number]['key'];
@@ -506,7 +506,7 @@ export default function RevenueSheet({ session: initialSession, rules, onMessage
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-amber-100 border border-amber-200 inline-block" /> Override</span>
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-100 border border-red-200 inline-block" /> SBI</span>
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-indigo-100 border border-indigo-200 inline-block" /> Sub-item</span>
-        <span className="flex items-center gap-1 text-red-600 font-semibold"><AlertTriangle size={10} /> Gold(g)* required</span>
+        <span className="flex items-center gap-1 text-red-600 font-semibold"><AlertTriangle size={10} /> Wt(g) req. for GOLD items</span>
         <span className="flex-1" />
         {/* Keyboard shortcuts — always visible, non-intrusive */}
         <span className="flex items-center gap-2 text-[10px] text-slate-400 border-l border-slate-200 pl-3">
@@ -517,6 +517,15 @@ export default function RevenueSheet({ session: initialSession, rules, onMessage
           <span><kbd className="bg-white border border-slate-300 rounded px-1 font-mono">Tab</kbd> next cell</span>
         </span>
       </div>
+
+      {/* No-tariff warning — formula auto-computation disabled without a tariff */}
+      {!tariff && (
+        <div className="px-4 py-1.5 bg-amber-50 border-b border-amber-300 text-xs text-amber-800 flex items-center gap-2 shrink-0">
+          <AlertTriangle size={12} className="text-amber-500 shrink-0" />
+          No tariff set — auto-computed columns (Bagg. Duty, Gold BCD, etc.) are inactive.
+          Click <strong>Config</strong> → <em>Rates &amp; Tariff</em> to configure rates.
+        </div>
+      )}
 
       {/* Validation banner — shown when Save/Download is clicked with pending errors */}
       {showValidationBanner && validationErrors.size > 0 && (
@@ -560,9 +569,13 @@ export default function RevenueSheet({ session: initialSession, rules, onMessage
                   key={col.key}
                   style={{ width: col.width, minWidth: col.width }}
                   className="px-1 py-1.5 text-center font-semibold text-[10px] uppercase tracking-wide border-r border-slate-700 whitespace-nowrap"
-                  title={col.key === 'gold_weight_gms' ? 'Required for GOLD and GOLD(C) items' : undefined}
+                  title={
+                    col.key === 'gold_weight_gms' ? 'Gold weight in grams — required only for GOLD and GOLD(C) items' :
+                    col.key === 'is_sbi_challan' ? 'SBI Challan — tick when payment made via SBI challan; marks row in red' :
+                    undefined
+                  }
                 >
-                  {col.label}{col.key === 'gold_weight_gms' ? <span className="text-red-400 ml-0.5">*</span> : null}
+                  {col.label}
                 </th>
               ))}
               <th className="w-8 px-1" />
@@ -702,7 +715,7 @@ export default function RevenueSheet({ session: initialSession, rules, onMessage
 
                   {/* Row actions: sub-item + delete */}
                   <td className="w-8 border-r border-slate-200 text-center">
-                    <div className="flex flex-col items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex flex-col items-center gap-0.5 opacity-30 hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => addSubItem(rowIdx)}
                         title="Add sub-item (same BR, multiple items)"

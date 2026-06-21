@@ -630,12 +630,17 @@ def _seed_duty_report_defaults():
         if db.query(DrItemType).first() is None:
             _system_items = [
                 "GOLD", "GOLD(C)", "SILVER", "SILVER(C)", "LIQUOR",
-                "CIGARETTE", "USED TV", "I PHONE", "MOBILE PHONE",
+                "CIGARETTE", "USED TV", "IPHONE", "MOBILE PHONE",
                 "LAPTOP", "JEWELLERY", "WATCHES", "CAMERA", "FOREIGN CURRENCY",
                 "RE-EXPORT", "OTHER",
             ]
             for name in _system_items:
                 db.add(DrItemType(name=name, usage_count=0, is_system=True))
+
+        # Data migration: rename "I PHONE" → "IPHONE" for any existing DB rows
+        iphone_old = db.query(DrItemType).filter(DrItemType.name == "I PHONE").first()
+        if iphone_old:
+            iphone_old.name = "IPHONE"
 
         if db.query(DrSettings).filter(DrSettings.id == 1).first() is None:
             db.add(DrSettings(id=1, greeting_recipients="Sir"))

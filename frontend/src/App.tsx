@@ -5,6 +5,7 @@ import DevModeBanner from './components/DevModeBanner';
 import DownloadToast from './components/DownloadToast';
 import ErrorBoundary from './components/ErrorBoundary';
 import TrialBanner from './components/TrialBanner';
+import { useTrialStatus } from './hooks/useTrialStatus';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './pages/auth/Login';
 import ModuleSelection from './pages/ModuleSelection';
@@ -155,6 +156,14 @@ function RevenueRoute({ children }: { children: React.ReactNode }) {
   if (!enabled) return <Navigate to="/modules" replace />;
   if (!isAuthenticated) return <Navigate to="/login/sdo" replace />;
   return <>{children}</>;
+}
+
+// Pushes content down by the exact height of the TrialBanner when it is visible,
+// so the fixed 26px banner never overlaps the top of any page.
+function TrialBannerPad() {
+  const { trial_disabled, expired, isLoading } = useTrialStatus();
+  const show = !isLoading && !trial_disabled && !expired;
+  return show ? <div style={{ height: '26px' }} aria-hidden /> : null;
 }
 
 function AppRoutes() {
@@ -338,6 +347,7 @@ export default function App() {
           <DownloadToast />
           <BrowserRouter>
             <TrialBanner />
+            <TrialBannerPad />
             <AppRoutes />
           </BrowserRouter>
         </BackendGate>
