@@ -42,16 +42,16 @@ class BusinessRulesEngine:
 
         fa_used = sum(br.total_fa_availed for br in existing_brs if br.total_fa_availed is not None)
         
-        if fa_used + current_fa_claim > settings.FA_LIMIT:
-            diff = settings.FA_LIMIT - fa_used
+        if fa_used + current_fa_claim > settings.GOLD_FA_LIMIT:
+            diff = settings.GOLD_FA_LIMIT - fa_used
             if diff <= 0:
                 raise HTTPException(
-                    status_code=400, 
-                    detail=f"Passenger already availed full F.A. Limit of {settings.FA_LIMIT} today."
+                    status_code=400,
+                    detail=f"Passenger already availed full F.A. Limit of {settings.GOLD_FA_LIMIT} today."
                 )
             else:
                 raise HTTPException(
-                    status_code=400, 
+                    status_code=400,
                     detail=f"Passenger can only avail Rs.{diff} F.A. Limit now."
                 )
         return True, current_fa_claim

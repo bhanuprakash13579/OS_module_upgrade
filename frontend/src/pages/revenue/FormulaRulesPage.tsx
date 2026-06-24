@@ -141,6 +141,7 @@ export default function FormulaRulesPage({ onBack, onRulesChanged }: Props) {
   const [deleteConfirm, setDeleteConfirm] = useState<DrFormulaRule | null>(null);
   const [showVarRef, setShowVarRef] = useState(false);
   const [exprPreview, setExprPreview] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -227,6 +228,12 @@ export default function FormulaRulesPage({ onBack, onRulesChanged }: Props) {
 
   const requestSave = () => {
     if (!editDraft.target_column) return;
+    // Validate that condition_items is non-empty for only/except rules
+    if (editDraft.condition_type !== 'all' && !editDraft.condition_items?.trim()) {
+      setSaveError(`"${editDraft.condition_type}" condition requires at least one item name (comma-separated, e.g. GOLD,SILVER).`);
+      return;
+    }
+    setSaveError(null);
     const old = rules.find(r => r.id === editingId) ?? null;
     setFormulaConfirm({ old, draft: editDraft });
   };
@@ -240,9 +247,15 @@ export default function FormulaRulesPage({ onBack, onRulesChanged }: Props) {
         await api.put(`/dcr/formula-rules/${editingId}`, editDraft);
       }
       reloadRules();
-    } catch { /* silent */ }
-    setFormulaConfirm(null);
-    setEditingId(null);
+      setFormulaConfirm(null);
+      setEditingId(null);
+      setSaveError(null);
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+        || 'Failed to save rule. Check your connection and try again.';
+      setSaveError(msg);
+      setFormulaConfirm(null); // dismiss confirm modal; keep edit form open
+    }
   };
 
   const confirmDelete = async (rule: DrFormulaRule) => {
@@ -432,6 +445,14 @@ export default function FormulaRulesPage({ onBack, onRulesChanged }: Props) {
               </div>
             )}
           </div>
+
+          {/* Save error banner */}
+          {saveError && (
+            <div className="mx-0 mb-2 px-4 py-2 bg-red-50 border border-red-300 rounded-lg text-sm text-red-700 flex items-center justify-between">
+              <span>{saveError}</span>
+              <button onClick={() => setSaveError(null)} className="ml-3 text-red-400 hover:text-red-600">✕</button>
+            </div>
+          )}
 
           {/* New rule inline form */}
           {editingId === 'new' && (

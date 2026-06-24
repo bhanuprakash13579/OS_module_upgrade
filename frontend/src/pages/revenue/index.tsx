@@ -121,6 +121,9 @@ export default function RevenueModule() {
   // Formula rules — fetched once, kept in sync via FormulaRulesPage callback
   const [rules, setRules] = useState<DrFormulaRule[]>([]);
   const [rulesLoaded, setRulesLoaded] = useState(false);
+  // pendingSession: a newly-created session waiting for rules to finish loading before opening
+  const [pendingSession, setPendingSession] = useState<DrSession | null>(null);
+  const [openError, setOpenError] = useState<string | null>(null);
 
   const loadSessions = useCallback(() => {
     setLoadingSessions(true);
@@ -138,18 +141,38 @@ export default function RevenueModule() {
   }, []); // eslint-disable-line
 
   const openSession = async (s: DrSession) => {
+    setOpenError(null);
     try {
       const res = await api.get(`/dcr/sessions/${s.id}`);
       setSession(res.data);
       setView('sheet');
-    } catch { /* silent */ }
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+        || 'Failed to open session. Please try again.';
+      setOpenError(msg);
+    }
   };
 
+  // Called when a new session is created via SessionSetup.
+  // If formula rules haven't loaded yet, park the session and open it once they arrive.
   const handleSessionReady = (s: DrSession) => {
-    setSession(s);
-    setView('sheet');
     loadSessions();
+    if (rulesLoaded) {
+      setSession(s);
+      setView('sheet');
+    } else {
+      setPendingSession(s);
+    }
   };
+
+  // Open pending session once rules finish loading
+  useEffect(() => {
+    if (rulesLoaded && pendingSession) {
+      setSession(pendingSession);
+      setPendingSession(null);
+      setView('sheet');
+    }
+  }, [rulesLoaded, pendingSession]);
 
   const handleBack = () => {
     setSession(null);
@@ -420,6 +443,14 @@ export default function RevenueModule() {
             </button>
           </div>
         </div>
+
+        {/* Open-session error feedback */}
+        {openError && (
+          <div className="mb-3 px-4 py-2.5 bg-red-50 border border-red-300 rounded-xl text-sm text-red-700 flex items-center justify-between">
+            <span>{openError}</span>
+            <button onClick={() => setOpenError(null)} className="ml-3 text-red-400 hover:text-red-600">✕</button>
+          </div>
+        )}
 
         {/* Session list */}
         {loadingSessions ? (

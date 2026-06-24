@@ -868,7 +868,7 @@ async def security_middleware(request: Request, call_next):
             try:
                 from datetime import date as _d
                 _start = _d.fromisoformat(state.trial_start_date)
-                _trial_expired = (_d.today() - _start).days > state.trial_days
+                _trial_expired = (_d.today() - _start).days >= state.trial_days
             except Exception:
                 pass
         if _trial_expired:

@@ -177,7 +177,9 @@ def create_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Any active user can create another user within their module's allowed roles."""
+    """Only DC officers can register new user accounts (SDO cannot self-escalate)."""
+    if current_user.user_role != "DC":
+        raise HTTPException(status_code=403, detail="Only a DC officer can register new user accounts.")
     if data.user_role not in _VALID_ROLES:
         raise HTTPException(status_code=400, detail=f"Invalid role '{data.user_role}'. Must be one of: {', '.join(sorted(_VALID_ROLES))}")
     if db.query(User).filter(User.user_id == data.user_id).first():

@@ -240,8 +240,9 @@ export function getAutoFields(
   if (!itemDesc.trim()) return new Set();
   const auto = new Set<string>();
   const seen = new Set<string>(); // first-match-wins per column
+  const sorted = [...rules].sort((a, b) => a.sort_order - b.sort_order);
 
-  for (const rule of rules) {
+  for (const rule of sorted) {
     if (!rule.is_active) continue;
     if (seen.has(rule.target_column)) continue;
     if (ruleMatchesItem(rule, itemDesc)) {
@@ -275,8 +276,9 @@ export function computeDuties(
   const vars = buildFormulaVars(tariff, dutiableValue, goldWeightGms);
   const result: Partial<DrEntry> = {};
   const seen = new Set<string>();
+  const sorted = [...rules].sort((a, b) => a.sort_order - b.sort_order);
 
-  for (const rule of rules) {
+  for (const rule of sorted) {
     if (!rule.is_active) continue;
     const col = rule.target_column;
     if (seen.has(col)) continue;

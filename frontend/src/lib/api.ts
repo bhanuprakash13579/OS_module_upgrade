@@ -47,9 +47,16 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('cops_token');
-      localStorage.removeItem('cops_user');
-      window.dispatchEvent(new Event('auth_declined'));
+      const copsToken = localStorage.getItem('cops_token');
+      const reqAuth: string | undefined = error.config?.headers?.Authorization;
+      // Only log the user out if this request was using their own session token.
+      // Admin-panel requests carry a separate admin JWT — a 401 there must not
+      // wipe the regular user's session.
+      if (!reqAuth || reqAuth === `Bearer ${copsToken}`) {
+        localStorage.removeItem('cops_token');
+        localStorage.removeItem('cops_user');
+        window.dispatchEvent(new Event('auth_declined'));
+      }
     }
     return Promise.reject(error);
   }

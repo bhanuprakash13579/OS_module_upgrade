@@ -162,7 +162,9 @@ function RevenueRoute({ children }: { children: React.ReactNode }) {
 // so the fixed 26px banner never overlaps the top of any page.
 function TrialBannerPad() {
   const { trial_disabled, expired, isLoading } = useTrialStatus();
-  const show = !isLoading && !trial_disabled && !expired;
+  // Render while loading to prevent layout shift — default state assumes trial active.
+  // Disappears instantly if status loads and trial is disabled/expired.
+  const show = isLoading || (!trial_disabled && !expired);
   return show ? <div style={{ height: '26px' }} aria-hidden /> : null;
 }
 

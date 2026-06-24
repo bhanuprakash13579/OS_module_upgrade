@@ -293,6 +293,11 @@ def save_entries(session_id: int, body: BulkSaveRequest, db: Session = Depends(g
     sess = db.query(DrSession).filter(DrSession.id == session_id).first()
     if not sess:
         raise HTTPException(status_code=404, detail="Session not found")
+    if sess.submitted_at:
+        raise HTTPException(
+            status_code=409,
+            detail="Session has been submitted. Unsubmit it first before making changes."
+        )
 
     db.query(DrEntry).filter(DrEntry.session_id == session_id).delete()
     db.query(DrDrEntry).filter(DrDrEntry.session_id == session_id).delete()
@@ -1042,6 +1047,7 @@ def _build_monthly_revenue_sheet(ws, sessions_data: list):
 
     cur_row = 2
     sl_counter = 1
+    grand_total = 0  # Python-computed to exclude per-session subtotal rows from col-28 sum
 
     for sd in sessions_data:
         sess    = sd["session"]
@@ -1100,8 +1106,8 @@ def _build_monthly_revenue_sheet(ws, sessions_data: list):
             ws.cell(row=cur_row, column=12, value=entry.sw_sc           or None).font = Font(size=8)
             ws.cell(row=cur_row, column=13, value=entry.gold_duty_bcd   or None).font = Font(size=8)
             ws.cell(row=cur_row, column=14, value=entry.gold_duty_cons  or None).font = Font(size=8)
-            ws.cell(row=cur_row, column=15, value=entry.silver_duty_cons or None).font = Font(size=8)
-            ws.cell(row=cur_row, column=16, value=None)  # silver BCD — not in model
+            ws.cell(row=cur_row, column=15, value=None)  # silver BCD — not a separate model field
+            ws.cell(row=cur_row, column=16, value=entry.silver_duty_cons or None).font = Font(size=8)
             ws.cell(row=cur_row, column=17, value=entry.sws_on_gold   or None).font = Font(size=8)
             ws.cell(row=cur_row, column=18, value=entry.aidc_gold_silver if is_gold   else None).font = Font(size=8)
             ws.cell(row=cur_row, column=19, value=entry.sws_on_silver or None).font = Font(size=8)
@@ -1113,7 +1119,9 @@ def _build_monthly_revenue_sheet(ws, sessions_data: list):
             ws.cell(row=cur_row, column=25, value=entry.other_charges    or None).font = Font(size=8)
             ws.cell(row=cur_row, column=26, value=entry.cess_on_cig or None).font = Font(size=8)
             ws.cell(row=cur_row, column=27, value=entry.fuel_duty or None).font = Font(size=8)
-            ws.cell(row=cur_row, column=28, value=round(entry.total_duty) if entry.total_duty else None).font = Font(size=8, bold=True)
+            _entry_total = round(entry.total_duty) if entry.total_duty else 0
+            ws.cell(row=cur_row, column=28, value=_entry_total or None).font = Font(size=8, bold=True)
+            grand_total += _entry_total
 
             for ci in range(1, 32):
                 c = ws.cell(row=cur_row, column=ci)
@@ -1151,8 +1159,10 @@ def _build_monthly_revenue_sheet(ws, sessions_data: list):
             ws.cell(row=cur_row, column=3, value=date_str if is_first else "").font = Font(size=8, bold=is_first)
             ws.cell(row=cur_row, column=4, value=os_e.os_no).font = Font(size=8)
             ws.cell(row=cur_row, column=5, value=os_e.item_desc).font = Font(size=8)
+            _os_total = round(os_e.amount) if os_e.amount else 0
             ws.cell(row=cur_row, column=27, value=os_e.amount or None).font = Font(size=8)
-            ws.cell(row=cur_row, column=28, value=round(os_e.amount) if os_e.amount else None).font = Font(size=8, bold=True)
+            ws.cell(row=cur_row, column=28, value=_os_total or None).font = Font(size=8, bold=True)
+            grand_total += _os_total
             for ci in range(1, 32):
                 ws.cell(row=cur_row, column=ci).border = border
                 ws.cell(row=cur_row, column=ci).alignment = Alignment(
@@ -1195,10 +1205,12 @@ def _build_monthly_revenue_sheet(ws, sessions_data: list):
             c.alignment = Alignment(vertical="center", horizontal="right" if ci >= 6 else "left")
         ws.cell(row=cur_row, column=5).value = "GRAND TOTAL"
         ws.cell(row=cur_row, column=5).alignment = Alignment(horizontal="right", vertical="center")
-        # Sum numeric duty columns
-        for ci in range(9, 29):
+        # Cols 9-27: SUM formula is safe (subtotal rows have no data in those cols)
+        for ci in range(9, 28):
             col_letter = get_column_letter(ci)
             ws.cell(row=cur_row, column=ci).value = f"=SUM({col_letter}2:{col_letter}{data_end})"
+        # Col 28 (TOTAL): use Python-computed value to exclude per-session subtotal rows
+        ws.cell(row=cur_row, column=28).value = grand_total or None
         ws.row_dimensions[cur_row].height = 18
 
     # Column widths
