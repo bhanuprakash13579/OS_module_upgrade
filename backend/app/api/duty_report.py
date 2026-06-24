@@ -62,9 +62,12 @@ def compute_duties(tariff: DrTariff, item_desc: str, dutiable_value: float,
         auto["liquor_duty"] = 0.0
         auto["aidc_on_liquor"] = 0.0
 
-    if desc_upper in ("GOLD", "SILVER"):
+    if desc_upper == "GOLD":
         auto["gold_duty_bcd"] = round(dutiable_value * tariff.gold_bcd_rate, 2)
         auto["aidc_gold_silver"] = round(dutiable_value * tariff.aidc_gold_rate, 2)
+    elif desc_upper == "SILVER":
+        auto["gold_duty_bcd"] = round(dutiable_value * tariff.silver_bcd_rate, 2)
+        auto["aidc_gold_silver"] = round(dutiable_value * tariff.aidc_silver_rate, 2)
     else:
         auto["gold_duty_bcd"] = 0.0
 
@@ -385,6 +388,8 @@ def submit_session(
     session = db.get(DrSession, session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    if session.submitted_at:
+        raise HTTPException(status_code=409, detail="Session already submitted.")
     from datetime import datetime as _dt
     session.submitted_at = _dt.utcnow()
     session.submitted_by = body.submitted_by or "Officer"

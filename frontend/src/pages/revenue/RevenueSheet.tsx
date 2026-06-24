@@ -128,6 +128,8 @@ export default function RevenueSheet({ session: initialSession, rules, onMessage
   // Auto-save debounce
   const saveTimer = useRef<number | undefined>(undefined);
 
+  const [saveBlockedBySubmit, setSaveBlockedBySubmit] = useState(false);
+
   const doSave = useCallback(async (): Promise<boolean> => {
     setSaving(true);
     try {
@@ -138,8 +140,13 @@ export default function RevenueSheet({ session: initialSession, rules, onMessage
       });
       setSession(res.data);
       setSaved(true);
+      setSaveBlockedBySubmit(false);
       return true;
-    } catch {
+    } catch (e: unknown) {
+      // 409 = session already submitted — surface this specifically
+      if ((e as { response?: { status?: number } })?.response?.status === 409) {
+        setSaveBlockedBySubmit(true);
+      }
       return false;
     } finally {
       setSaving(false);
@@ -524,6 +531,15 @@ export default function RevenueSheet({ session: initialSession, rules, onMessage
           <AlertTriangle size={12} className="text-amber-500 shrink-0" />
           No tariff set — auto-computed columns (Bagg. Duty, Gold BCD, etc.) are inactive.
           Click <strong>Config</strong> → <em>Rates &amp; Tariff</em> to configure rates.
+        </div>
+      )}
+
+      {/* Submitted-session save block — backend rejected the save because session is submitted */}
+      {saveBlockedBySubmit && (
+        <div className="px-4 py-1.5 bg-orange-50 border-b border-orange-300 text-xs text-orange-800 flex items-center gap-2 shrink-0">
+          <AlertTriangle size={12} className="text-orange-500 shrink-0" />
+          This session has been submitted — edits cannot be saved. Click <strong>Re-open</strong> in the footer to unlock it.
+          <button onClick={() => setSaveBlockedBySubmit(false)} className="ml-auto text-orange-400 hover:text-orange-600">✕</button>
         </div>
       )}
 

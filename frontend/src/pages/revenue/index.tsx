@@ -277,7 +277,7 @@ export default function RevenueModule() {
   if (view === 'config') {
     return (
       <FormulaRulesPage
-        onBack={() => setView('dashboard')}
+        onBack={() => setView(session ? 'sheet' : 'dashboard')}
         onRulesChanged={handleRulesChanged}
       />
     );
