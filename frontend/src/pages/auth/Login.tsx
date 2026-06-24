@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ClipboardEdit, AlertTriangle, KeyRound, User, Loader2, Gavel, Search, ScanLine } from 'lucide-react';
+import { ClipboardEdit, AlertTriangle, KeyRound, User, Loader2, Gavel, Search, ScanLine, ClipboardList } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
 
 export default function Login() {
-  const { moduleType } = useParams<{ moduleType: 'sdo' | 'adjudication' | 'query' | 'apis' }>();
+  const { moduleType } = useParams<{ moduleType: 'sdo' | 'adjudication' | 'query' | 'apis' | 'revenue' }>();
   const isSDO = moduleType === 'sdo';
   const isQuery = moduleType === 'query';
   const isAdjn = moduleType === 'adjudication';
   const isApis = moduleType === 'apis';
+  const isRevenue = moduleType === 'revenue';
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -23,7 +24,7 @@ export default function Login() {
   React.useEffect(() => {
     const checkBootstrap = async () => {
       try {
-        const res = await api.get(`/auth/bootstrap/${moduleType}`);
+        const res = await api.get(`/auth/bootstrap/${isRevenue ? 'sdo' : moduleType}`);
         if (res.data?.bootstrap_needed && res.data?.credentials) {
           setBootstrapInfo(res.data.credentials);
         }
@@ -44,7 +45,8 @@ export default function Login() {
       formData.append('username', username);
       formData.append('password', password);
       // Pass the requested module to backend to enforce RBAC during token generation
-      formData.append('module_type', moduleType || '');
+      // Revenue module accepts the same credentials as SDO (any authenticated user)
+      formData.append('module_type', isRevenue ? 'sdo' : (moduleType || ''));
 
       const response = await api.post('/auth/login', formData, {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
@@ -57,6 +59,7 @@ export default function Login() {
       if (isSDO) navigate('/sdo');
       else if (isQuery) navigate('/query');
       else if (isApis) navigate('/apis');
+      else if (isRevenue) navigate('/revenue');
       else navigate('/adjudication');
 
     } catch (err: any) {
@@ -67,7 +70,7 @@ export default function Login() {
   };
 
   return (
-    <div className={`min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden ${isSDO ? 'bg-slate-50' : isQuery ? 'bg-emerald-50/50' : isApis ? 'bg-violet-50/50' : 'bg-amber-50/50'}`}>
+    <div className={`min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden ${isSDO ? 'bg-slate-50' : isQuery ? 'bg-emerald-50/50' : isApis ? 'bg-violet-50/50' : isRevenue ? 'bg-teal-50/50' : 'bg-amber-50/50'}`}>
       
       {/* Decorative background elements */}
       {isSDO && (
@@ -94,17 +97,24 @@ export default function Login() {
           <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-purple-500/10 rounded-full -z-10"></div>
         </>
       )}
+      {isRevenue && (
+        <>
+          <div className="absolute top-0 right-[-10%] w-[600px] h-[600px] bg-teal-400/20 rounded-full -z-10"></div>
+          <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-cyan-500/10 rounded-full -z-10"></div>
+        </>
+      )}
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md cursor-pointer" onClick={() => navigate('/modules')}>
         <div className="flex justify-center flex-col items-center group">
-          <div className={`p-4 rounded-2xl shadow-lg border transition-transform group-hover:scale-105 ${isSDO ? 'bg-blue-900 border-blue-800' : isQuery ? 'bg-emerald-900 border-emerald-800' : isApis ? 'bg-violet-900 border-violet-800' : 'bg-amber-800 border-amber-700'}`}>
+          <div className={`p-4 rounded-2xl shadow-lg border transition-transform group-hover:scale-105 ${isSDO ? 'bg-blue-900 border-blue-800' : isQuery ? 'bg-emerald-900 border-emerald-800' : isApis ? 'bg-violet-900 border-violet-800' : isRevenue ? 'bg-teal-800 border-teal-700' : 'bg-amber-800 border-amber-700'}`}>
             {isSDO && <ClipboardEdit className="w-12 h-12 text-blue-300" />}
             {isAdjn && <Gavel className="w-12 h-12 text-amber-300" />}
             {isQuery && <Search className="w-12 h-12 text-emerald-300" />}
             {isApis && <ScanLine className="w-12 h-12 text-violet-300" />}
+            {isRevenue && <ClipboardList className="w-12 h-12 text-teal-300" />}
           </div>
-          <h2 className={`mt-6 text-center text-3xl font-extrabold tracking-tight ${isSDO ? 'text-blue-900' : isQuery ? 'text-emerald-900' : isApis ? 'text-violet-900' : 'text-amber-900'}`}>
-            {isSDO ? 'SDO MODULE' : isQuery ? 'QUERY MODULE' : isApis ? 'COPS ↔ APIS' : 'ADJUDICATION MODULE'}
+          <h2 className={`mt-6 text-center text-3xl font-extrabold tracking-tight ${isSDO ? 'text-blue-900' : isQuery ? 'text-emerald-900' : isApis ? 'text-violet-900' : isRevenue ? 'text-teal-900' : 'text-amber-900'}`}>
+            {isSDO ? 'SDO MODULE' : isQuery ? 'QUERY MODULE' : isApis ? 'COPS ↔ APIS' : isRevenue ? 'REVENUE REPORT' : 'ADJUDICATION MODULE'}
           </h2>
           <p className="mt-2 text-center text-sm text-slate-500 font-medium">
             COPS
@@ -113,7 +123,7 @@ export default function Login() {
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10 mb-10">
-        <div className={`py-8 px-4 shadow-2xl sm:rounded-xl sm:px-10 border ${isSDO ? 'bg-white/80 border-blue-100' : isQuery ? 'bg-white/80 border-emerald-100' : isApis ? 'bg-white/80 border-violet-100' : 'bg-white/80 border-amber-200'}`}>
+        <div className={`py-8 px-4 shadow-2xl sm:rounded-xl sm:px-10 border ${isSDO ? 'bg-white/80 border-blue-100' : isQuery ? 'bg-white/80 border-emerald-100' : isApis ? 'bg-white/80 border-violet-100' : isRevenue ? 'bg-white/80 border-teal-100' : 'bg-white/80 border-amber-200'}`}>
           
           {bootstrapInfo && (
             <div className={`mb-6 p-4 rounded-lg border-2 shadow-lg ${isSDO ? 'bg-blue-50 border-blue-400' : 'bg-amber-50 border-amber-400'}`}>
@@ -169,6 +179,8 @@ export default function Login() {
                       ? 'border-slate-300 focus:border-emerald-500 focus:ring-emerald-500/20'
                       : isApis
                       ? 'border-slate-300 focus:border-violet-500 focus:ring-violet-500/20'
+                      : isRevenue
+                      ? 'border-slate-300 focus:border-teal-500 focus:ring-teal-500/20'
                       : 'border-slate-300 focus:border-amber-500 focus:ring-amber-500/20'
                   }`}
                   placeholder="Enter your Login ID"
@@ -194,6 +206,8 @@ export default function Login() {
                       ? 'border-slate-300 focus:border-emerald-500 focus:ring-emerald-500/20'
                       : isApis
                       ? 'border-slate-300 focus:border-violet-500 focus:ring-violet-500/20'
+                      : isRevenue
+                      ? 'border-slate-300 focus:border-teal-500 focus:ring-teal-500/20'
                       : 'border-slate-300 focus:border-amber-500 focus:ring-amber-500/20'
                   }`}
                   placeholder="Enter your password"
@@ -212,10 +226,12 @@ export default function Login() {
                     ? 'bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-600'
                     : isApis
                     ? 'bg-violet-600 hover:bg-violet-700 focus:ring-violet-600'
+                    : isRevenue
+                    ? 'bg-teal-600 hover:bg-teal-700 focus:ring-teal-600'
                     : 'bg-amber-700 hover:bg-amber-800 focus:ring-amber-700'
                 }`}
               >
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : `Log In to ${isSDO ? 'SDO' : isQuery ? 'Query' : isApis ? 'COPS ↔ APIS' : 'Adjudication'}`}
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : `Log In to ${isSDO ? 'SDO' : isQuery ? 'Query' : isApis ? 'COPS ↔ APIS' : isRevenue ? 'Revenue Report' : 'Adjudication'}`}
               </button>
             </div>
             
@@ -236,9 +252,9 @@ export default function Login() {
 
       {/* Footer */}
       <div className="absolute bottom-0 left-0 right-0 flex justify-center items-center py-3">
-        <p className={`text-xs tracking-widest uppercase select-none ${isSDO ? 'text-slate-400/60' : isQuery ? 'text-emerald-900/30' : isApis ? 'text-violet-900/30' : 'text-amber-900/30'}`}>
+        <p className={`text-xs tracking-widest uppercase select-none ${isSDO ? 'text-slate-400/60' : isQuery ? 'text-emerald-900/30' : isApis ? 'text-violet-900/30' : isRevenue ? 'text-teal-900/30' : 'text-amber-900/30'}`}>
           Powered by{' '}
-          <span className={`font-semibold ${isSDO ? 'text-slate-500/70' : isQuery ? 'text-emerald-900/50' : isApis ? 'text-violet-900/50' : 'text-amber-900/50'}`}>
+          <span className={`font-semibold ${isSDO ? 'text-slate-500/70' : isQuery ? 'text-emerald-900/50' : isApis ? 'text-violet-900/50' : isRevenue ? 'text-teal-900/50' : 'text-amber-900/50'}`}>
             Get Some Idea Technologies
           </span>
         </p>

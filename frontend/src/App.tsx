@@ -154,7 +154,7 @@ function RevenueRoute({ children }: { children: React.ReactNode }) {
 
   if (enabled === null) return <div className="min-h-screen bg-slate-900" />;
   if (!enabled) return <Navigate to="/modules" replace />;
-  if (!isAuthenticated) return <Navigate to="/login/sdo" replace />;
+  if (!isAuthenticated) return <Navigate to="/login/revenue" replace />;
   return <>{children}</>;
 }
 
