@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Printer } from 'lucide-react';
 import api from '../../lib/api';
+import { fitToPrintedPages, PRINT_PAGE_CLASS } from '../../lib/fitToPrintedPages';
 import { showDownloadToast } from '@/components/DownloadToast';
 
 export default function OSPrintView() {
@@ -178,13 +179,18 @@ export default function OSPrintView() {
     if (os_no && os_year) fetchRecord();
   }, [os_no, os_year]);
 
+  // Keep Ctrl+P to two sheets. Officers fall back to browser printing when the
+  // PDF download fails, and a case with many items used to spill page one onto a
+  // second sheet and push the adjudication order to a third.
+  useEffect(() => fitToPrintedPages(), []);
+
   // Pre-generate the PDF in the background as soon as the record loads.
   // On failure clear the ref so the next download attempt starts a fresh request
   // rather than re-awaiting an already-rejected promise.
   useEffect(() => {
     if (data && os_no && os_year) {
       const req = api
-        .get(`/os/${os_no}/${os_year}/print-pdf`, { responseType: 'arraybuffer' })
+        .get(`/os/${os_no}/${os_year}/print-pdf`, { responseType: 'arraybuffer', timeout: 0 })
         .then((r) => r.data);
       req.catch(() => { pdfPromiseRef.current = null; });
       pdfPromiseRef.current = req;
@@ -296,7 +302,7 @@ export default function OSPrintView() {
   const handlePrint = async () => {
     // Use the pre-generated PDF (started when page loaded); fall back to a fresh request
     const pdfReady = pdfPromiseRef.current
-      ?? api.get(`/os/${os_no}/${os_year}/print-pdf`, { responseType: 'arraybuffer' }).then((r) => r.data);
+      ?? api.get(`/os/${os_no}/${os_year}/print-pdf`, { responseType: 'arraybuffer', timeout: 0 }).then((r) => r.data);
 
     try {
       const { save } = await import('@tauri-apps/plugin-dialog');
@@ -322,7 +328,7 @@ export default function OSPrintView() {
       // promise always throws immediately without retrying the network call.
       try {
         const pdfData = await api
-          .get(`/os/${os_no}/${os_year}/print-pdf`, { responseType: 'arraybuffer' })
+          .get(`/os/${os_no}/${os_year}/print-pdf`, { responseType: 'arraybuffer', timeout: 0 })
           .then((r) => r.data);
         const blob = new Blob([pdfData], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
@@ -465,7 +471,7 @@ export default function OSPrintView() {
       <div id="os-print-pages" className="max-w-[8.5in] mx-auto mt-8 print:mt-0 print:max-w-none print:w-[8.5in] text-black leading-tight print:leading-tight space-y-8 print:space-y-0" style={{ fontFamily: '"Times New Roman", Times, serif', fontSize: '10.5pt' }}>
         
         {/* --- PAGE 1: BOOKING REPORT --- */}
-        <div className="bg-white p-8 shadow-md print:shadow-none relative print:w-[8.5in] print:max-w-[8.5in] box-border print:px-6 print:py-4 flex flex-col print:block overflow-hidden print:overflow-hidden m-auto" style={{ pageBreakAfter: 'always' }}>
+        <div className={`${PRINT_PAGE_CLASS} bg-white p-8 shadow-md print:shadow-none relative print:w-[8.5in] print:max-w-[8.5in] box-border print:px-6 print:py-4 flex flex-col print:block overflow-hidden print:overflow-hidden m-auto`} style={{ pageBreakAfter: 'always' }}>
           
           {/* Header */}
           <div className="border-4 border-solid border-black p-2 flex items-center mb-4 min-h-[5rem]">
@@ -646,7 +652,7 @@ export default function OSPrintView() {
         </div>
 
         {/* --- PAGE 2: ADJUDICATION ORDER --- */}
-        <div className="bg-white p-8 shadow-md print:shadow-none relative print:w-[8.5in] box-border print:px-6 print:py-4 flex flex-col print:block">
+        <div className={`${PRINT_PAGE_CLASS} bg-white p-8 shadow-md print:shadow-none relative print:w-[8.5in] box-border print:px-6 print:py-4 flex flex-col print:block`}>
           
           <div className="w-full text-center">
             <span className="font-bold">{p2OfficeHeading}</span>
