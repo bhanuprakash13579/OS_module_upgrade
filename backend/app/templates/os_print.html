@@ -108,6 +108,11 @@
      into 90x90 stretched it about 5% wider than it should be. */
   .header-logo img { width: 90px; height: auto; }
   .header-text { text-align: center; vertical-align: middle; padding: 4px; }
+  /* Scaled to sit against a 90px emblem. At the 9pt base these two lines read
+     as a caption beside it rather than the office's own name; em units keep
+     the relationship intact when the fit search shrinks the page. */
+  .header-text .line1 { font-size: 1.5em; font-weight: bold; line-height: 1.25; }
+  .header-text .line2 { font-size: 1.15em; line-height: 1.25; }
 
   .gap4  { margin-bottom: 4px; }
   .gap6  { margin-bottom: 6px; }

@@ -1878,8 +1878,13 @@ def print_os_pdf(
     # rather than the 12 a straight walk down the ladder needed.  Results are
     # cached in-memory keyed on a SHA-256 hash of all template data, so repeat
     # downloads of the same unchanged O/S are instant.
+    # Both ladders reach the same floor. Page 1 used to stop at 8pt, which is
+    # above what a thirty-item seizure needs — the search would exhaust the
+    # ladder, fall back to 8pt, and the booking page would silently spill onto a
+    # third page. Page 2 already went down to 5.5pt; there was no reason for the
+    # page carrying the item table to have less room to work with.
     _P2 = [11.0, 10.5, 10.0, 9.5, 9.0, 8.5, 8.0, 7.5, 7.0, 6.5, 6.0, 5.5]
-    _P1 = [11.0, 10.5, 10.0, 9.5, 9.0, 8.5, 8.0]
+    _P1 = [11.0, 10.5, 10.0, 9.5, 9.0, 8.5, 8.0, 7.5, 7.0, 6.5, 6.0, 5.5]
 
     cache_key = _font_cache_key(template_vars)
     cached = _font_cache.get(cache_key)

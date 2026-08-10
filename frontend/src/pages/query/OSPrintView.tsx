@@ -477,7 +477,13 @@ export default function OSPrintView() {
           <div className="border-4 border-solid border-black p-2 flex items-center mb-4 min-h-[5rem]">
             {/* Real Logo */}
             <div className="w-1/6 flex justify-center">
-              <img src="/customs-logo.jpg" alt="Indian Customs Logo" className="w-16 h-16 object-contain grayscale print:grayscale" />
+              {/* Matches the downloaded PDF: same PNG asset, same size. This
+                  used to be the old JPEG at 64px with a grayscale filter
+                  applied on screen as well as in print — three separate
+                  reasons the ring lettering came out unreadable. The printer
+                  converts to black and white on its own; forcing it here only
+                  cost contrast. */}
+              <img src="/customs-logo.png" alt="Indian Customs Logo" className="w-24 h-auto object-contain" />
             </div>
             {/* Header Text */}
             <div className="w-5/6 text-center font-bold flex flex-col justify-center">
