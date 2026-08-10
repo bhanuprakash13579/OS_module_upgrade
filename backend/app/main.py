@@ -134,8 +134,17 @@ def apply_sqlite_migrations():
                     conn.execute(text("ALTER TABLE dr_entries ADD COLUMN overrides TEXT"))
                 if "cess_on_cig" not in dr_cols:
                     conn.execute(text("ALTER TABLE dr_entries ADD COLUMN cess_on_cig FLOAT DEFAULT 0"))
-            except Exception:
-                pass  # table may not exist yet (first run — create_all will handle it)
+            except Exception as e:
+                # A missing table on first run is expected — create_all builds it
+                # moments later. Anything else is a migration that did NOT apply,
+                # and swallowing it means the column is absent while the code
+                # that uses it carries on as though it were there.
+                _m = str(e).lower()
+                if not ("no such table" in _m or "duplicate column" in _m):
+                    logger.error(
+                        "SCHEMA MIGRATION FAILED (dr_entries): %s — "
+                        "the application will run with a column missing.", e
+                    )
 
             # ── dr_sessions: submitted_at / submitted_by columns ──────────────
             try:
@@ -147,8 +156,15 @@ def apply_sqlite_migrations():
                     conn.execute(text("ALTER TABLE dr_sessions ADD COLUMN submitted_by VARCHAR(100)"))
                 if "challan_no" not in sess_cols:
                     conn.execute(text("ALTER TABLE dr_sessions ADD COLUMN challan_no VARCHAR(50)"))
-            except Exception:
-                pass
+            except Exception as e:
+                # Same reasoning as above: "already there" and "did not work" are
+                # different outcomes and were being treated identically.
+                _m = str(e).lower()
+                if not ("no such table" in _m or "duplicate column" in _m):
+                    logger.error(
+                        "SCHEMA MIGRATION FAILED (dr_sessions): %s — "
+                        "the application will run with a column missing.", e
+                    )
             # Auto-init trial_start_date for existing rows (idempotent)
             conn.execute(text(
                 "UPDATE feature_flags SET trial_start_date = date('now') WHERE trial_start_date IS NULL"
