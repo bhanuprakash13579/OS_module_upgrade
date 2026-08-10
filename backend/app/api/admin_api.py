@@ -119,12 +119,18 @@ _TABLE_REGISTRY = [
     ("item_cat_master.csv",        ItemCatMaster,       ("category_code",),                        ("category_code",)),
     ("duty_rate_master.csv",       DutyRateMaster,      ("duty_category", "from_date"),            ("duty_category", "from_date")),
     ("br_no_limits.csv",           BrNoLimits,          ("br_type",),                              ("br_type",)),
-    # Baggage
-    ("br_master.csv",              BrMaster,            ("br_no", "br_date", "br_type"),           ("br_date", "br_no")),
-    ("br_items.csv",               BrItems,             ("br_no", "br_date", "items_sno"),         ("br_date", "br_no", "items_sno")),
-    # Detention
-    ("dr_master.csv",              DrMaster,            ("dr_no", "dr_date"),                      ("dr_date", "dr_no")),
-    ("dr_items.csv",               DrItems,             ("dr_no", "items_sno"),                    ("dr_no", "items_sno")),
+    # Baggage and Detention are deliberately NOT here.
+    #
+    # They have dedicated restore blocks further down which validate the date,
+    # the type and the number before inserting, and which key on the pairs the
+    # database actually enforces. Listing them here as well meant every row was
+    # offered to BOTH paths: the generic loop keyed on (br_no, br_date, br_type)
+    # while the block keyed on (br_no, br_year), the two disagreed about what
+    # already existed, and br_master came back from a restore with every record
+    # duplicated — 334,546 receipts became 669,092.
+    #
+    # One table, one restore path. If these ever need to be generic again, the
+    # dedicated blocks must go in the same change.
     # Fuel
     ("fuel_master.csv",            FuelMaster,          ("br_no", "br_date"),                      ("br_date", "br_no")),
     # OS (offence)
@@ -983,6 +989,11 @@ def admin_restore_backup(
     existing_masters = _existing_os_keys(db)
     existing_items = _existing_item_keys(db)
     master_inserted = master_skipped = items_inserted = items_skipped = 0
+    # Active (os_no, os_year) pairs already present, plus the ones this file adds.
+    # Seeded from the database so a second restore into a populated system behaves
+    # the same as the first.
+    seen_active_keys = {(k[0], k[1]) for k in existing_masters}
+    master_conflicts: list[dict] = []
 
     # ── Restore cops_master ──────────────────────────────────────────────────
     master_text = zf.read("cops_master.csv").decode("utf-8-sig")
@@ -999,6 +1010,33 @@ def admin_restore_backup(
         if key in existing_masters:
             master_skipped += 1
             continue
+
+        # The database enforces UNIQUE (os_no, os_year) for active rows —
+        # uq_cops_master_os_no_year_active. The key above ALSO includes
+        # location_code, so two rows that differ only in location passed this
+        # guard and then violated the index, and one IntegrityError abandoned the
+        # entire restore: 29,071 good records lost to 29 conflicts.
+        #
+        # Legacy data really does contain them. In the office's own backup, OS
+        # 55/2004 appears twice as two different passengers — the old system
+        # allowed one number to be reused, and the new schema does not.
+        #
+        # Guard on exactly what the index enforces, and RECORD what was set
+        # aside. Dropping 29 case records silently would be the worse failure of
+        # the two, so they are returned to the caller by number and name.
+        active = (row.get("entry_deleted") or "N").strip().upper() != "Y"
+        uniq = (os_no, os_year)
+        if active and uniq in seen_active_keys:
+            master_conflicts.append({
+                "os_no": os_no,
+                "os_year": os_year,
+                "pax_name": (row.get("pax_name") or "").strip(),
+                "os_date": (row.get("os_date") or "").strip(),
+            })
+            master_skipped += 1
+            continue
+        if active:
+            seen_active_keys.add(uniq)
 
         kwargs = {"os_no": os_no, "os_year": os_year, "location_code": location_code}
         for col in _MASTER_COLS:
@@ -1665,6 +1703,12 @@ def admin_restore_backup(
     return {
         "master_inserted": master_inserted,
         "master_skipped": master_skipped,
+        # Cases the backup holds twice under one OS number and year, which the
+        # active-records index does not allow. Returned by number and name rather
+        # than counted, because "29 skipped" tells an officer nothing they can
+        # act on and these are real cases someone has to look at.
+        "master_conflicts": master_conflicts,
+        "master_conflict_count": len(master_conflicts),
         "items_inserted": items_inserted,
         "items_skipped": items_skipped,
         "statutes_inserted": statutes_inserted,
