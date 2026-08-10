@@ -867,35 +867,63 @@ def admin_restore_backup(
                 pass
         raise HTTPException(status_code=400, detail="Cannot read uploaded file.")
 
+    # ── Open the archive, and say plainly when it cannot be opened ───────────
+    #
+    # Backups are AES-encrypted ZIPs. Python's own zipfile can LIST the entries
+    # of one but cannot decrypt them, and the old code fell back to it whenever
+    # pyzipper was missing or its test-read failed. The consequence was a
+    # restore that got past the "contains cops_master.csv" check and then threw
+    # while reading, with nothing said about the real cause — which is exactly
+    # what a packaged build missing pyzipper produced: a backup that restored in
+    # development and would not restore on Windows.
+    #
+    # A reader that cannot read the file is not a fallback. Each failure now
+    # names itself.
+    def _is_aes(path: str) -> bool:
+        try:
+            with zipfile.ZipFile(path) as _probe:
+                return any(i.compress_type == 99 for i in _probe.infolist())
+        except zipfile.BadZipFile:
+            return False
+
     zf = None
-    if _PYZIPPER_AVAILABLE:
+    _open_error = None
+    try:
+        _aes = _is_aes(_zip_tmp)
+    except Exception:
+        _aes = False
+
+    if _aes and not _PYZIPPER_AVAILABLE:
+        _open_error = (
+            "This backup is encrypted, but this installation cannot open encrypted "
+            "backups (the pyzipper component is missing from the build). The file "
+            "itself is fine — it will restore on a build that includes it."
+        )
+    elif _aes:
         try:
             _zf = _pyzipper.AESZipFile(_zip_tmp)
             _zf.setpassword(get_zip_password())
-            # Test-read the first file to verify the password works
-            _zf.read(_zf.namelist()[0])
+            _zf.read(_zf.namelist()[0])   # prove the password before trusting it
             zf = _zf
-        except (RuntimeError, zipfile.BadZipFile):
-            # Wrong password or not AES-encrypted — try as plain ZIP
-            try:
-                zf = zipfile.ZipFile(_zip_tmp)
-            except zipfile.BadZipFile:
-                pass
+        except RuntimeError:
+            _open_error = (
+                "The backup could not be decrypted. It was created by an "
+                "installation with a different password."
+            )
         except zipfile.BadZipFile:
-            pass
-        # Any other exception (IOError, MemoryError, etc.) propagates — it's a real error
+            _open_error = "The file is not a valid ZIP archive."
     else:
         try:
             zf = zipfile.ZipFile(_zip_tmp)
         except zipfile.BadZipFile:
-            pass
+            _open_error = "The file is not a valid ZIP archive."
 
     if zf is None:
         try:
             os.unlink(_zip_tmp)
         except OSError:
             pass
-        raise HTTPException(status_code=400, detail="File is not a valid ZIP archive.")
+        raise HTTPException(status_code=400, detail=_open_error or "File is not a valid ZIP archive.")
 
     if "cops_master.csv" not in zf.namelist():
         try:

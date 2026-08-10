@@ -85,6 +85,26 @@ a = Analysis(
         'multipart',
         # aiosqlite
         'aiosqlite',
+        # pyzipper + Cryptodome — AES-256 encrypted backup ZIPs.
+        # MUST be explicit. pyzipper is imported inside a try/except ImportError,
+        # so when PyInstaller misses it the application still starts and the
+        # failure only appears at a restore: the archive lists its entries, the
+        # "contains cops_master.csv" check passes, and reading throws. That is
+        # precisely the bug this line fixes — a backup that would not restore on
+        # Windows while restoring fine in development.
+        'pyzipper',
+        'pyzipper.zipfile',
+        'pyzipper.zipfile_aes',
+        'Cryptodome',
+        'Cryptodome.Cipher',
+        'Cryptodome.Cipher.AES',
+        'Cryptodome.Hash',
+        'Cryptodome.Hash.SHA1',
+        'Cryptodome.Hash.HMAC',
+        'Cryptodome.Protocol',
+        'Cryptodome.Protocol.KDF',
+        'Cryptodome.Util',
+        'Cryptodome.Util.Padding',
         # sqlcipher3 — AES-256 SQLite encryption (must be explicit; loaded via importlib)
         'sqlcipher3',
         'sqlcipher3.dbapi2',
