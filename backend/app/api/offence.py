@@ -1471,8 +1471,15 @@ def print_os_pdf(
         _base = Path(getattr(_sys, '_MEIPASS', '')) / "frontend_dist"
     else:
         _base = Path(__file__).parent.parent.parent.parent / "frontend" / "dist"
-    logo_file = _base / "customs-logo.jpg"
-    logo_path = logo_file.as_uri() if logo_file.exists() else ""
+    # Prefer the PNG. The emblem is line art with fine ring lettering, and
+    # JPEG's ringing artefacts land exactly on it — the part that has to stay
+    # legible in a black-and-white print. The JPEG stays as a fallback so an
+    # older bundle that has not been rebuilt still prints an emblem.
+    logo_file = next(
+        (p for p in (_base / "customs-logo.png", _base / "customs-logo.jpg") if p.exists()),
+        None,
+    )
+    logo_path = logo_file.as_uri() if logo_file else ""
 
     # ── Render template (cached across requests) ──────────────────────────────
     tmpl = _get_pdf_template()
@@ -1864,13 +1871,13 @@ def print_os_pdf(
     template_vars["para_pp_html"]              = _paragraphize(template_vars["para_pp"],              _STYLE_ORDER_LAST)
 
     # ── Generate PDF ───────────────────────────────────────────────────────────
-    # Two independent top-down searches (Page 1 font, Page 2 font) run in
-    # parallel using a 2-worker thread pool.  Top-down starts from the largest
-    # font and stops at the first size that fits on one page — for routine
-    # 1-to-4 item bookings this resolves in a single render instead of the 3
-    # that a binary search needs.  Results are cached in-memory keyed on a
-    # SHA-256 hash of all template data, so repeat downloads of the same
-    # unchanged O/S are instant.
+    # Two independent searches (Page 1 font, Page 2 font) run in parallel on a
+    # 2-worker thread pool.  Each probes the largest font first — a routine
+    # 1-to-4 item booking fits at 11pt and resolves in a single render — and
+    # binary-searches only when it does not, so a long case costs 5 renders
+    # rather than the 12 a straight walk down the ladder needed.  Results are
+    # cached in-memory keyed on a SHA-256 hash of all template data, so repeat
+    # downloads of the same unchanged O/S are instant.
     _P2 = [11.0, 10.5, 10.0, 9.5, 9.0, 8.5, 8.0, 7.5, 7.0, 6.5, 6.0, 5.5]
     _P1 = [11.0, 10.5, 10.0, 9.5, 9.0, 8.5, 8.0]
 
@@ -1884,15 +1891,36 @@ def print_os_pdf(
         test_vars["logo_path"] = ""          # skip image I/O during sizing
 
         def _fit_page(sizes, page_no):
-            """Top-down search: return largest font size that fits on one page."""
-            for size in sizes:
+            """Largest font size in `sizes` that still fits on one page.
+
+            `sizes` runs largest first, and fitting is monotonic along it:
+            once a size fits, every smaller size fits too. So probe the
+            largest directly — a routine booking fits at 11pt and costs a
+            single render, which is the overwhelmingly common case — and
+            only fall back to a binary search when it does not. That bounds
+            a long case at 5 renders instead of walking all twelve, which
+            was several seconds the officer spent watching a spinner.
+            """
+            def _fits(i):
                 html = tmpl.render(**test_vars, **{
-                    f"p{page_no}_font_size": f"{size}pt",
+                    f"p{page_no}_font_size": f"{sizes[i]}pt",
                     "only_page": page_no,
                 })
-                if len(WeasyHTML(string=html).render().pages) <= 1:
-                    return f"{size}pt"
-            return f"{sizes[-1]}pt"          # fallback to smallest
+                return len(WeasyHTML(string=html).render().pages) <= 1
+
+            if _fits(0):
+                return f"{sizes[0]}pt"
+
+            lo, hi = 1, len(sizes) - 1
+            best = len(sizes) - 1            # fallback to smallest
+            while lo <= hi:
+                mid = (lo + hi) // 2
+                if _fits(mid):
+                    best = mid               # fits — try a larger one
+                    hi = mid - 1
+                else:
+                    lo = mid + 1
+            return f"{sizes[best]}pt"
 
         with _ThreadPoolExecutor(max_workers=2) as _pool:
             _f1 = _pool.submit(_fit_page, _P1, 1)

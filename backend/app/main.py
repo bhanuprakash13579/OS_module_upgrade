@@ -12,6 +12,7 @@ from datetime import date
 import logging
 import os
 import sys
+import threading
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -772,6 +773,32 @@ def _llog(msg: str) -> None:
         pass
 
 
+def _warm_pdf_engine() -> None:
+    """Pay WeasyPrint's start-up cost before anyone asks for a PDF.
+
+    Importing WeasyPrint takes about 0.7s and its first render another 0.2s,
+    because that first render is when it discovers and parses the system
+    fonts. Whoever printed the first O/S after each launch was paying for
+    both, on top of their own document — it looked like the print was slow
+    when most of it was the engine waking up.
+
+    Runs on a daemon thread so startup does not wait for it, and so a machine
+    with a broken font configuration still gets a working application: the
+    print path imports WeasyPrint itself and will surface the real error
+    there. Failure here only means the warm-up did not help.
+    """
+    def _warm():
+        try:
+            from weasyprint import HTML
+            HTML(string="<html><body>warm</body></html>").render()
+            _llog("PDF engine warm")
+        except Exception as e:
+            _llog(f"PDF engine warm-up failed ({type(e).__name__}: {e}) — "
+                  "printing will still work but the first O/S will be slower")
+
+    threading.Thread(target=_warm, name="pdf-warmup", daemon=True).start()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Create all tables and seed data on startup."""
@@ -792,6 +819,9 @@ async def lifespan(app: FastAPI):
         _llog("_load_state_from_db starting...")
         _load_state_from_db()
         _llog("_load_state_from_db done")
+
+        _llog("warming the PDF engine in the background...")
+        _warm_pdf_engine()
 
         _llog("lifespan startup complete — yielding")
     except BaseException as e:
