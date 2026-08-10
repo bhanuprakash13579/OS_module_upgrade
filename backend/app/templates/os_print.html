@@ -98,8 +98,15 @@
     border-collapse: collapse;
     margin-bottom: 8px;
   }
-  .header-logo { width: 70px; text-align: center; vertical-align: middle; padding: 4px; }
-  .header-logo img { width: 60px; height: 60px; }
+  /* The emblem carries ring lettering — "CUSTOMS AND CENTRAL EXCISE" and
+     "GOVERNMENT OF INDIA" — that has to survive a black-and-white laser print.
+     At 60px those letters were about two pixels tall and the printer's halftone
+     screen turned them into a smudge. 90px is where they become readable; the
+     cell grows with it so the heading stays centred. */
+  .header-logo { width: 100px; text-align: center; vertical-align: middle; padding: 4px; }
+  /* height:auto, not a fixed square — the emblem is 1170x1230, and forcing it
+     into 90x90 stretched it about 5% wider than it should be. */
+  .header-logo img { width: 90px; height: auto; }
   .header-text { text-align: center; vertical-align: middle; padding: 4px; }
 
   .gap4  { margin-bottom: 4px; }
