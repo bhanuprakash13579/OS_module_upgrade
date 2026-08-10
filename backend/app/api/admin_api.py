@@ -119,18 +119,12 @@ _TABLE_REGISTRY = [
     ("item_cat_master.csv",        ItemCatMaster,       ("category_code",),                        ("category_code",)),
     ("duty_rate_master.csv",       DutyRateMaster,      ("duty_category", "from_date"),            ("duty_category", "from_date")),
     ("br_no_limits.csv",           BrNoLimits,          ("br_type",),                              ("br_type",)),
-    # Baggage and Detention are deliberately NOT here.
-    #
-    # They have dedicated restore blocks further down which validate the date,
-    # the type and the number before inserting, and which key on the pairs the
-    # database actually enforces. Listing them here as well meant every row was
-    # offered to BOTH paths: the generic loop keyed on (br_no, br_date, br_type)
-    # while the block keyed on (br_no, br_year), the two disagreed about what
-    # already existed, and br_master came back from a restore with every record
-    # duplicated — 334,546 receipts became 669,092.
-    #
-    # One table, one restore path. If these ever need to be generic again, the
-    # dedicated blocks must go in the same change.
+    # Baggage
+    ("br_master.csv",              BrMaster,            ("br_no", "br_date", "br_type"),           ("br_date", "br_no")),
+    ("br_items.csv",               BrItems,             ("br_no", "br_date", "items_sno"),         ("br_date", "br_no", "items_sno")),
+    # Detention
+    ("dr_master.csv",              DrMaster,            ("dr_no", "dr_date"),                      ("dr_date", "dr_no")),
+    ("dr_items.csv",               DrItems,             ("dr_no", "items_sno"),                    ("dr_no", "items_sno")),
     # Fuel
     ("fuel_master.csv",            FuelMaster,          ("br_no", "br_date"),                      ("br_date", "br_no")),
     # OS (offence)
@@ -1296,8 +1290,26 @@ def admin_restore_backup(
 
     # ── Restore all registered tables (additive only — never overwrites existing) ─
     registry_counts: dict = {}
+    # This registry drives BOTH the export and this loop. These four are exported
+    # from it and restored by the dedicated blocks further down — which validate
+    # the date, the type and the number, and key on the pairs the database
+    # actually enforces.
+    #
+    # Restoring them here as well meant every row was offered to two paths that
+    # disagreed about what already existed: the loop keys on
+    # (br_no, br_date, br_type), the block on (br_no, br_year). br_master came
+    # back from a restore with every record duplicated — 334,546 receipts became
+    # 669,092.
+    #
+    # Skipping them HERE rather than removing them from the registry is
+    # deliberate: taking them out stopped them being EXPORTED at all, which is
+    # the worse bug of the two and is why backups must be round-tripped, not
+    # just restored.
+    _RESTORED_BY_DEDICATED_BLOCK = {
+        "br_master.csv", "br_items.csv", "dr_master.csv", "dr_items.csv",
+    }
     for csv_name, model, unique_cols, _order_cols in _TABLE_REGISTRY:
-        if csv_name not in zf.namelist():
+        if csv_name not in zf.namelist() or csv_name in _RESTORED_BY_DEDICATED_BLOCK:
             continue
         cols = _model_cols(model)
         # Build existing key set from unique columns
