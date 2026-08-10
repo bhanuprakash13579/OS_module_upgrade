@@ -1,0 +1,2 @@
+\contentsline {chapter}{\numberline {1}Advanced Linear Algebra}{5}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Unit 1: Linear Transformations}{5}{section.1.1}%

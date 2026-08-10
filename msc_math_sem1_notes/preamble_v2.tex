@@ -1,0 +1,351 @@
+% =====================================================================
+% MSc Mathematics Semester 1 — Complete Study Booklet
+% Publication-quality preamble for XeLaTeX
+% =====================================================================
+
+\documentclass[11pt,a4paper,openany]{book}
+
+% --- Core math + typography ------------------------------------------
+\usepackage{amsmath,amsthm}
+\usepackage{mathtools}      % \DeclarePairedDelimiter, \xrightarrow
+\usepackage{cancel}         % \cancel{...} for canceling terms in derivations
+
+% --- XeLaTeX font setup ----------------------------------------------
+\usepackage{fontspec}
+\usepackage{unicode-math}   % keeps Unicode math characters working
+\setmainfont{Latin Modern Roman}[Numbers=OldStyle]
+\setsansfont{Latin Modern Sans}
+\setmonofont{Latin Modern Mono}[Scale=0.92]
+\setmathfont{Latin Modern Math}
+
+% --- Graphics + TikZ for cover/diagrams ------------------------------
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{calc,arrows.meta,positioning,decorations.pathreplacing}
+
+% --- Page geometry ---------------------------------------------------
+\usepackage[a4paper,top=2.6cm,bottom=2.6cm,left=2.4cm,right=2.4cm,
+            headheight=15pt,footskip=1.2cm]{geometry}
+\usepackage{microtype}      % refined typography
+\usepackage{ragged2e}
+\usepackage{parskip}        % paragraph spacing instead of indent
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.55em plus 0.1em minus 0.1em}
+
+% --- Color palette (publisher-grade, restful on the eye) -------------
+\usepackage{xcolor}
+\definecolor{NavyDeep}{HTML}{1A2A57}      % covers, chapter titles
+\definecolor{NavyMid}{HTML}{2C3E70}       % section titles
+\definecolor{NavySoft}{HTML}{4A5C90}      % subsection titles
+\definecolor{InkBlack}{HTML}{1B1B1F}      % body
+\definecolor{Stone}{HTML}{555B66}         % captions, headers
+
+\definecolor{DefBlue}{HTML}{1F6FB2}       % definition border
+\definecolor{DefBlueBg}{HTML}{EAF3FB}     % definition background
+\definecolor{ThmPlum}{HTML}{6B2C8F}       % theorem border
+\definecolor{ThmPlumBg}{HTML}{F4ECF8}     % theorem background
+\definecolor{LemmaTeal}{HTML}{1F7A6F}     % lemma/corollary border
+\definecolor{LemmaTealBg}{HTML}{E5F3F1}   % lemma background
+\definecolor{ProofGray}{HTML}{4A4A4A}     % proof border
+\definecolor{ProofGrayBg}{HTML}{F4F4F4}   % proof background
+\definecolor{ExGreen}{HTML}{2D7A3A}       % example border
+\definecolor{ExGreenBg}{HTML}{E9F5EC}     % example background
+\definecolor{ExamRed}{HTML}{B5292B}       % NET / Exam tip border
+\definecolor{ExamRedBg}{HTML}{FBE9E9}     % NET / Exam tip background
+\definecolor{TipAmber}{HTML}{B07A0E}      % memory aid / mnemonic border
+\definecolor{TipAmberBg}{HTML}{FCF4DD}    % memory aid background
+\definecolor{IntuitTeal}{HTML}{0E6E78}    % intuition border
+\definecolor{IntuitTealBg}{HTML}{E0F2F4}  % intuition background
+\definecolor{PreReqSand}{HTML}{8B6F47}    % prerequisite border
+\definecolor{PreReqSandBg}{HTML}{FAF3E5}  % prerequisite background
+\definecolor{WarnOrange}{HTML}{C8551A}    % pitfall warning border
+\definecolor{WarnOrangeBg}{HTML}{FBEBDD}  % pitfall warning background
+
+% --- Hyperref / bookmarks --------------------------------------------
+\usepackage[bookmarks=true,bookmarksopen=true,bookmarksdepth=2,
+            colorlinks=true,linkcolor=NavyMid,urlcolor=NavyMid,
+            citecolor=NavyMid,pdftitle={MSc Mathematics Semester 1 — Complete Study Booklet},
+            pdfauthor={MSc Mathematics Booklet},
+            pdfsubject={CSIR NET / Manipal University Exam Preparation}]{hyperref}
+
+% --- Boxes & frames --------------------------------------------------
+\usepackage[most,breakable,skins,theorems]{tcolorbox}
+\tcbset{
+  enhanced, sharp corners=northwest, sharp corners=southeast,
+  rounded corners=northeast, rounded corners=southwest,
+  arc=4pt, boxrule=0.6pt, left=10pt, right=10pt, top=6pt, bottom=6pt,
+  fonttitle=\bfseries\sffamily,
+  breakable
+}
+
+% Definition box -- blue
+\newtcolorbox{definitionbox}[1][]{%
+  colback=DefBlueBg, colframe=DefBlue, coltitle=white,
+  title={\textsf{Definition}\;#1}, attach boxed title to top left={xshift=8pt,yshift=-7pt},
+  boxed title style={colback=DefBlue,sharp corners,boxrule=0pt,left=6pt,right=6pt}
+}
+
+% Theorem box -- plum
+\newtcolorbox{theorembox}[1][]{%
+  colback=ThmPlumBg, colframe=ThmPlum, coltitle=white,
+  title={\textsf{Theorem}\;#1}, attach boxed title to top left={xshift=8pt,yshift=-7pt},
+  boxed title style={colback=ThmPlum,sharp corners,boxrule=0pt,left=6pt,right=6pt}
+}
+
+% Lemma / Corollary -- teal
+\newtcolorbox{lemmabox}[1][]{%
+  colback=LemmaTealBg, colframe=LemmaTeal, coltitle=white,
+  title={\textsf{Lemma}\;#1}, attach boxed title to top left={xshift=8pt,yshift=-7pt},
+  boxed title style={colback=LemmaTeal,sharp corners,boxrule=0pt,left=6pt,right=6pt}
+}
+\newtcolorbox{corollarybox}[1][]{%
+  colback=LemmaTealBg, colframe=LemmaTeal, coltitle=white,
+  title={\textsf{Corollary}\;#1}, attach boxed title to top left={xshift=8pt,yshift=-7pt},
+  boxed title style={colback=LemmaTeal,sharp corners,boxrule=0pt,left=6pt,right=6pt}
+}
+
+% Proof box -- gray
+\newtcolorbox{proofbox}[1][]{%
+  colback=ProofGrayBg, colframe=ProofGray, coltitle=white,
+  title={\textsf{Proof}\;#1}, attach boxed title to top left={xshift=8pt,yshift=-7pt},
+  boxed title style={colback=ProofGray,sharp corners,boxrule=0pt,left=6pt,right=6pt}
+}
+
+% Example box -- green
+\newtcolorbox{examplebox}[1][]{%
+  colback=ExGreenBg, colframe=ExGreen, coltitle=white,
+  title={\textsf{Worked Example}\;#1}, attach boxed title to top left={xshift=8pt,yshift=-7pt},
+  boxed title style={colback=ExGreen,sharp corners,boxrule=0pt,left=6pt,right=6pt}
+}
+
+% Exam tip / CSIR-NET box -- red
+\newtcolorbox{exambox}[1][]{%
+  colback=ExamRedBg, colframe=ExamRed, coltitle=white,
+  title={\textsf{CSIR NET / Exam Tip}\;#1}, attach boxed title to top left={xshift=8pt,yshift=-7pt},
+  boxed title style={colback=ExamRed,sharp corners,boxrule=0pt,left=6pt,right=6pt}
+}
+
+% Memory aid / Mnemonic -- amber
+\newtcolorbox{mnemonicbox}[1][]{%
+  colback=TipAmberBg, colframe=TipAmber, coltitle=white,
+  title={\textsf{Memory Aid}\;#1}, attach boxed title to top left={xshift=8pt,yshift=-7pt},
+  boxed title style={colback=TipAmber,sharp corners,boxrule=0pt,left=6pt,right=6pt}
+}
+
+% Intuition / In Plain English -- teal
+\newtcolorbox{intuitbox}[1][]{%
+  colback=IntuitTealBg, colframe=IntuitTeal, coltitle=white,
+  title={\textsf{Intuition / Plain English}\;#1}, attach boxed title to top left={xshift=8pt,yshift=-7pt},
+  boxed title style={colback=IntuitTeal,sharp corners,boxrule=0pt,left=6pt,right=6pt}
+}
+
+% Prerequisite recap -- sand
+\newtcolorbox{prereqbox}[1][]{%
+  colback=PreReqSandBg, colframe=PreReqSand, coltitle=white,
+  title={\textsf{Quick Refresher}\;#1}, attach boxed title to top left={xshift=8pt,yshift=-7pt},
+  boxed title style={colback=PreReqSand,sharp corners,boxrule=0pt,left=6pt,right=6pt}
+}
+
+% Common pitfall -- orange
+\newtcolorbox{pitfallbox}[1][]{%
+  colback=WarnOrangeBg, colframe=WarnOrange, coltitle=white,
+  title={\textsf{Common Pitfall}\;#1}, attach boxed title to top left={xshift=8pt,yshift=-7pt},
+  boxed title style={colback=WarnOrange,sharp corners,boxrule=0pt,left=6pt,right=6pt}
+}
+
+% --- Header / footer -------------------------------------------------
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE]{\small\textsf{\nouppercase{\leftmark}}}
+\fancyhead[RO]{\small\textsf{\nouppercase{\rightmark}}}
+\fancyfoot[C]{\small\textsf{\thepage}}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{NavyMid}\leaders\hrule height \headrulewidth\hfill}}
+
+% --- Title styling ---------------------------------------------------
+\usepackage{titlesec}
+\titleformat{\chapter}[display]
+  {\normalfont\sffamily\Huge\bfseries\color{NavyDeep}}
+  {\filright\Large\textsc{Chapter}\,\thechapter}{14pt}{\Huge}
+\titlespacing*{\chapter}{0pt}{30pt}{20pt}
+
+\titleformat{\section}
+  {\normalfont\sffamily\LARGE\bfseries\color{NavyMid}}
+  {\thesection}{0.8em}{}
+\titlespacing*{\section}{0pt}{16pt}{8pt}
+
+\titleformat{\subsection}
+  {\normalfont\sffamily\Large\bfseries\color{NavySoft}}
+  {\thesubsection}{0.7em}{}
+\titlespacing*{\subsection}{0pt}{12pt}{6pt}
+
+\titleformat{\subsubsection}
+  {\normalfont\sffamily\large\bfseries\color{NavySoft!90!black}}
+  {\thesubsubsection}{0.6em}{}
+\titlespacing*{\subsubsection}{0pt}{10pt}{4pt}
+
+% --- Lists -----------------------------------------------------------
+\usepackage{enumitem}
+\setlist[itemize]{topsep=2pt,itemsep=2pt,parsep=0pt,leftmargin=1.4em,
+                  label=\textcolor{NavyMid}{\small\textbullet}}
+\setlist[enumerate]{topsep=2pt,itemsep=2pt,parsep=0pt,leftmargin=1.6em,
+                    label=\textcolor{NavyMid}{\textbf{\arabic*.}}}
+
+% --- Tables ----------------------------------------------------------
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{multirow}
+\renewcommand{\arraystretch}{1.18}
+
+% --- Caption styling -------------------------------------------------
+\usepackage[font=small,labelfont={bf,sf,color=NavyMid}]{caption}
+
+% --- TOC styling -----------------------------------------------------
+\usepackage{titletoc}
+\usepackage[titles]{tocloft}
+\renewcommand{\cftchapfont}{\bfseries\sffamily\color{NavyDeep}}
+\renewcommand{\cftchappagefont}{\bfseries\color{NavyDeep}}
+\renewcommand{\cftsecfont}{\sffamily\color{InkBlack}}
+\renewcommand{\cftsubsecfont}{\sffamily\color{Stone}}
+
+% --- Math operators & shortcuts --------------------------------------
+\DeclareMathOperator{\Tr}{Tr}
+\DeclareMathOperator{\rank}{rank}
+\DeclareMathOperator{\nullity}{nullity}
+\DeclareMathOperator{\nul}{null}
+\DeclareMathOperator{\dimension}{dim}
+\DeclareMathOperator{\Span}{span}
+\DeclareMathOperator{\Hom}{Hom}
+\DeclareMathOperator{\End}{End}
+\DeclareMathOperator{\diag}{diag}
+\DeclareMathOperator{\im}{Im}
+\DeclareMathOperator{\Real}{Re}
+\DeclareMathOperator{\Imag}{Im}
+\DeclareMathOperator{\sgn}{sgn}
+\DeclareMathOperator{\interior}{int}
+\DeclareMathOperator*{\esssup}{ess\,sup}
+\DeclareMathOperator{\proj}{proj}
+\DeclareMathOperator{\Var}{Var}
+\DeclareMathOperator{\Cov}{Cov}
+% Field shortcuts
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\C}{\mathbb{C}}
+\newcommand{\Q}{\mathbb{Q}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\F}{\mathbb{F}}
+\newcommand{\K}{\mathbb{K}}
+
+% Common shortcuts
+\newcommand{\eps}{\varepsilon}
+\newcommand{\ph}{\varphi}
+\newcommand{\To}{\longrightarrow}
+\newcommand{\iso}{\cong}
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+\newcommand{\abs}[1]{\left\lvert#1\right\rvert}
+\newcommand{\inner}[2]{\langle #1,\,#2\rangle}
+\newcommand{\set}[1]{\left\{#1\right\}}
+\newcommand{\setbuilder}[2]{\left\{\,#1 : #2\,\right\}}
+\newcommand{\restr}[2]{\left.#1\right|_{#2}}
+\newcommand{\indicator}[1]{\mathbf{1}_{#1}}
+\newcommand{\dd}{\,\mathrm{d}}
+% Fallbacks for amssymb-style symbols not always present under unicode-math.
+\providecommand{\blacksquare}{\mbox{\rule[0.05em]{0.55em}{0.55em}}}
+\providecommand{\square}{\mbox{\fbox{\rule{0pt}{0.5em}\rule{0.5em}{0pt}}}}
+\renewcommand{\qedsymbol}{\ensuremath{\blacksquare}}
+
+% --- Reset toc/loft conditioning ------------------------------------
+\setcounter{tocdepth}{2}
+\setcounter{secnumdepth}{2}
+
+% Avoid pandoc-introduced commands gripes
+\providecommand{\tightlist}{\setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\providecommand{\pandocbounded}[1]{#1}
+\providecommand{\real}{\Real}
+
+% Allow widow/orphan control
+\widowpenalty=10000
+\clubpenalty=10000
+\raggedbottom
+
+% =====================================================================
+\begin{document}
+
+% --- Cover -----------------------------------------------------------
+\begin{titlepage}
+\thispagestyle{empty}
+\begin{tikzpicture}[remember picture, overlay]
+  \fill[NavyDeep] (current page.south west) rectangle (current page.north east);
+  \fill[NavyMid!90] ([yshift=-3.5cm]current page.north west) rectangle ([yshift=-4cm]current page.north east);
+  \node[anchor=north,white,font=\sffamily\fontsize{14}{18}\selectfont,inner sep=0pt]
+    at ([yshift=-2.3cm]current page.north) {MANIPAL UNIVERSITY JAIPUR \quad\textbar\quad DISTANCE EDUCATION};
+  \node[anchor=center,white,font=\sffamily\fontsize{56}{64}\selectfont\bfseries]
+    at ([yshift=4cm]current page.center) {MSc Mathematics};
+  \node[anchor=center,white!95,font=\sffamily\fontsize{28}{34}\selectfont]
+    at ([yshift=2cm]current page.center) {Semester 1 --- Complete Study Booklet};
+  \draw[white,line width=1.4pt]
+    ([yshift=0.6cm,xshift=-6cm]current page.center) --
+    ([yshift=0.6cm,xshift=6cm]current page.center);
+  \node[anchor=center,white!90,font=\sffamily\fontsize{18}{22}\selectfont\itshape,align=center]
+    at ([yshift=-0.4cm]current page.center)
+    {Prepared for CSIR NET Qualification\\\& University Examinations};
+  \node[anchor=center,white!85,font=\sffamily\fontsize{12}{16}\selectfont,align=center]
+    at ([yshift=-3cm]current page.center)
+    {Linear Algebra \;\textbullet\; Real Analysis \;\textbullet\; Topology\\
+     Complex Analysis \;\textbullet\; Differential Equations \;\textbullet\; Rigid-Body Dynamics};
+  \node[anchor=center,white!70,font=\sffamily\fontsize{11}{14}\selectfont]
+    at ([yshift=-5cm]current page.center)
+    {6 Subjects \;\textbullet\; 60+ Units \;\textbullet\; 50+ Proofs \;\textbullet\; 150+ Examples};
+  \node[anchor=south,white!75,font=\sffamily\fontsize{10}{14}\selectfont]
+    at ([yshift=2.6cm]current page.south) {A self-study companion --- 2026 Edition};
+\end{tikzpicture}
+\end{titlepage}
+
+% --- Foreword --------------------------------------------------------
+\frontmatter
+\chapter*{How to use this booklet}
+\addcontentsline{toc}{chapter}{How to use this booklet}
+
+\begin{intuitbox}
+This booklet is your \emph{single source of truth} for MSc Mathematics
+Semester 1 at Manipal University Jaipur, and a focused launch pad for
+the CSIR NET (Mathematical Sciences) examination. Every chapter is
+written in three layers: (i) a friendly \textbf{Quick Refresher} that
+re-grounds you in the prerequisites, (ii) the formal \textbf{theory},
+written exactly as it must appear in your university answer scripts,
+and (iii) \textbf{worked examples and CSIR NET-style questions} so you
+build pattern recognition.
+\end{intuitbox}
+
+\textbf{Reading order.} For a first pass, read each chapter linearly.
+Skip nothing in the prerequisites chapter -- it is the foundation on
+which everything else stands. For revision, jump to the
+\emph{CSIR NET Quick Revision} chapter and the \emph{Hit-Rate Priority
+Analysis} to plan your study sprints.
+
+\textbf{Color code.}\\[2pt]
+\begin{tabular}{@{}p{0.32\textwidth}p{0.62\textwidth}@{}}
+\textcolor{DefBlue}{\rule{1.2em}{0.7em}}\;\textbf{Definition (blue)} & A formal definition. Memorise verbatim.\\
+\textcolor{ThmPlum}{\rule{1.2em}{0.7em}}\;\textbf{Theorem (plum)}    & A named result you must be able to state and prove.\\
+\textcolor{LemmaTeal}{\rule{1.2em}{0.7em}}\;\textbf{Lemma / Corollary} & Supporting result.\\
+\textcolor{ProofGray}{\rule{1.2em}{0.7em}}\;\textbf{Proof (gray)}    & The proof, written in exam style.\\
+\textcolor{ExGreen}{\rule{1.2em}{0.7em}}\;\textbf{Worked Example}    & A solved problem.\\
+\textcolor{ExamRed}{\rule{1.2em}{0.7em}}\;\textbf{CSIR NET / Exam Tip} & A pattern that the exam loves.\\
+\textcolor{TipAmber}{\rule{1.2em}{0.7em}}\;\textbf{Memory Aid}        & A mnemonic.\\
+\textcolor{IntuitTeal}{\rule{1.2em}{0.7em}}\;\textbf{Plain-English Intuition} & The picture behind the symbols.\\
+\textcolor{PreReqSand}{\rule{1.2em}{0.7em}}\;\textbf{Quick Refresher} & Class-12 / earlier-semester recap.\\
+\textcolor{WarnOrange}{\rule{1.2em}{0.7em}}\;\textbf{Common Pitfall}  & A trap that loses students marks.\\
+\end{tabular}
+
+\textbf{Use a pen.} Mathematics is not a spectator sport. As you read,
+\emph{re-derive} every equation -- this is non-negotiable. The proofs
+are written so you can copy them verbatim into your university scripts;
+do not memorise them, \emph{master} them.
+
+\tableofcontents
+\mainmatter
+
+% Body chapters get appended here by the build script.

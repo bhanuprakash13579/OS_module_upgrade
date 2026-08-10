@@ -1,0 +1,31 @@
+COPS — Cross-sheet duplicate STATUS (Team A / Team B / Team C)
+=======================================================================
+NO timestamp, NO live formula. The status column is written as plain text
+by the Apps Script (os_sheet_formulas.js):
+
+RULE (works for BOTH OS and DR; key = Case type + number + year):
+  • When a case is entered, if it already exists in ANOTHER team's sheet
+    (or earlier in the same sheet), the row shows:
+        ALREADY ENTERED at location <loc> by <that team>
+    otherwise:
+        NEW CASE
+
+WHY NO FORMULA:
+  "First team to enter wins" is CHRONOLOGICAL — it depends on who entered
+  earlier, which a live cell formula cannot know. So the edit trigger writes
+  the status at the moment of entry: whoever already holds the case entered
+  before you, so they are shown as the owner. The owner's row is never
+  rewritten, so it stays NEW CASE — no flip-flopping, updates instantly.
+
+HOW IT IS MAINTAINED (all in os_sheet_formulas.js):
+  • onEditFillRow trigger  -> writes the status text for the row you just
+    entered; clearing a key cell wipes that row's data + blanks the status
+    (lookup formulas are kept for reuse).
+  • setupTeamSheets()      -> one-time baseline: recomputes status text for
+    all EXISTING rows. Run it ONCE on a clean start (Team B and Team C empty).
+    Do not re-run it after teams have begun cross-entering — a full recompute
+    has no way to know the original entry order and falls back to sheet order
+    (Team A first). Day-to-day, the trigger keeps everything correct.
+
+Columns assumed: A=Case type, B=number, C=year, D=status, G=location
+Conditional formatting: "Text contains" -> ALREADY ENTERED (red).
