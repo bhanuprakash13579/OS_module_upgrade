@@ -3128,11 +3128,25 @@ def purge_os_case(
     # ── 6. Baggage Receipts (by specific BR numbers stored on the case) ────────
     br_del = 0
     br_items_del = 0
+    # Receipt numbers restart every year, so a bare `br_no = :b` reaches back
+    # through every year that reused the number and deletes those receipts too.
+    # The receipts belonging to THIS case are found by (br_no, os_no, os_year)
+    # and their items removed by the receipt's own (br_no, br_date) key, so a
+    # purge cannot touch a year it was not asked about.
     for brn in set(br_nos):
-        br_items_del += _del("DELETE FROM br_items WHERE br_no = :b", b=brn)
-        br_del       += _del("DELETE FROM br_master WHERE br_no = :b AND os_no = :n", b=brn, n=os_no)
-        _del("DELETE FROM old_br_items WHERE br_no = :b", b=brn)
-        _del("DELETE FROM old_br_master WHERE br_no = :b", b=brn)
+        rows = db.execute(
+            text("SELECT br_no, br_date FROM br_master "
+                 "WHERE br_no = :b AND os_no = :n AND os_year = :y"),
+            {"b": brn, "n": os_no, "y": body.os_year},
+        ).fetchall()
+        for r_no, r_date in rows:
+            br_items_del += _del(
+                "DELETE FROM br_items WHERE br_no = :b AND br_date = :d", b=r_no, d=r_date)
+            _del("DELETE FROM old_br_items WHERE br_no = :b AND br_date = :d", b=r_no, d=r_date)
+        br_del += _del(
+            "DELETE FROM br_master WHERE br_no = :b AND os_no = :n AND os_year = :y",
+            b=brn, n=os_no, y=body.os_year)
+        _del("DELETE FROM old_br_master WHERE br_no = :b AND os_no = :n", b=brn, n=os_no)
     if br_items_del:
         deleted["br_items"]  = br_items_del
     if br_del:
@@ -3140,8 +3154,19 @@ def purge_os_case(
 
     # ── 7. Detention Receipt (by the DR number stored on the case) ─────────────
     if dr_no_int is not None:
-        deleted["dr_items"]  = _del("DELETE FROM dr_items WHERE dr_no = :d", d=dr_no_int)
-        deleted["dr_master"] = _del("DELETE FROM dr_master WHERE dr_no = :d AND os_no = :n", d=dr_no_int, n=os_no)
+        # Same reasoning as the baggage receipts above.
+        _dr_rows = db.execute(
+            text("SELECT dr_no, dr_date FROM dr_master "
+                 "WHERE dr_no = :d AND os_no = :n AND os_year = :y"),
+            {"d": dr_no_int, "n": os_no, "y": body.os_year},
+        ).fetchall()
+        _dri = 0
+        for d_no, d_date in _dr_rows:
+            _dri += _del("DELETE FROM dr_items WHERE dr_no = :d AND dr_date = :dt", d=d_no, dt=d_date)
+        deleted["dr_items"]  = _dri
+        deleted["dr_master"] = _del(
+            "DELETE FROM dr_master WHERE dr_no = :d AND os_no = :n AND os_year = :y",
+            d=dr_no_int, n=os_no, y=body.os_year)
 
     # ── 8. Warehouse — general (cascade via sub-query on wh_no) ───────────────
     _del("DELETE FROM wh_items WHERE wh_no IN (SELECT wh_no FROM wh_master WHERE os_no = :n)", n=os_no)
