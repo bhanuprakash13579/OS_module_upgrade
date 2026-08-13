@@ -291,6 +291,88 @@ def set_challan(session_id: int, body: SetChallanRequest, db: Session = Depends(
 
 # ── Bulk entry save ───────────────────────────────────────────────────────────
 
+# ── Carrying the BR ↔ O.S. linkage back to the register ───────────────────────
+
+def _link_receipts_to_cases(db: Session, sess: DrSession) -> int:
+    """Record, on the O.S. case, the receipts named against it in this shift.
+
+    The revenue sheet is filled every day and carries both numbers on the same
+    line: the baggage receipt, and the case it belongs to. The case is supposed
+    to learn that through the adjudication screen, and at a shift change nobody
+    has time to go back and open it — so the register never finds out, while the
+    sheet has known all along. This reads the linkage and writes it across, with
+    the date of the report the receipt appeared on, which is the day it was
+    collected.
+
+    It only ever adds. An entry already on the case is left exactly as it is,
+    amount and all: the sheet is a second source for the association, not the
+    authority on it. A case number that does not exist is passed over — a sheet
+    may carry a typo, and that must not cost the office the shift's figures.
+    """
+    from app.models.offence import CopsMaster          # local: avoids a cycle
+
+    report_date = sess.report_date.isoformat() if sess.report_date else ""
+    if not report_date:
+        return 0
+
+    added_total, cases = 0, set()
+    rows = db.query(DrEntry).filter(
+        DrEntry.session_id == sess.id,
+        DrEntry.br_no.isnot(None),
+        DrEntry.os_ref.isnot(None),
+    ).all()
+
+    for r in rows:
+        br_raw, os_ref = (r.br_no or "").strip(), (r.os_ref or "").strip()
+        if not br_raw or "/" not in os_ref:
+            continue                                    # "520" alone names no year
+        os_no, _, year_txt = os_ref.partition("/")
+        os_no = os_no.strip()
+        try:
+            os_year = int(year_txt.strip())
+        except ValueError:
+            continue
+        if not os_no:
+            continue
+
+        # One cell may name several receipts.
+        numbers = [n.strip() for n in br_raw.replace(";", ",").replace("/", ",").split(",")]
+        numbers = [n for n in numbers if n]
+        if not numbers:
+            continue
+
+        case = db.query(CopsMaster).filter(
+            CopsMaster.os_no == os_no,
+            CopsMaster.os_year == os_year,
+            CopsMaster.entry_deleted == "N",
+        ).first()
+        if not case:
+            continue
+
+        try:
+            existing = json.loads(case.post_adj_br_entries) if case.post_adj_br_entries else []
+            if not isinstance(existing, list):
+                existing = []
+        except (ValueError, TypeError):
+            continue                                    # unreadable: leave it alone
+
+        added = 0
+        for n in numbers:
+            if any(str(e.get("no", "")).strip() == n for e in existing if isinstance(e, dict)):
+                continue
+            existing.append({"no": n, "date": report_date})
+            added += 1
+        if added:
+            case.post_adj_br_entries = json.dumps(existing)
+            added_total += added
+            cases.add((os_no, os_year))
+
+    if added_total:
+        logging.info("revenue sheet supplied %d receipt(s) to %d case(s)",
+                     added_total, len(cases))
+    return len(cases)
+
+
 @router.put("/sessions/{session_id}/entries", response_model=SessionWithEntries)
 def save_entries(session_id: int, body: BulkSaveRequest, db: Session = Depends(get_db)):
     sess = db.query(DrSession).filter(DrSession.id == session_id).first()
@@ -314,6 +396,17 @@ def save_entries(session_id: int, body: BulkSaveRequest, db: Session = Depends(g
         db.add(DrOsEntry(session_id=session_id, **e.model_dump()))
 
     db.commit()
+
+    # The sheet knows which receipt settled which case; the register does not.
+    # After the figures are safely committed, never before — a failure to link
+    # must not cost the office the shift's work.
+    try:
+        if _link_receipts_to_cases(db, sess):
+            db.commit()
+    except Exception:
+        db.rollback()
+        logging.exception("could not carry the receipt linkage to the register")
+
     return get_session(session_id, db)
 
 
