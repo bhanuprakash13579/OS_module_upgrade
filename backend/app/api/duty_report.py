@@ -651,7 +651,11 @@ def _build_revenue_sheet(ws, entries: list, dr_entries: list, os_entries: list,
     prev_br = None
     for row_idx, entry in enumerate(entries, start=2):
         # Sub-row detection: same BR number as the row immediately above
-        is_sub_row = bool(entry.br_no and entry.br_no == prev_br)
+        # Compared with the spacing taken off: a receipt typed "46552" on one row
+        # and "46552 " on the next is one receipt, and reading it as two split the
+        # group, gave it two serial numbers and left the pair unmerged.
+        br_key = (entry.br_no or "").strip()
+        is_sub_row = bool(br_key and br_key == prev_br)
         is_cancelled = "CANCEL" in (entry.item_desc or "").upper()
 
         # SL No.: blank for sub-rows (same BR = continuation)
@@ -692,10 +696,16 @@ def _build_revenue_sheet(ws, entries: list, dr_entries: list, os_entries: list,
             entry.total_duty or None,
             entry.flight_no,
         ]
-        prev_br = entry.br_no
+        prev_br = br_key
 
         for col_idx, val in enumerate(row_data, start=1):
             cell = ws.cell(row=row_idx, column=col_idx, value=val)
+            # An item written "=SUM(A1:A9)" — or anything else starting with an
+            # equals sign — was stored as a live formula, so the description
+            # showed a number, or an error, instead of the words the officer
+            # wrote. It is text, and it is written as text.
+            if isinstance(val, str) and val.startswith("="):
+                cell.data_type = "s"
             cell.border = border
             if is_cancelled:
                 # Strikethrough grey for cancelled entries
@@ -723,7 +733,8 @@ def _build_revenue_sheet(ws, entries: list, dr_entries: list, os_entries: list,
     _ei = 0
     while _ei < len(entries):
         _ej = _ei + 1
-        while _ej < len(entries) and entries[_ej].br_no and entries[_ej].br_no == entries[_ei].br_no:
+        _key = lambda x: (x.br_no or "").strip()
+        while _ej < len(entries) and _key(entries[_ej]) and _key(entries[_ej]) == _key(entries[_ei]):
             _ej += 1
         if _ej > _ei + 1:
             r1, r2 = _ei + 2, _ej + 1   # entry[i] → row i+2 (header is row 1)
@@ -761,6 +772,8 @@ def _build_revenue_sheet(ws, entries: list, dr_entries: list, os_entries: list,
 
     def sub_cell(row, col, val, right=False):
         cell = ws.cell(row=row, column=col, value=val)
+        if isinstance(val, str) and val.startswith("="):
+            cell.data_type = "s"                      # an item name, not a formula
         cell.font = Font(size=9)
         cell.border = sub_border
         cell.alignment = Alignment(horizontal="right" if right else "left", vertical="center")
@@ -1050,6 +1063,12 @@ def _build_adc_sheet(ws, entries: list, dr_entries: list, os_entries: list):
 
         for col_idx, val in enumerate(row_data, start=1):
             cell = ws.cell(row=row_idx, column=col_idx, value=val)
+            # An item written "=SUM(A1:A9)" — or anything else starting with an
+            # equals sign — was stored as a live formula, so the description
+            # showed a number, or an error, instead of the words the officer
+            # wrote. It is text, and it is written as text.
+            if isinstance(val, str) and val.startswith("="):
+                cell.data_type = "s"
             cell.border = border
             # BR No. column (2) red bold for offline BRs
             if col_idx == 2 and getattr(entry, "is_offline_br", False):
@@ -1088,6 +1107,8 @@ def _build_adc_sheet(ws, entries: list, dr_entries: list, os_entries: list):
 
     def sub_cell(row, col, val, right=False):
         cell = ws.cell(row=row, column=col, value=val)
+        if isinstance(val, str) and val.startswith("="):
+            cell.data_type = "s"                      # an item name, not a formula
         cell.font = Font(size=9)
         cell.border = sub_border
         cell.alignment = Alignment(horizontal="right" if right else "left", vertical="center")
