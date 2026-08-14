@@ -293,6 +293,68 @@ def set_challan(session_id: int, body: SetChallanRequest, db: Session = Depends(
 
 # ── Carrying the BR ↔ O.S. linkage back to the register ───────────────────────
 
+def _digit(ch: str) -> bool:
+    return ch in "0123456789"
+
+
+def parse_os_ref(raw: str):
+    """The case a revenue line names, read out of whatever the officer typed.
+
+    Almost every line carries a bare ``481/2026``, but the column is free text
+    and the reports also hold ``OS No. 501/2026`` and
+    ``OS 527/2025 DATED 22.07.2025`` — an older case settled now, with the date
+    of the original order written alongside. Splitting on the first slash finds
+    the year in one of those and nothing usable in the other.
+
+    A short year is taken as this century — ``520/26`` is case 520 of 2026,
+    which is the only thing anyone typing it means. Nothing is settled on that
+    reading alone: the case still has to exist in the register, and a number
+    that matches nothing is passed over.
+
+    The trap is a date. ``22/07/2025`` in the case column would otherwise be read
+    as case 7 of 2025 and quietly settle somebody else's case, so a number that
+    follows a slash, dot or dash — as the middle of a date does — is not a case
+    number.
+    """
+    c = raw or ""
+    n = len(c)
+    for i, ch in enumerate(c):
+        if ch != "/":
+            continue
+
+        e = i
+        while e > 0 and c[e - 1].isspace():
+            e -= 1
+        b = e
+        while b > 0 and _digit(c[b - 1]):
+            b -= 1
+        if b == e or e - b > 5:
+            continue
+        if b > 0 and c[b - 1] in "/.-":
+            continue                                  # part of a date
+
+        k = i + 1
+        while k < n and c[k].isspace():
+            k += 1
+        ys = k
+        while k < n and _digit(c[k]):
+            k += 1
+        digits = k - ys
+        if digits not in (2, 4):
+            continue
+        if k < n and c[k] in "/.-" and k + 1 < n and _digit(c[k + 1]):
+            continue                                  # the date carries on
+
+        year = int(c[ys:k]) + (2000 if digits == 2 else 0)
+        if not 2000 <= year <= 2100:
+            continue
+        no = c[b:e].lstrip("0")
+        if not no:
+            continue
+        return no, year
+    return None
+
+
 def _link_receipts_to_cases(db: Session, sess: DrSession) -> int:
     """Record, on the O.S. case, the receipts named against it in this shift.
 
@@ -324,16 +386,12 @@ def _link_receipts_to_cases(db: Session, sess: DrSession) -> int:
 
     for r in rows:
         br_raw, os_ref = (r.br_no or "").strip(), (r.os_ref or "").strip()
-        if not br_raw or "/" not in os_ref:
-            continue                                    # "520" alone names no year
-        os_no, _, year_txt = os_ref.partition("/")
-        os_no = os_no.strip()
-        try:
-            os_year = int(year_txt.strip())
-        except ValueError:
+        if not br_raw:
             continue
-        if not os_no:
-            continue
+        parsed = parse_os_ref(os_ref)
+        if not parsed:
+            continue                                    # a note, a date, or "520" alone
+        os_no, os_year = parsed
 
         # One cell may name several receipts.
         numbers = [n.strip() for n in br_raw.replace(";", ",").replace("/", ",").split(",")]
@@ -515,6 +573,41 @@ def _fmt_date(d: date) -> str:
     return d.strftime("%d.%m.%Y")
 
 
+def _fit_columns(ws, header_row: int, first_row: int, last_row: int,
+                 columns, min_w: float = 7, max_w: float = 26) -> None:
+    """Give each column the width its contents actually need.
+
+    The widths used to be a fixed list, so a long item description was cut off
+    while a column of five-digit receipt numbers sat half empty. This measures
+    what is in the column and sizes it to that, within limits — nothing narrower
+    than is readable, nothing so wide the sheet runs off the page.
+
+    Headings are allowed to wrap, so a column only has to be as wide as the
+    longest single word in its heading. The description below it wraps too, and
+    those rows are left to size themselves, so text that needs a second line gets
+    one instead of being clipped.
+    """
+    from openpyxl.utils import get_column_letter
+
+    for col in columns:
+        widest = 0
+        for r in range(first_row, last_row + 1):
+            v = ws.cell(row=r, column=col).value
+            if v is None:
+                continue
+            if isinstance(v, (int, float)):
+                text = f"{round(v):,}"
+            else:
+                text = str(v)
+                if text.startswith("="):
+                    continue                       # a formula, not what is shown
+            widest = max(widest, max((len(line) for line in text.splitlines()), default=0))
+        head = str(ws.cell(row=header_row, column=col).value or "")
+        longest_word = max((len(w) for w in head.split()), default=0)
+        ws.column_dimensions[get_column_letter(col)].width = \
+            max(min_w, min(max_w, max(widest, longest_word) + 2))
+
+
 def _build_revenue_sheet(ws, entries: list, dr_entries: list, os_entries: list,
                          shift_label: str):
     """Write one DAY or NIGHT sheet into ws."""
@@ -611,13 +704,22 @@ def _build_revenue_sheet(ws, entries: list, dr_entries: list, os_entries: list,
                 cell.font = Font(size=9, color="FF0000", bold=True)
             else:
                 cell.font = Font(size=9)
-            cell.alignment = Alignment(vertical="center",
-                                       horizontal="right" if col_idx >= 5 else "left")
+            cell.alignment = Alignment(
+                vertical="center",
+                horizontal="right" if col_idx >= 5 else "left",
+                wrap_text=col_idx == 4,        # the item description, which runs long
+            )
             if fill:
                 cell.fill = fill
-        ws.row_dimensions[row_idx].height = 16
+        # The row height is left unset so a wrapped description gets the second
+        # line it needs instead of being cut off at a fixed 16 points.
 
-    # Merge consecutive same-BR cells in column B (BR No.) to match physical register
+    # One receipt covering three items is written as three rows. The serial and
+    # the receipt number belong to the receipt, not to each item, so they are
+    # clubbed across the group — as they are in the physical register, and as the
+    # office writes them by hand. The BR was already merged this way; the serial
+    # beside it was not, which left a column of numbers that no longer counted
+    # receipts and did not line up with the number it belonged to.
     _ei = 0
     while _ei < len(entries):
         _ej = _ei + 1
@@ -625,8 +727,9 @@ def _build_revenue_sheet(ws, entries: list, dr_entries: list, os_entries: list,
             _ej += 1
         if _ej > _ei + 1:
             r1, r2 = _ei + 2, _ej + 1   # entry[i] → row i+2 (header is row 1)
-            ws.merge_cells(start_row=r1, start_column=2, end_row=r2, end_column=2)
-            ws.cell(row=r1, column=2).alignment = Alignment(horizontal="left", vertical="center")
+            for _col, _h in ((1, "center"), (2, "left")):
+                ws.merge_cells(start_row=r1, start_column=_col, end_row=r2, end_column=_col)
+                ws.cell(row=r1, column=_col).alignment = Alignment(horizontal=_h, vertical="center")
         _ei = _ej
 
     data_last_row = len(entries) + 1
@@ -681,18 +784,36 @@ def _build_revenue_sheet(ws, entries: list, dr_entries: list, os_entries: list,
 
     ws.row_dimensions[summary_start].height = 18
 
-    # Unique items summary
+    # Unique items summary.
+    #
+    # This table has to come to the same figure as the receipts above it, so it
+    # takes in every row that carries money — including one where nobody typed an
+    # item, which used to be dropped and left the table quietly short.
+    #
+    # Items are whatever the officers type, and a new one appears here the day it
+    # is first used. Two spellings of the same thing are the same thing: case and
+    # stray spacing are ignored when grouping, and the first spelling used is the
+    # one shown. It sums the row's total, so a total corrected by hand is carried
+    # here as well.
+    UNNAMED = "NOT SPECIFIED"
     item_totals: dict = defaultdict(float)
     item_counts: dict = defaultdict(int)
+    item_names: dict = {}
     for e in entries:
-        if e.item_desc:
-            item_totals[e.item_desc] += (e.total_duty or 0)
-            item_counts[e.item_desc] += 1
+        amount = e.total_duty or 0
+        raw = (e.item_desc or "").strip()
+        if not raw and not amount:
+            continue                                  # an empty row of the sheet
+        key = " ".join(raw.split()).upper() or UNNAMED
+        item_names.setdefault(key, raw or UNNAMED)
+        item_totals[key] += amount
+        item_counts[key] += 1
 
-    for i, (item_name, total_duty) in enumerate(item_totals.items()):
+    for i, (key, total_duty) in enumerate(item_totals.items()):
+        item_name = item_names[key]
         r = summary_start + 1 + i
         sub_cell(r, 2, item_name)
-        sub_cell(r, 4, item_counts[item_name], right=True)
+        sub_cell(r, 4, item_counts[key], right=True)
         sub_cell(r, 5, round(total_duty), right=True)
         ws.row_dimensions[r].height = 15
 
@@ -770,10 +891,8 @@ def _build_revenue_sheet(ws, entries: list, dr_entries: list, os_entries: list,
         ws.row_dimensions[r].height = 14
 
     # Column widths — wider for better readability
-    col_widths = [5, 14, 14, 24, 14, 10, 11, 11, 11, 11,
-                  11, 13, 13, 11, 13, 11, 11, 13, 13, 13, 13, 10, 10, 12, 13]
-    for i, w in enumerate(col_widths, start=1):
-        ws.column_dimensions[get_column_letter(i)].width = w
+    # Every column sized to what is in it, headings and sub-tables alike.
+    _fit_columns(ws, 1, 1, ws.max_row, range(1, 26))
 
     ws.freeze_panes = "A2"
 
@@ -829,10 +948,33 @@ def _build_consolidated_sheet(ws, day_entries: list, night_entries: list):
         cell.border = border
     ws.row_dimensions[2].height = 20
 
-    for i, (label, field) in enumerate(DUTY_ROWS):
+    # An officer may correct a row's total by hand — rare, and always deliberate.
+    # The head-wise rows below are built from the individual columns, so they
+    # cannot show that correction, and the shift's collection would come out here
+    # as something other than what the DAY and NIGHT sheets say. The two must
+    # agree: those sheets are the record of what was collected.
+    #
+    # So the difference is carried as a row of its own. Every head stays true to
+    # its column, the column still adds up to the total, and the correction is
+    # named rather than hidden inside a head that did not receive it. The row is
+    # written only when there is a difference, so an ordinary day's report is
+    # exactly as it was.
+    def _corrections(entries):
+        by_head = sum(_sum_field(entries, f) for _, f in DUTY_ROWS)
+        return round(sum(e.total_duty or 0 for e in entries)) - by_head
+
+    rows = list(DUTY_ROWS)
+    day_fix, night_fix = _corrections(day_entries), _corrections(night_entries)
+    if day_fix or night_fix:
+        rows = rows + [("Correction to totals entered by hand", None)]
+
+    for i, (label, field) in enumerate(rows):
         r = 3 + i
-        day_val = _sum_field(day_entries, field)
-        night_val = _sum_field(night_entries, field)
+        if field is None:
+            day_val, night_val = day_fix, night_fix
+        else:
+            day_val = _sum_field(day_entries, field)
+            night_val = _sum_field(night_entries, field)
         for col in range(1, 6):
             cell = ws.cell(row=r, column=col)
             cell.border = sub_border
@@ -846,7 +988,7 @@ def _build_consolidated_sheet(ws, day_entries: list, night_entries: list):
         ws.cell(row=r, column=5).value = (day_val + night_val) or None
         ws.row_dimensions[r].height = 15
 
-    total_row = 3 + len(DUTY_ROWS)
+    total_row = 3 + len(rows)
     for col in range(1, 6):
         cell = ws.cell(row=total_row, column=col)
         cell.border = border
@@ -859,11 +1001,9 @@ def _build_consolidated_sheet(ws, day_entries: list, night_entries: list):
         ws.cell(row=total_row, column=col).value = f"=SUM({col_letter}3:{col_letter}{total_row - 1})"
     ws.row_dimensions[total_row].height = 20
 
-    ws.column_dimensions["A"].width = 5
-    ws.column_dimensions["B"].width = 32
-    ws.column_dimensions["C"].width = 16
-    ws.column_dimensions["D"].width = 16
-    ws.column_dimensions["E"].width = 16
+    # The head descriptions are long and the money columns are not; each gets the
+    # width it needs.
+    _fit_columns(ws, 2, 2, ws.max_row, range(1, 6), min_w=6, max_w=36)
 
 
 def _build_adc_sheet(ws, entries: list, dr_entries: list, os_entries: list):
@@ -991,9 +1131,8 @@ def _build_adc_sheet(ws, entries: list, dr_entries: list, os_entries: list):
     if os_entries:
         ws.cell(row=os_last + 1, column=7).value = f"=SUM(G{sub_start+1}:G{os_last})"
 
-    col_widths = [8, 16, 28, 14, 14, 5, 8, 16, 28, 14]
-    for i, w in enumerate(col_widths, start=1):
-        ws.column_dimensions[get_column_letter(i)].width = w
+    # Sized to the contents, as on the revenue sheet.
+    _fit_columns(ws, 1, 1, ws.max_row, range(1, 11), max_w=30)
     ws.freeze_panes = "A2"
 
 
