@@ -147,6 +147,35 @@ def apply_sqlite_migrations():
                         "the application will run with a column missing.", e
                     )
 
+            # ── dr_formula_rules: version history ─────────────────────────────
+            #
+            # A formula is no longer rewritten in place; a change writes a new
+            # version. Rules already in the database are the first version of
+            # their own lineage, in force from before any shift on record, so
+            # every existing sheet keeps computing exactly as it did.
+            try:
+                fr_cols = {row[1] for row in
+                           conn.execute(text("PRAGMA table_info(dr_formula_rules)")).fetchall()}
+                if fr_cols:
+                    if "lineage_id" not in fr_cols:
+                        conn.execute(text("ALTER TABLE dr_formula_rules ADD COLUMN lineage_id INTEGER"))
+                    if "effective_from" not in fr_cols:
+                        conn.execute(text("ALTER TABLE dr_formula_rules ADD COLUMN effective_from DATE"))
+                    if "changed_by" not in fr_cols:
+                        conn.execute(text("ALTER TABLE dr_formula_rules ADD COLUMN changed_by TEXT"))
+                    conn.execute(text(
+                        "UPDATE dr_formula_rules SET lineage_id = id WHERE lineage_id IS NULL"))
+                    conn.execute(text(
+                        "UPDATE dr_formula_rules SET effective_from = '1900-01-01' "
+                        "WHERE effective_from IS NULL"))
+            except Exception as e:
+                _m = str(e).lower()
+                if not ("no such table" in _m or "duplicate column" in _m):
+                    logger.error(
+                        "SCHEMA MIGRATION FAILED (dr_formula_rules): %s — "
+                        "formula history will not be kept.", e
+                    )
+
             # ── dr_sessions: submitted_at / submitted_by columns ──────────────
             try:
                 sess_cols_res = conn.execute(text("PRAGMA table_info(dr_sessions)"))

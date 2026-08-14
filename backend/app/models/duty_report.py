@@ -185,3 +185,18 @@ class DrFormulaRule(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
+
+    # ── Version history ──────────────────────────────────────────────────────
+    #
+    # A rule is never rewritten. Changing a formula writes a new row carrying the
+    # same lineage_id and the date it takes effect from, and the old row stays
+    # exactly as it was. A shift then computes on the rule that was in force on
+    # its own report date: a sheet from last year reopened today recomputes the
+    # way it did last year, and today's sheet uses today's formula.
+    #
+    # The figures already entered were never at risk — a duty is worked out as
+    # the row is typed and stored as a flat amount, never recomputed. This is
+    # about the row somebody edits after the formula has moved on.
+    lineage_id = Column(Integer, index=True)             # the rule this descends from
+    effective_from = Column(Date, index=True)            # in force from this date
+    changed_by = Column(String(120))                     # who wrote this version

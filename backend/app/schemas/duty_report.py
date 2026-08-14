@@ -179,12 +179,30 @@ class DrFormulaRuleIn(BaseModel):
     expression: str = ""               # e.g. "value * baggage_rate"; empty = manual
     is_active: bool = True
     notes: Optional[str] = None
+    lineage_id: Optional[int] = None
+    effective_from: Optional[date] = None
 
 
 class DrFormulaRuleOut(DrFormulaRuleIn):
     id: int
     created_at: Optional[datetime] = None
+    # Which rule this descends from, the day it took effect, and who wrote it.
+    lineage_id: Optional[int] = None
+    effective_from: Optional[date] = None
+    changed_by: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
+
+
+class DrFormulaRuleRevision(BaseModel):
+    """A new formula for one column, signed by the officer making the change.
+
+    The username and password are the officer's own, typed again. A formula sets
+    what every passenger is charged, and the menu that opens this dialog sits one
+    click from the sheet; asking for the password makes the change deliberate.
+    """
+    expression: str = ""
+    username: str
+    password: str
 
 
 class SubmitSessionRequest(BaseModel):

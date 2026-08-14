@@ -144,6 +144,13 @@ export default function RevenueModule() {
     setOpenError(null);
     try {
       const res = await api.get(`/dcr/sessions/${s.id}`);
+      // The rules as they stood on the day of this shift. A formula changed
+      // since then applies from the day it was changed, so a sheet reopened
+      // from last year still computes the way it did last year.
+      try {
+        const rr = await api.get('/dcr/formula-rules', { params: { as_of: s.report_date } });
+        setRules(rr.data);
+      } catch { /* keep the rules already loaded */ }
       setSession(res.data);
       setView('sheet');
     } catch (e: unknown) {
@@ -330,6 +337,13 @@ export default function RevenueModule() {
             rules={rules}
             onMessage={() => setShowMessage(true)}
             onConfig={() => setView('config')}
+            onRulesChanged={() => {
+              // A formula was rewritten from the sheet — take it up at once,
+              // resolved for this shift's own date.
+              api.get('/dcr/formula-rules', { params: { as_of: session?.report_date } })
+                .then(r => setRules(r.data))
+                .catch(() => {});
+            }}
           />
         </div>
 

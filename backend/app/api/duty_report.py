@@ -15,6 +15,8 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.models.auth import User
+from app.services.auth import get_current_active_user, verify_password
 from app.models.duty_report import (
     DrTariff, DrItemType, DrSession, DrEntry, DrDrEntry, DrOsEntry, DrSettings,
     DrFormulaRule
@@ -29,7 +31,7 @@ from app.schemas.duty_report import (
     DrSettingsIn, DrSettingsOut,
     BulkSaveRequest, SessionWithEntries,
     ComputeDutiesRequest, ComputeDutiesResponse,
-    DrFormulaRuleIn, DrFormulaRuleOut,
+    DrFormulaRuleIn, DrFormulaRuleOut, DrFormulaRuleRevision,
     SubmitSessionRequest,
 )
 
@@ -481,15 +483,126 @@ def compute_duties_endpoint(body: ComputeDutiesRequest, db: Session = Depends(ge
 
 # ── Formula Rules ─────────────────────────────────────────────────────────────
 
+def _rules_in_force(db: Session, as_of: date):
+    """The formula rules that were in force on a given day.
+
+    A rule is never rewritten; changing one writes a new version carrying the
+    same lineage and the date it takes effect. So a shift computes on the rules
+    of its own report date — a sheet from last year, reopened and edited today,
+    recomputes the way it did last year, and today's sheet uses today's formula.
+
+    Versions dated after the day in question are ignored, and of those on or
+    before it the newest wins. A rule with no lineage recorded is one of its own
+    (a database that predates this, or a row written by hand).
+    """
+    newest: dict = {}
+    for r in db.query(DrFormulaRule).order_by(DrFormulaRule.sort_order, DrFormulaRule.id).all():
+        eff = r.effective_from
+        if eff and eff > as_of:
+            continue                                   # not yet in force that day
+        key = r.lineage_id or r.id
+        best = newest.get(key)
+        if best is None or (eff or date.min) >= (best.effective_from or date.min):
+            newest[key] = r
+    return sorted(newest.values(), key=lambda r: (r.sort_order, r.id))
+
+
 @router.get("/formula-rules", response_model=List[DrFormulaRuleOut])
-def list_formula_rules(db: Session = Depends(get_db)):
-    return db.query(DrFormulaRule).order_by(DrFormulaRule.sort_order, DrFormulaRule.id).all()
+def list_formula_rules(as_of: Optional[date] = None, db: Session = Depends(get_db)):
+    """The rules as they stand today, or as they stood on `as_of`."""
+    return _rules_in_force(db, as_of or date.today())
+
+
+@router.get("/formula-rules/{rule_id}/history", response_model=List[DrFormulaRuleOut])
+def formula_rule_history(rule_id: int, db: Session = Depends(get_db)):
+    """Every version of one rule, newest first — what it was, and who changed it."""
+    rule = db.get(DrFormulaRule, rule_id)
+    if not rule:
+        raise HTTPException(status_code=404, detail="Formula rule not found")
+    lineage = rule.lineage_id or rule.id
+    return (db.query(DrFormulaRule)
+              .filter(DrFormulaRule.lineage_id == lineage)
+              .order_by(DrFormulaRule.effective_from.desc(), DrFormulaRule.id.desc())
+              .all())
+
+
+@router.post("/formula-rules/{rule_id}/revise", response_model=DrFormulaRuleOut)
+def revise_formula_rule(
+    rule_id: int,
+    body: DrFormulaRuleRevision,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_active_user),
+):
+    """Put a new formula in force for one column, from today.
+
+    The officer types their own username and password again to get here. A
+    formula decides what every passenger is charged, and a menu item one click
+    away from the sheet is a menu item that gets clicked by accident; asking for
+    the password makes the change deliberate without sending anyone to find a
+    supervisor at two in the morning.
+
+    Nothing is overwritten. The old version stays in the table with its own
+    dates, so a sheet from before today still computes the way it did.
+    """
+    if (body.username or "").strip().lower() != (user.user_id or "").strip().lower():
+        raise HTTPException(status_code=403,
+                            detail="Sign the change with your own username.")
+    if not verify_password(body.password or "", user.user_pwd or ""):
+        raise HTTPException(status_code=403, detail="That password is not right.")
+
+    current = db.get(DrFormulaRule, rule_id)
+    if not current:
+        raise HTTPException(status_code=404, detail="Formula rule not found")
+
+    today = date.today()
+    lineage = current.lineage_id or current.id
+    expression = (body.expression or "").strip()
+
+    # A second change on the same day replaces that day's version rather than
+    # stacking two rules with one date, which would leave the winner to chance.
+    same_day = (db.query(DrFormulaRule)
+                  .filter(DrFormulaRule.lineage_id == lineage,
+                          DrFormulaRule.effective_from == today)
+                  .first())
+    if same_day and same_day.id != current.id:
+        same_day.expression = expression
+        same_day.changed_by = user.user_id
+        db.commit(); db.refresh(same_day)
+        return same_day
+    if same_day and same_day.id == current.id and current.effective_from == today:
+        current.expression = expression
+        current.changed_by = user.user_id
+        db.commit(); db.refresh(current)
+        return current
+
+    version = DrFormulaRule(
+        sort_order=current.sort_order,
+        target_column=current.target_column,
+        column_label=current.column_label,
+        condition_type=current.condition_type,
+        condition_items=current.condition_items,
+        expression=expression,
+        is_active=current.is_active,
+        notes=current.notes,
+        lineage_id=lineage,
+        effective_from=today,
+        changed_by=user.user_id,
+    )
+    db.add(version)
+    db.commit()
+    db.refresh(version)
+    logging.info("formula for %s revised by %s, in force from %s",
+                 current.target_column, user.user_id, today)
+    return version
 
 
 @router.post("/formula-rules", response_model=DrFormulaRuleOut)
 def create_formula_rule(body: DrFormulaRuleIn, db: Session = Depends(get_db)):
     rule = DrFormulaRule(**body.model_dump())
+    rule.effective_from = rule.effective_from or date.today()
     db.add(rule)
+    db.flush()
+    rule.lineage_id = rule.lineage_id or rule.id      # a new rule begins its own line
     db.commit()
     db.refresh(rule)
     return rule
